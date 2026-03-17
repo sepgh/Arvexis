@@ -1,0 +1,104 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: #0f1117;
+  --color-foreground: #e2e8f0;
+  --color-card: #1a1b23;
+  --color-card-foreground: #e2e8f0;
+  --color-border: #2e303a;
+  --color-input: #1e2028;
+  --color-primary: #3b82f6;
+  --color-primary-foreground: #ffffff;
+  --color-muted: #1e2028;
+  --color-muted-foreground: #64748b;
+  --color-accent: #252630;
+  --color-accent-foreground: #e2e8f0;
+  --color-destructive: #7f1d1d;
+  --color-destructive-foreground: #fef2f2;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color-scheme: dark;
+}
+
+body {
+  background-color: #0f1117;
+  color: #e2e8f0;
+  overflow: hidden;
+  height: 100vh;
+}
+
+#root {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Form inputs */
+.input-base {
+  width: 100%;
+  background: #1e2028;
+  border: 1px solid #2e303a;
+  border-radius: 8px;
+  color: #e2e8f0;
+  font-size: 0.875rem;
+  padding: 0.5rem 0.75rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.input-base:focus {
+  border-color: #3b82f6;
+}
+
+.input-base::placeholder {
+  color: #64748b;
+}
+
+.input-base option {
+  background: #1a1b23;
+}
+
+/* React Flow overrides */
+.react-flow__node {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.react-flow__edge-path {
+  stroke-width: 2;
+}
+
+.react-flow__controls {
+  background: #1a1b23 !important;
+  border: 1px solid #2e303a !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+}
+
+.react-flow__controls button {
+  background: #1a1b23 !important;
+  border-bottom: 1px solid #2e303a !important;
+  color: #94a3b8 !important;
+  fill: #94a3b8 !important;
+}
+
+.react-flow__controls button:hover {
+  background: #252630 !important;
+}
+
+.react-flow__minimap {
+  background: #1a1b23 !important;
+  border: 1px solid #2e303a !important;
+  border-radius: 8px !important;
+}
+
+.react-flow__background {
+  background-color: #0f1117 !important;
+}
