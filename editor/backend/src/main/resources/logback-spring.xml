@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!--
+        Arvexis Editor Logback configuration
+
+        Configurable at runtime via Spring properties / CLI flags:
+
+          editor.log.path                    Log directory (default: ~/.engine-editor/logs)
+          logging.level.com.engine.editor    Application log level (default: INFO)
+
+        Example overrides:
+          java -jar arvexis-editor.jar
+               editor.log.path=/var/log/arvexis
+               logging.level.com.engine.editor=DEBUG
+    -->
+
+    <springProperty scope="context" name="LOG_PATH"
+                    source="editor.log.path"
+                    defaultValue="${user.home}/.engine-editor/logs"/>
+    <springProperty scope="context" name="APP_LOG_LEVEL"
+                    source="logging.level.com.engine.editor"
+                    defaultValue="INFO"/>
+
+    <property name="LOG_FILE"        value="${LOG_PATH}/arvexis-editor.log"/>
+    <property name="CONSOLE_PATTERN" value="%d{HH:mm:ss.SSS} %highlight(%-5level) %cyan(%logger{36}) - %msg%n"/>
+    <property name="FILE_PATTERN"    value="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"/>
+
+    <!-- Console appender -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <pattern>${CONSOLE_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Rolling file appender -->
+    <!--  • Rotates daily and when the file exceeds 10 MB                   -->
+    <!--  • Keeps 30 days of compressed (gzip) archives                     -->
+    <!--  • Hard cap of 200 MB total across all archived logs               -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_FILE}</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/arvexis-editor.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>200MB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${FILE_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- FFmpeg package: always DEBUG so all process output is captured -->
+    <logger name="com.engine.editor.ffmpeg" level="DEBUG" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </logger>
+
+    <!-- Client browser logs forwarded via POST /api/logs -->
+    <logger name="arvexis.client" level="DEBUG" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </logger>
+
+    <!-- Application loggers -->
+    <logger name="com.engine.editor" level="${APP_LOG_LEVEL}" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </logger>
+
+    <!-- Suppress noisy framework loggers -->
+    <logger name="org.springframework"     level="WARN"/>
+    <logger name="com.zaxxer.hikari"       level="WARN"/>
+    <logger name="org.flywaydb"            level="INFO"/>
+    <logger name="org.hibernate"           level="WARN"/>
+
+    <!-- Root fallback -->
+    <root level="WARN">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </root>
+
+</configuration>

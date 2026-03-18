@@ -42,7 +42,7 @@ public final class ProgressProcessRunner {
                                     BooleanSupplier cancelCheck,
                                     ProcessRef processRef) throws IOException {
 
-        log.debug("ProgressRun: {}", String.join(" ", command));
+        log.info("FFmpeg (progress): {}", String.join(" ", command));
         ProcessBuilder pb = new ProcessBuilder(command);
         pb.redirectErrorStream(false);
         Process process = pb.start();
@@ -64,6 +64,7 @@ public final class ProgressProcessRunner {
                 String line;
                 while ((line = reader.readLine()) != null) {
                     stderrBuf.append(line).append('\n');
+                    log.debug("FFmpeg: {}", line);
 
                     if (cancelCheck != null && cancelCheck.getAsBoolean()) {
                         process.destroyForcibly();

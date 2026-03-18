@@ -28,12 +28,13 @@ const NODES: { type: NodeType; label: string; color: string; icon: React.ReactNo
     ),
   },
   {
-    type: 'decision',
-    label: 'Decision',
+    type: 'condition',
+    label: 'Condition',
     color: 'text-violet-400 border-violet-500/40 hover:border-violet-400 hover:bg-violet-500/10',
     icon: (
       <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
         <path d="M6.5 1L12 6.5 6.5 12 1 6.5z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+        <path d="M4 6.5h5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
       </svg>
     ),
   },
@@ -41,16 +42,17 @@ const NODES: { type: NodeType; label: string; color: string; icon: React.ReactNo
 
 export default function GraphToolbar({ onAddNode }: GraphToolbarProps) {
   return (
-    <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 bg-card/90 backdrop-blur border border-border rounded-xl px-2 py-1.5 shadow-xl">
-      <span className="text-[10px] text-muted-foreground pr-1 select-none">Add</span>
+    <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center bg-card/90 backdrop-blur border border-border rounded-xl shadow-xl" style={{ padding: '10px 16px', gap: 10 }}>
+      <span className="text-muted-foreground select-none font-medium" style={{ fontSize: 14, paddingRight: 4 }}>Add</span>
       {NODES.map(({ type, label, color, icon }) => (
         <button
           key={type}
           onClick={() => onAddNode(type)}
           className={[
-            'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all',
+            'flex items-center rounded-lg font-medium border transition-all',
             color,
           ].join(' ')}
+          style={{ padding: '10px 16px', fontSize: 14, gap: 8 }}
         >
           {icon}
           {label}

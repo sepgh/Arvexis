@@ -65,12 +65,12 @@ export default function StateEditor({ nodeId }: StateEditorProps) {
     <div className="flex flex-col h-full overflow-hidden">
       {error && <div className="mx-3 my-2 text-xs text-red-400 bg-red-500/10 rounded-lg px-3 py-2">{error}</div>}
 
-      <div className="px-4 py-2 text-xs text-muted-foreground border-b border-border/50 flex items-center justify-between">
+      <div className="text-muted-foreground border-b border-border/50 flex items-center justify-between" style={{ padding: '14px 20px', fontSize: 14 }}>
         <span>{drafts.length} assignment{drafts.length !== 1 ? 's' : ''}</span>
         {saving && <span className="text-muted-foreground">Saving…</span>}
       </div>
 
-      <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-3">
+      <div className="flex-1 overflow-y-auto flex flex-col" style={{ padding: 20, gap: 16 }}>
         {drafts.length === 0 && (
           <p className="text-xs text-muted-foreground text-center py-4">
             No assignments. State nodes execute SpEL assignments in order, then follow their single outgoing edge.
@@ -79,12 +79,12 @@ export default function StateEditor({ nodeId }: StateEditorProps) {
 
         {drafts.map((expr, i) => (
           <div key={i} className="flex flex-col gap-1.5">
-            <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <span>#{i + 1}</span>
               <div className="ml-auto flex items-center gap-0.5">
-                <button onClick={() => moveAssignment(i, -1)} disabled={i === 0}              className="w-5 h-5 hover:text-foreground disabled:opacity-30 flex items-center justify-center">↑</button>
-                <button onClick={() => moveAssignment(i, 1)}  disabled={i === drafts.length - 1} className="w-5 h-5 hover:text-foreground disabled:opacity-30 flex items-center justify-center">↓</button>
-                <button onClick={() => removeAssignment(i)}   className="w-5 h-5 hover:text-red-400 flex items-center justify-center">×</button>
+                <button onClick={() => moveAssignment(i, -1)} disabled={i === 0}              className="w-6 h-6 hover:text-foreground disabled:opacity-30 flex items-center justify-center text-sm">↑</button>
+                <button onClick={() => moveAssignment(i, 1)}  disabled={i === drafts.length - 1} className="w-6 h-6 hover:text-foreground disabled:opacity-30 flex items-center justify-center text-sm">↓</button>
+                <button onClick={() => removeAssignment(i)}   className="w-6 h-6 hover:text-red-400 flex items-center justify-center text-sm">×</button>
               </div>
             </div>
             <SpelInput
@@ -99,7 +99,8 @@ export default function StateEditor({ nodeId }: StateEditorProps) {
 
         <button
           onClick={addAssignment}
-          className="mt-1 px-4 py-2 text-xs rounded-lg border border-dashed border-border text-muted-foreground hover:text-foreground hover:border-primary transition-colors"
+          className="rounded-lg border border-dashed border-border text-muted-foreground hover:text-foreground hover:border-primary transition-colors"
+          style={{ marginTop: 4, padding: '12px 16px', fontSize: 14 }}
         >
           + Add assignment
         </button>

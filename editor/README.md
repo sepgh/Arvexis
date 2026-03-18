@@ -1,6 +1,6 @@
-# Interactive Video Engine — Editor
+# Arvexis — Editor
 
-A node-based editor for authoring interactive video experiences. Authors assemble a directed graph of scenes, decisions, and state mutations; the engine compiles it into a self-contained playable package.
+A node-based editor for authoring interactive video experiences. Authors assemble a directed graph of scenes, conditions, and state mutations; the engine compiles it into a self-contained playable package.
 
 ---
 
@@ -130,18 +130,55 @@ All settings live in `src/main/resources/application.properties`:
 |----------|---------|-------------|
 | `server.port` | `8080` | HTTP port |
 | `editor.db.path` | `~/.engine-editor/editor.db` | Startup SQLite path |
-| `spring.jpa.hibernate.ddl-auto` | `none` | Schema managed by Flyway |
-| `logging.level.com.engine.editor` | `INFO` | Application log level |
+| `editor.log.path` | `~/.engine-editor/logs` | Log file directory |
+| `logging.level.com.engine.editor` | `INFO` | Application log level (`DEBUG`, `INFO`, `WARN`, `ERROR`) |
+
+All properties can be overridden at runtime via CLI flags:
+
+```bash
+java -jar arvexis-editor.jar \
+  --server.port=9090 \
+  --editor.log.path=/var/log/arvexis \
+  --logging.level.com.engine.editor=DEBUG
+```
 
 Test overrides are in `src/test/resources/application-test.properties`.
 
+### Logging
+
+Log output goes to **both the console and a rolling log file**.
+
+**Log file location** (default `~/.engine-editor/logs/arvexis-editor.log`):
+
+```
+~/.engine-editor/logs/
+├── arvexis-editor.log              Current log file
+└── arvexis-editor.2025-01-15.0.log.gz   Daily rotated + gzip-compressed archives
+```
+
+**Rotation policy**: rotates daily and when the file exceeds 10 MB; keeps 30 days of archives (200 MB total cap).
+
+**Log levels** — set via `--logging.level.com.engine.editor=<LEVEL>`:
+
+| Level | What is logged |
+|-------|---------------|
+| `ERROR` | Errors only |
+| `WARN` | Errors + warnings |
+| `INFO` | Normal operation (default) |
+| `DEBUG` | Full detail including every FFmpeg command and its stderr output |
+
+**FFmpeg output** is always logged at `DEBUG` level (logger `com.engine.editor.ffmpeg`). Setting the application to `DEBUG` captures the complete FFmpeg command line and all stderr lines (progress, encoder stats, errors).
+
+**Browser client logs** — `console.warn` and `console.error` calls from the React frontend are automatically forwarded to the server via `POST /api/logs` and appear in the same log file with the prefix `[browser]`.
+
 ### API Reference
 
-#### Health
+#### Health & Logging
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/health` | Returns `{"status":"ok"}` |
+| `POST` | `/api/logs` | Forward a browser log entry to the server log file (`{"level":"warn","message":"...","context":"..."}`) |
 
 #### Project Lifecycle
 
@@ -153,7 +190,7 @@ Test overrides are in `src/test/resources/application-test.properties`.
 | `GET` | `/api/project/config` | — | Current project configuration |
 | `PUT` | `/api/project/config` | `UpdateProjectConfigRequest` JSON | Patch project configuration |
 
-**`CreateProjectRequest` fields** (all optional except `directoryPath` and `name`):
+**`CreateProjectRequest` fields** (all optional except `directoryPath` and `name`). `ffmpegThreads: null` (or omitted) means Auto — FFmpeg chooses based on available CPU cores:
 
 ```json
 {
@@ -166,7 +203,8 @@ Test overrides are in `src/test/resources/application-test.properties`.
   "fps": 30,
   "audioSampleRate": 44100,
   "audioBitRate": 128,
-  "decisionTimeoutSecs": 5.0
+  "decisionTimeoutSecs": 5.0,
+  "ffmpegThreads": null
 }
 ```
 
@@ -183,7 +221,7 @@ Test overrides are in `src/test/resources/application-test.properties`.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/api/nodes` | Create node (`name`, `type`: `scene`/`state`/`decision`, `posX`, `posY`) |
+| `POST` | `/api/nodes` | Create node (`name`, `type`: `scene`/`state`/`condition`, `posX`, `posY`) |
 | `GET` | `/api/nodes` | List all nodes |
 | `GET` | `/api/nodes/{id}` | Get single node |
 | `PUT` | `/api/nodes/{id}` | Update node (`name`, `posX`, `posY`, `isEnd`) |
@@ -194,7 +232,7 @@ Test overrides are in `src/test/resources/application-test.properties`.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/api/edges` | Create edge (`sourceNodeId`, `targetNodeId`, `sourceDecisionKey`?, `sourceConditionOrder`?) |
+| `POST` | `/api/edges` | Create edge (`sourceNodeId`, `targetNodeId`, `sourceDecisionKey`?, `sourceConditionName`?) |
 | `GET` | `/api/edges` | List all edges |
 | `GET` | `/api/edges/{id}` | Get single edge |
 | `PUT` | `/api/edges/{id}` | Update edge routing keys |
@@ -224,12 +262,12 @@ Test overrides are in `src/test/resources/application-test.properties`.
 | `GET` | `/api/nodes/{id}/state` | Get state data (assignments) |
 | `PUT` | `/api/nodes/{id}/state/assignments` | Save SpEL assignments (`expression`, `assignmentOrder`) |
 
-#### Decision Node Editor
+#### Condition Node Editor
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/nodes/{id}/decision` | Get decision data (conditions) |
-| `PUT` | `/api/nodes/{id}/decision/conditions` | Save SpEL conditions (`expression`, `conditionOrder`, `isElse`) |
+| `GET` | `/api/nodes/{id}/condition` | Get condition data (conditions) |
+| `PUT` | `/api/nodes/{id}/condition/conditions` | Save SpEL conditions (`name`, `expression`, `conditionOrder`, `isElse`) |
 
 #### SpEL Validation
 
@@ -255,6 +293,9 @@ Test overrides are in `src/test/resources/application-test.properties`.
 | `POST` | `/api/assets/{id}/tags` | Add a tag to an asset (`{"tag":"..."}`) |
 | `DELETE` | `/api/assets/{id}/tags/{tag}` | Remove a tag from an asset |
 | `POST` | `/api/assets/compatibility-check` | Check two assets are compatible for compositing |
+| `POST` | `/api/assets/upload` | Upload a media file (multipart `file` + optional `folder`) |
+| `POST` | `/api/assets/folder` | Create a subfolder (`{"path":"name"}`) |
+| `GET` | `/api/assets/folders` | List all subdirectories in the assets directory |
 
 #### Preview (Async Jobs)
 
@@ -397,6 +438,43 @@ npx tsc -b --noEmit
 
 ---
 
+## CI / CD
+
+Two GitHub Actions workflows live in `.github/workflows/`:
+
+### `ci.yml` — Continuous Integration
+
+Triggered on every push/PR to `main`/`master`.
+
+- **build** — builds the frontend and packages the backend JAR (Linux x64 runner).
+- **test** — runs all backend unit tests.
+
+The JAR artifact is retained for 14 days.
+
+### `release.yml` — Release Builds
+
+Triggered when a version tag (`v*.*.*`) is pushed, or manually via `workflow_dispatch`.
+
+| Job | Runner | Output |
+|-----|--------|--------|
+| `build-native` (Linux x64) | `ubuntu-latest` | `arvexis-editor` native binary |
+| `build-native` (Windows x64) | `windows-latest` | `arvexis-editor.exe` native binary |
+| `build-jar` | `ubuntu-latest` | `arvexis-editor.jar` (requires Java 21) |
+| `release` | `ubuntu-latest` | Creates a **draft** GitHub Release with all three artifacts |
+
+Native binaries are built with GraalVM Community Edition and require no JVM to run. The JAR fallback runs on any platform with Java 21+.
+
+**To cut a release:**
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+Then visit the GitHub Releases page, review the auto-generated draft, and publish it.
+
+---
+
 ## Project Lifecycle
 
 The editor is a **single-project application**: one project is open at a time. On startup no project is loaded.
@@ -442,3 +520,7 @@ Tasks are tracked in [`../docs/tasks.md`](../docs/tasks.md).
 | T-024b | ✅ Done | hls.js offline bundling — `hls.min.js` (413 KB, v1.5.13) embedded in runtime JAR as classpath resource; `index.html` loads from `/hls.min.js` (no CDN dependency) |
 | T-025 | ✅ Done | Localization API — `LocalizationService` + `LocalizationController`; `POST/GET/DELETE /api/locales`, `POST/GET/DELETE /api/subtitles`, `POST/GET/DELETE /api/decision-translations`; cascade delete via FK; manifest `localization` section already populated by `ManifestService` |
 | T-026 | ✅ Done | End-to-end integration test — 7-node graph (4 scenes, 1 state, 1 decision, 1 unreachable), 4 transitions (crossfade/fade_in/dissolve/slide_left), cycle with counter, SpEL `#counter >= 3` gate to end scene; bug fixed: SpEL variables now default to `0` on first use (`seedMissingVars` in `GameEngine`) |
+| T-027 | ✅ Done | Rename Decision→Condition — DB migrations V3 (type rename) + V4 (condition name + source_condition_name on edges), `ConditionNodeService/Controller`, all services updated, runtime JAR rebuilt, all frontend components updated |
+| T-028 | ✅ Done | UX improvements — per-exit handles on Scene/Condition nodes, single-edge-per-exit enforcement, `LabeledEdge` component, click-to-rename all node types, consistent sizing, resizable side panels (`ResizableSidePanel` + `usePanelResize`) |
+| T-029 | ✅ Done | Asset upload & folder creation — `POST /api/assets/upload`, `POST /api/assets/folder`, `GET /api/assets/folders`; `AssetBrowser` upload bar with folder selector, file picker, new-folder form |
+| T-030 | ✅ Done | Arvexis rename — header updated, `LocalizationPanel` with locale list + placeholders, `localizationPanelOpen` store state, "Locales" header button, `Locale`/`SubtitleEntry`/`DecisionTranslation` types, READMEs + docs updated |

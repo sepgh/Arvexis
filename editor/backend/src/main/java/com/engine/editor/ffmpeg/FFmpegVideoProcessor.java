@@ -160,7 +160,8 @@ public class FFmpegVideoProcessor implements VideoProcessor {
             .ffmpegPath(ffmpegPath)
             .overwrite()
             .hideBanner()
-            .logLevel("error");
+            .logLevel("error")
+            .threads(spec.getFfmpegThreads());
 
         builder.colorInput(
             spec.getBackgroundColor(),

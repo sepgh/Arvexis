@@ -1,6 +1,6 @@
-# Tasks
+# Tasks — Arvexis
 
-Ordered implementation tasks for the Interactive Video Engine.
+Ordered implementation tasks for Arvexis (Node-Based Interactive Video Engine).
 Refer to [system-design.md](system-design.md) for full design details.
 Also, mockup is created to get ideas for the editor.
 
@@ -49,13 +49,13 @@ Also, mockup is created to get ideas for the editor.
 
 **Work**:
 - `project_config` — project-level settings (name, paths, resolutions, FPS, audio settings, decision timeout, default locale, output directory)
-- `nodes` — id, name, type (scene/state/decision), is_root, is_end, background_color, decision_appearance_config (JSON)
+- `nodes` — id, name, type (scene/state/condition), is_root, is_end, background_color, decision_appearance_config (JSON)
 - `node_video_layers` — node_id, asset_id, order, start_at
 - `node_audio_tracks` — node_id, asset_id, order, start_at
 - `node_state_assignments` — node_id, order, expression (SpEL)
-- `node_decision_conditions` — node_id, order, expression (SpEL), is_else
+- `node_decision_conditions` — node_id, order, name (label), expression (SpEL), is_else
 - `scene_decisions` — node_id, decision_key, is_default, order
-- `edges` — id, source_node_id, source_decision_key (nullable), source_condition_order (nullable), target_node_id
+- `edges` — id, source_node_id, source_decision_key (nullable), source_condition_order (nullable), source_condition_name (nullable), target_node_id
 - `edge_transitions` — edge_id, type (none/fade_in/fade_out/crossfade/slide_left/slide_right/wipe/dissolve/cut/video), duration, config (JSON)
 - `transition_video_layers` — edge_id, asset_id, order, start_at
 - `transition_audio_tracks` — edge_id, asset_id, order, start_at
@@ -188,14 +188,14 @@ Also, mockup is created to get ideas for the editor.
   - `DELETE /api/nodes/{id}` — delete node (cascade delete edges)
   - `PUT /api/nodes/{id}/root` — set node as root
 - **Edges**:
-  - `POST /api/edges` — create edge (source, target, source_decision_key or source_condition_order)
+  - `POST /api/edges` — create edge (source, target, source_decision_key or source_condition_name)
   - `GET /api/edges` — list all edges
   - `PUT /api/edges/{id}` — update edge properties
   - `DELETE /api/edges/{id}` — delete edge
 - **Validation rules** (enforced on save):
   - Exactly one root node
   - State nodes have exactly one outgoing edge
-  - Decision nodes: each condition maps to one edge; else is always last
+  - Condition nodes: each condition maps to one edge (keyed by condition name); else is always last
   - Scene node decision keys map to edges
   - Transition only on edges targeting scene nodes
   - Transition duration ≤ 5 seconds
@@ -215,9 +215,9 @@ Also, mockup is created to get ideas for the editor.
 
 **Work**:
 - Custom React Flow node components for each type:
-  - **Scene node**: displays name, distinct visual style, end flag indicator
+  - **Scene node**: displays name, distinct visual style, end flag indicator, per-decision exit handles
   - **State node**: displays name, distinct visual style
-  - **Decision node**: displays name, distinct visual style
+  - **Condition node**: displays name, distinct visual style, per-condition exit handles with labels
 - Node creation: toolbar or context menu to add each node type
 - Edge creation: drag from node handle to target node
 - Node selection, dragging, deletion
@@ -282,9 +282,9 @@ Also, mockup is created to get ideas for the editor.
 
 ---
 
-## T-013: Decision Node Editor (Frontend + Backend)
+## T-013: Condition Node Editor (Frontend + Backend)
 
-**Description**: Editor for decision node conditions using SpEL expressions.
+**Description**: Editor for condition node conditions using SpEL expressions.
 
 **Work**:
 - Side panel listing conditions (ordered)
@@ -608,3 +608,82 @@ Also, mockup is created to get ideas for the editor.
 
 **Bugs found and fixed during T-026:**
 - `[x]` SpEL variable default initialization: `#var + 1` on first use threw NullPointerException when `#var` was uninitialized — fixed by seeding missing `#var` references to `0` before evaluation in `GameEngine.executeAssignment` and `evaluateConditions`
+
+---
+
+## T-027: Rename — Decision Node → Condition Node
+
+**Description**: Rename the "Decision Node" concept to "Condition Node" throughout the entire codebase, database, runtime, and documentation.
+
+**Work**:
+- DB migration V3: rename node type `'decision'` → `'condition'` in `nodes` table (SQLite table recreation)
+- DB migration V4: add `name` column to `node_decision_conditions`; add `source_condition_name` to `edges`
+- Backend: `ConditionNodeService` / `ConditionNodeController` replacing `DecisionNodeService` / `DecisionNodeController`
+- Backend: `GraphService`, `ManifestService`, `ValidationService` updated (`decision` → `condition`)
+- Runtime: `GameEngine` `case "condition"` replacing `case "decision"`; `Manifest.java` comment updated; JAR rebuilt
+- Frontend: `NodeType`, `GraphNode.exits`, `GraphEdge.sourceConditionName`, `ConditionDataResponse`
+- Frontend: `useGraph`, `SceneNode`, `ConditionNode` (was `DecisionNode`), `ConditionEditor`, `NodeEditorPanel`, `GraphToolbar`, `CanvasPage` all updated
+- Docs: `system-design.md`, `tasks.md`, READMEs updated
+
+**Testable outcome**:
+- `[x]` All DB rows use `type = 'condition'`; old `'decision'` rows migrated
+- `[x]` Backend API endpoints use `/condition`; old `/decision` removed
+- `[x]` Runtime traverses condition nodes correctly
+- `[x]` Editor canvas shows "Condition" node type with correct label and handles
+- `[x]` Condition names editable in the editor and shown as exit handle labels on the canvas
+
+---
+
+## T-028: UX Improvements — Canvas & Editor
+
+**Description**: Multiple UX enhancements to the editor canvas and node editors.
+
+**Work**:
+- **Per-exit handles**: scene nodes render one handle per decision key; condition nodes render one handle per condition name. Edges connect from the specific exit handle.
+- **Single-edge-per-exit enforcement**: `useGraph.onConnect` and backend `GraphService.createEdge` both reject a second edge from the same exit handle.
+- **Labeled edges**: custom `LabeledEdge` React Flow edge type shows decision key, condition name, and/or transition type as a mid-edge badge.
+- **Click-to-rename nodes**: all three node types rename on single click (previously double-click for some).
+- **Consistent node sizing**: all nodes use `min-w-[180px]`, larger handles (`w-3 h-3`), `font-semibold` names.
+- **Resizable side panels**: `ResizableSidePanel` wrapper + `usePanelResize` hook. AssetBrowser (left), NodeEditorPanel, EdgeEditorPanel (right) are all resizable.
+
+**Testable outcome**:
+- `[x]` Dragging from a specific decision handle creates an edge keyed to that decision
+- `[x]` Attempting a second edge from the same exit handle is silently rejected
+- `[x]` Edge labels appear on the canvas for keyed edges
+- `[x]` Side panels can be resized by dragging the border handle
+
+---
+
+## T-029: Asset Upload & Folder Creation UI
+
+**Description**: Allow users to upload media files and create folders directly from the Asset Browser.
+
+**Work**:
+- Backend: `POST /api/assets/upload` (multipart), `POST /api/assets/folder`, `GET /api/assets/folders` in `AssetController`
+- Backend: `AssetService.uploadAsset`, `AssetService.createFolder`, `AssetService.listFolders` with path-traversal safety
+- Frontend: `apiClient.postForm` for multipart uploads
+- Frontend: `AssetBrowser` upload bar — folder selector dropdown, upload button, file picker, new-folder toggle with inline input
+
+**Testable outcome**:
+- `[x]` Selecting files and clicking Upload copies them to the assets directory and indexes them
+- `[x]` Creating a folder via the UI creates the directory on disk
+- `[x]` Folder list updates after creation
+
+---
+
+## T-030: Arvexis Rename & Localization Panel
+
+**Description**: Rename the product to Arvexis and add a basic Localization panel to the editor UI.
+
+**Work**:
+- Editor header: "Interactive Video Engine" → "Arvexis"
+- Frontend `NodeType`: `'decision'` → `'condition'` (completed in T-027)
+- `LocalizationPanel` component: locale list, add-locale form, placeholder for subtitle and decision-label editors
+- `localizationPanelOpen` state in Zustand store; "Locales" button in header toolbar
+- `Locale`, `SubtitleEntry`, `DecisionTranslation` types added to `types/index.ts`
+- READMEs updated with Arvexis name
+
+**Testable outcome**:
+- `[x]` Editor header displays "Arvexis"
+- `[x]` "Locales" button opens the localization panel
+- `[x]` Localization panel shows locale list and placeholder for future subtitle/translation editors

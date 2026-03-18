@@ -12,6 +12,7 @@ public class CompositeSpec {
     private final int fps;
     private final double duration;
     private final Path outputPath;
+    private final Integer ffmpegThreads;
 
     private CompositeSpec(Builder builder) {
         this.videoLayers = List.copyOf(builder.videoLayers);
@@ -21,6 +22,7 @@ public class CompositeSpec {
         this.fps = builder.fps;
         this.duration = builder.duration;
         this.outputPath = builder.outputPath;
+        this.ffmpegThreads = builder.ffmpegThreads;
     }
 
     public List<VideoLayerSpec> getVideoLayers() { return videoLayers; }
@@ -30,6 +32,7 @@ public class CompositeSpec {
     public int getFps() { return fps; }
     public double getDuration() { return duration; }
     public Path getOutputPath() { return outputPath; }
+    public Integer getFfmpegThreads() { return ffmpegThreads; }
 
     public static Builder builder() { return new Builder(); }
 
@@ -41,6 +44,7 @@ public class CompositeSpec {
         private int fps = 30;
         private double duration = 0;
         private Path outputPath;
+        private Integer ffmpegThreads;
 
         public Builder videoLayers(List<VideoLayerSpec> layers) { this.videoLayers = layers; return this; }
         public Builder audioTracks(List<AudioTrackSpec> tracks) { this.audioTracks = tracks; return this; }
@@ -49,6 +53,7 @@ public class CompositeSpec {
         public Builder fps(int fps) { this.fps = fps; return this; }
         public Builder duration(double duration) { this.duration = duration; return this; }
         public Builder outputPath(Path path) { this.outputPath = path; return this; }
+        public Builder ffmpegThreads(Integer threads) { this.ffmpegThreads = threads; return this; }
         public CompositeSpec build() { return new CompositeSpec(this); }
     }
 }

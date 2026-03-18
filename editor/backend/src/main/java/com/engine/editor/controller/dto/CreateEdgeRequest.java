@@ -4,5 +4,6 @@ public record CreateEdgeRequest(
     String sourceNodeId,
     String targetNodeId,
     String sourceDecisionKey,
-    Integer sourceConditionOrder
+    Integer sourceConditionOrder,
+    String sourceConditionName
 ) {}

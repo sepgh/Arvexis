@@ -65,6 +65,18 @@ public class FFmpegCommandBuilder {
         return this;
     }
 
+    /**
+     * Set {@code -threads N} to limit FFmpeg CPU thread usage.
+     * Pass {@code null} or {@code 0} to let FFmpeg choose automatically (default).
+     */
+    public FFmpegCommandBuilder threads(Integer count) {
+        if (count != null && count > 0) {
+            globalArgs.add("-threads");
+            globalArgs.add(String.valueOf(count));
+        }
+        return this;
+    }
+
     /** Append a raw global argument (before any {@code -i} inputs). */
     public FFmpegCommandBuilder globalArg(String arg) {
         globalArgs.add(arg);

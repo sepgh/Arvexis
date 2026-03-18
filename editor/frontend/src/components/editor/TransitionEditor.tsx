@@ -170,7 +170,7 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
         />
       )}
 
-      <div className="px-4 py-2 text-xs text-muted-foreground border-b border-border/50 flex items-center justify-between">
+      <div className="px-5 py-3 text-sm text-muted-foreground border-b border-border/50 flex items-center justify-between">
         <span>→ <span className="text-foreground">{data?.targetNodeType ?? '…'}</span> node</span>
         <div className="flex items-center gap-2">
           {saving && <span>Saving…</span>}
@@ -178,7 +178,7 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
             <button
               onClick={handlePreview}
               disabled={previewing}
-              className="text-xs px-2 py-0.5 rounded-md bg-primary/15 text-primary hover:bg-primary/25 disabled:opacity-50 transition-colors border border-primary/30"
+              className="text-sm px-3 py-1.5 rounded-md bg-primary/15 text-primary hover:bg-primary/25 disabled:opacity-50 transition-colors border border-primary/30"
             >
               {previewing ? '…' : '▶ Preview'}
             </button>
@@ -193,7 +193,7 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
             key={s.id}
             onClick={() => setSection(s.id)}
             className={[
-              'flex-1 py-2 text-xs font-medium transition-colors',
+              'flex-1 py-3 text-sm font-medium transition-colors',
               section === s.id ? 'text-foreground border-b-2 border-primary -mb-px' : 'text-muted-foreground hover:text-foreground',
             ].join(' ')}
           >
@@ -202,12 +202,12 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-3">
+      <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3">
         {/* Config section */}
         {section === 'config' && (
           <>
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs text-muted-foreground">Transition type</label>
+              <label className="text-sm text-muted-foreground">Transition type</label>
               <select
                 value={data?.type ?? 'none'}
                 onChange={e => handleTypeChange(e.target.value as TransitionType)}
@@ -221,7 +221,7 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
 
             {data?.type && data.type !== 'none' && (
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs text-muted-foreground">Duration (max 5s)</label>
+                <label className="text-sm text-muted-foreground">Duration (max 5s)</label>
                 <div className="flex items-center gap-2">
                   <input
                     type="number" min="0" max="5" step="0.1"
@@ -292,10 +292,10 @@ function VideoLayerRow({ layer, index, total, onRemove, onMoveUp, onMoveDown }: 
     <div className={['rounded-lg border p-2.5 flex items-center gap-2',
       layer.alphaError ? 'border-red-500/60 bg-red-500/5' : 'border-border/50 bg-muted/40',
     ].join(' ')}>
-      <span className="text-[10px] text-muted-foreground w-4 shrink-0">#{index + 1}</span>
-      {layer.hasAlpha && <span className="text-[9px] px-1 py-px rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">α</span>}
-      <span className="flex-1 text-xs text-foreground truncate">{layer.assetFileName}</span>
-      {layer.alphaError && <span className="text-[10px] text-red-400 shrink-0">no α</span>}
+      <span className="text-xs text-muted-foreground w-5 shrink-0">#{index + 1}</span>
+      {layer.hasAlpha && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">α</span>}
+      <span className="flex-1 text-sm text-foreground truncate">{layer.assetFileName}</span>
+      {layer.alphaError && <span className="text-xs text-red-400 shrink-0">no α</span>}
       <div className="flex gap-0.5">
         <button onClick={onMoveUp}   disabled={index === 0}         className="w-5 h-5 text-muted-foreground hover:text-foreground disabled:opacity-30 flex items-center justify-center text-xs">↑</button>
         <button onClick={onMoveDown} disabled={index === total - 1} className="w-5 h-5 text-muted-foreground hover:text-foreground disabled:opacity-30 flex items-center justify-center text-xs">↓</button>
@@ -310,9 +310,9 @@ function AudioTrackRow({ track, index, onRemove }: {
 }) {
   return (
     <div className="rounded-lg border border-border/50 bg-muted/40 p-2.5 flex items-center gap-2">
-      <span className="text-[10px] text-muted-foreground w-4 shrink-0">#{index + 1}</span>
-      <span className="flex-1 text-xs truncate">{track.assetFileName}</span>
-      {track.duration != null && <span className="text-[10px] text-muted-foreground">{track.duration.toFixed(1)}s</span>}
+      <span className="text-xs text-muted-foreground w-5 shrink-0">#{index + 1}</span>
+      <span className="flex-1 text-sm truncate">{track.assetFileName}</span>
+      {track.duration != null && <span className="text-xs text-muted-foreground">{track.duration.toFixed(1)}s</span>}
       <button onClick={onRemove} className="w-5 h-5 text-muted-foreground hover:text-red-400 flex items-center justify-center">×</button>
     </div>
   )

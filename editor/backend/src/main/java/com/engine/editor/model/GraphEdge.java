@@ -6,6 +6,7 @@ public class GraphEdge {
     private String sourceNodeId;
     private String sourceDecisionKey;
     private Integer sourceConditionOrder;
+    private String sourceConditionName;
     private String targetNodeId;
     private EdgeTransitionData transition;
 
@@ -23,6 +24,11 @@ public class GraphEdge {
     public Integer getSourceConditionOrder() { return sourceConditionOrder; }
     public void setSourceConditionOrder(Integer sourceConditionOrder) {
         this.sourceConditionOrder = sourceConditionOrder;
+    }
+
+    public String getSourceConditionName() { return sourceConditionName; }
+    public void setSourceConditionName(String sourceConditionName) {
+        this.sourceConditionName = sourceConditionName;
     }
 
     public String getTargetNodeId() { return targetNodeId; }

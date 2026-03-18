@@ -30,7 +30,7 @@ public class Manifest {
     public static class NodeData {
         @JsonProperty("id")                       public String  id;
         @JsonProperty("name")                     public String  name;
-        @JsonProperty("type")                     public String  type;  // scene | state | decision
+        @JsonProperty("type")                     public String  type;  // scene | state | condition
         @JsonProperty("isRoot")                   public boolean isRoot;
         @JsonProperty("isEnd")                    public boolean isEnd;
         @JsonProperty("computedDuration")         public Double  computedDuration;

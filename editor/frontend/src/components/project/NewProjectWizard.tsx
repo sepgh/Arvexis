@@ -9,6 +9,14 @@ interface NewProjectWizardProps {
 const FPS_OPTIONS = [24, 30, 60]
 const RESOLUTION_OPTIONS = ['1280x720', '1920x1080', '2560x1440', '3840x2160']
 const SAMPLE_RATE_OPTIONS = [44100, 48000]
+const THREAD_OPTIONS: { label: string; value: number | null }[] = [
+  { label: 'Auto', value: null },
+  { label: '1', value: 1 },
+  { label: '2', value: 2 },
+  { label: '4', value: 4 },
+  { label: '8', value: 8 },
+  { label: '16', value: 16 },
+]
 
 export default function NewProjectWizard({ onClose }: NewProjectWizardProps) {
   const setProjectConfig = useEditorStore((s) => s.setProjectConfig)
@@ -19,6 +27,7 @@ export default function NewProjectWizard({ onClose }: NewProjectWizardProps) {
   const [previewRes, setPreviewRes] = useState('1280x720')
   const [sampleRate, setSampleRate] = useState(44100)
   const [decisionTimeout, setDecisionTimeout] = useState(5)
+  const [ffmpegThreads, setFfmpegThreads] = useState<number | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -37,6 +46,7 @@ export default function NewProjectWizard({ onClose }: NewProjectWizardProps) {
         previewResolution: previewRes,
         audioSampleRate: sampleRate,
         decisionTimeoutSecs: decisionTimeout,
+        ffmpegThreads,
       })
       setProjectConfig(config)
       onClose()
@@ -49,20 +59,20 @@ export default function NewProjectWizard({ onClose }: NewProjectWizardProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-lg bg-card border border-border rounded-xl shadow-2xl flex flex-col">
+      <div className="w-full max-w-xl bg-card border border-border rounded-xl shadow-2xl flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="text-base font-semibold text-foreground">New Project</h2>
+        <div className="flex items-center justify-between border-b border-border" style={{ padding: '20px 28px' }}>
+          <h2 className="font-semibold text-foreground" style={{ fontSize: 20 }}>New Project</h2>
           <button
             onClick={onClose}
-            className="text-muted-foreground hover:text-foreground transition-colors text-xl leading-none"
+            className="text-muted-foreground hover:text-foreground transition-colors text-2xl leading-none p-1"
           >
             ×
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4 px-6 py-5">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-5 px-7 py-6">
           <Field label="Project Name" required>
             <input
               type="text"
@@ -137,6 +147,18 @@ export default function NewProjectWizard({ onClose }: NewProjectWizardProps) {
             </Field>
           </div>
 
+          <Field label="FFmpeg Threads" hint="Auto lets FFmpeg choose based on available CPU cores">
+            <select
+              value={ffmpegThreads ?? ''}
+              onChange={(e) => setFfmpegThreads(e.target.value === '' ? null : Number(e.target.value))}
+              className="input-base"
+            >
+              {THREAD_OPTIONS.map((opt) => (
+                <option key={String(opt.value)} value={opt.value ?? ''}>{opt.label}</option>
+              ))}
+            </select>
+          </Field>
+
           {error && (
             <div className="text-sm text-destructive-foreground bg-destructive rounded-md px-3 py-2">
               {error}
@@ -148,14 +170,15 @@ export default function NewProjectWizard({ onClose }: NewProjectWizardProps) {
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground border border-border rounded-lg transition-colors"
+              className="px-5 py-2.5 text-sm text-muted-foreground hover:text-foreground border border-border rounded-lg transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting || !name.trim() || !dirPath.trim()}
-              className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
+              className="font-medium bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
+              style={{ padding: '10px 24px', fontSize: 14 }}
             >
               {submitting ? 'Creating…' : 'Create Project'}
             </button>

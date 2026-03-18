@@ -1,8 +1,12 @@
 package com.engine.editor.model;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.List;
 
 public class GraphNode {
+
+    /** A single exit handle: the source of one outgoing edge. */
+    public record NodeExit(String key, String label, boolean isDefault) {}
 
     private String id;
     private String name;
@@ -13,6 +17,7 @@ public class GraphNode {
     private String decisionAppearanceConfig;
     private double posX;
     private double posY;
+    private List<NodeExit> exits;
 
     public GraphNode() {}
 
@@ -46,4 +51,7 @@ public class GraphNode {
 
     public double getPosY() { return posY; }
     public void setPosY(double posY) { this.posY = posY; }
+
+    public List<NodeExit> getExits() { return exits; }
+    public void setExits(List<NodeExit> exits) { this.exits = exits; }
 }

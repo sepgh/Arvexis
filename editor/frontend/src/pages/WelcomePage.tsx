@@ -11,7 +11,7 @@ export default function WelcomePage() {
     <div className="flex flex-col items-center justify-center h-full w-full bg-background select-none">
       {/* Logo / title area */}
       <div className="flex flex-col items-center gap-3 mb-12">
-        <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+        <div className="rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center" style={{ width: 88, height: 88 }}>
           <svg
             width="32"
             height="32"
@@ -29,17 +29,17 @@ export default function WelcomePage() {
           </svg>
         </div>
         <div className="text-center">
-          <h1 className="text-2xl font-semibold text-foreground tracking-tight">
+          <h1 className="font-semibold text-foreground tracking-tight" style={{ fontSize: 32 }}>
             Interactive Video Engine
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-muted-foreground" style={{ fontSize: 16, marginTop: 8 }}>
             Node-based editor for interactive video experiences
           </p>
         </div>
       </div>
 
       {/* Action cards */}
-      <div className="flex gap-4">
+      <div className="flex gap-6">
         <ActionCard
           title="New Project"
           description="Start from scratch with a new project directory"
@@ -89,24 +89,25 @@ function ActionCard({ title, description, icon, onClick, primary }: ActionCardPr
     <button
       onClick={onClick}
       className={[
-        'flex flex-col items-start gap-3 w-52 p-5 rounded-xl border text-left transition-all',
+        'flex flex-col items-start rounded-xl border text-left transition-all',
         'hover:scale-[1.02] active:scale-[0.98]',
         primary
           ? 'bg-primary/10 border-primary/30 hover:bg-primary/15 hover:border-primary/50'
           : 'bg-card border-border hover:bg-accent hover:border-border',
       ].join(' ')}
+      style={{ width: 280, padding: 32, gap: 20 }}
     >
       <div
         className={[
-          'w-9 h-9 rounded-lg flex items-center justify-center',
+          'rounded-lg flex items-center justify-center w-12 h-12',
           primary ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground',
         ].join(' ')}
       >
         {icon}
       </div>
       <div>
-        <p className="text-sm font-medium text-foreground">{title}</p>
-        <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{description}</p>
+        <p className="font-medium text-foreground" style={{ fontSize: 18 }}>{title}</p>
+        <p className="text-muted-foreground leading-relaxed" style={{ fontSize: 15, marginTop: 6 }}>{description}</p>
       </div>
     </button>
   )

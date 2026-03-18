@@ -87,16 +87,16 @@ public class ValidationService {
             }
         }
 
-        // ── Error: decision node with no else condition ────────────────────────
+        // ── Error: condition node with no else condition ────────────────────────
         for (Map<String, Object> n : nodes) {
-            if (!"decision".equals(n.get("type"))) continue;
+            if (!"condition".equals(n.get("type"))) continue;
             String nId = (String) n.get("id");
             Integer elseCount = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM node_decision_conditions WHERE node_id=? AND is_else=1",
                 Integer.class, nId);
             if (elseCount == null || elseCount == 0) {
                 errors.add(new ValidationIssue("error", "NO_ELSE_CONDITION",
-                    "Decision node '" + n.get("name") + "' has no else condition.",
+                    "Condition node '" + n.get("name") + "' has no else condition.",
                     nId, null));
             }
         }

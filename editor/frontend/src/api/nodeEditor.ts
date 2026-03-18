@@ -1,6 +1,6 @@
 import apiClient from './client'
 import type {
-  SceneDataResponse, StateDataResponse, DecisionDataResponse,
+  SceneDataResponse, StateDataResponse, ConditionDataResponse,
   VideoLayerData, AudioTrackData, DecisionItemData,
   AssignmentData, ConditionData, SpelValidateResponse,
 } from '@/types'
@@ -9,7 +9,7 @@ export interface VideoLayerRequest { assetId: string; startAt: number }
 export interface AudioTrackRequest { assetId: string; startAt: number }
 export interface DecisionItemRequest { decisionKey: string; isDefault: boolean; decisionOrder: number }
 export interface AssignmentRequest { expression: string }
-export interface ConditionRequest { expression: string | null; isElse: boolean }
+export interface ConditionRequest { name: string | null; expression: string | null; isElse: boolean }
 
 // Scene
 export const getSceneData    = (id: string) => apiClient.get<SceneDataResponse>(`/nodes/${id}/scene`)
@@ -25,14 +25,17 @@ export const getStateData      = (id: string) => apiClient.get<StateDataResponse
 export const saveAssignments   = (id: string, assignments: AssignmentRequest[]) =>
   apiClient.put<StateDataResponse>(`/nodes/${id}/state/assignments`, assignments)
 
-// Decision
-export const getDecisionData   = (id: string) => apiClient.get<DecisionDataResponse>(`/nodes/${id}/decision`)
+// Condition node
+export const getConditionData  = (id: string) => apiClient.get<ConditionDataResponse>(`/nodes/${id}/condition`)
 export const saveConditions    = (id: string, conditions: ConditionRequest[]) =>
-  apiClient.put<DecisionDataResponse>(`/nodes/${id}/decision/conditions`, conditions)
+  apiClient.put<ConditionDataResponse>(`/nodes/${id}/condition/conditions`, conditions)
+
+/** @deprecated use getConditionData */
+export const getDecisionData   = getConditionData
 
 // SpEL
 export const validateSpel = (expression: string, mode: 'assignment' | 'boolean') =>
   apiClient.post<SpelValidateResponse>('/spel/validate', { expression, mode })
 
 // Re-export types for convenience
-export type { VideoLayerData, AudioTrackData, DecisionItemData, AssignmentData, ConditionData }
+export type { VideoLayerData, AudioTrackData, DecisionItemData, AssignmentData, ConditionData, ConditionDataResponse }

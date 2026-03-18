@@ -8,6 +8,7 @@ import {
   useReactFlow,
   ReactFlowProvider,
   type NodeTypes,
+  type EdgeTypes,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { useHealth } from '@/hooks/useHealth'
@@ -17,16 +18,23 @@ import AssetBrowser from '@/components/assets/AssetBrowser'
 import GraphToolbar from '@/components/canvas/GraphToolbar'
 import SceneNode from '@/components/canvas/nodes/SceneNode'
 import StateNode from '@/components/canvas/nodes/StateNode'
-import DecisionNode from '@/components/canvas/nodes/DecisionNode'
+import ConditionNode from '@/components/canvas/nodes/DecisionNode'
 import NodeEditorPanel from '@/components/editor/NodeEditorPanel'
 import EdgeEditorPanel from '@/components/editor/EdgeEditorPanel'
 import ValidationPanel from '@/components/editor/ValidationPanel'
+import LabeledEdge from '@/components/canvas/LabeledEdge'
+import ResizableSidePanel from '@/components/layout/ResizableSidePanel'
+import LocalizationPanel from '@/components/editor/LocalizationPanel'
 import type { NodeType } from '@/types'
 
 const NODE_TYPES: NodeTypes = {
-  scene: SceneNode as NodeTypes[string],
-  state: StateNode as NodeTypes[string],
-  decision: DecisionNode as NodeTypes[string],
+  scene:     SceneNode as NodeTypes[string],
+  state:     StateNode as NodeTypes[string],
+  condition: ConditionNode as NodeTypes[string],
+}
+
+const EDGE_TYPES: EdgeTypes = {
+  labeled: LabeledEdge as EdgeTypes[string],
 }
 
 function GraphCanvas() {
@@ -34,9 +42,10 @@ function GraphCanvas() {
   const { screenToFlowPosition } = useReactFlow()
   const selectedNodeId       = useEditorStore(s => s.selectedNodeId)
   const setSelectedNodeId    = useEditorStore(s => s.setSelectedNodeId)
-  const selectedEdgeId       = useEditorStore(s => s.selectedEdgeId)
-  const setSelectedEdgeId    = useEditorStore(s => s.setSelectedEdgeId)
-  const validationPanelOpen  = useEditorStore(s => s.validationPanelOpen)
+  const selectedEdgeId          = useEditorStore(s => s.selectedEdgeId)
+  const setSelectedEdgeId       = useEditorStore(s => s.setSelectedEdgeId)
+  const validationPanelOpen     = useEditorStore(s => s.validationPanelOpen)
+  const localizationPanelOpen   = useEditorStore(s => s.localizationPanelOpen)
 
   const {
     nodes,
@@ -48,6 +57,7 @@ function GraphCanvas() {
     onNodesDelete,
     onEdgesDelete,
     addNode,
+    reloadGraph,
   } = useGraph()
 
   const handleAddNode = useCallback(
@@ -81,6 +91,7 @@ function GraphCanvas() {
         nodes={nodes}
         edges={edges}
         nodeTypes={NODE_TYPES}
+        edgeTypes={EDGE_TYPES}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
@@ -130,9 +141,23 @@ function GraphCanvas() {
           : 'Connecting…'}
       </div>
       </div>
-      {selectedNodeData && <NodeEditorPanel nodeData={selectedNodeData} />}
-      {selectedEdgeId && !selectedNodeData && <EdgeEditorPanel edgeId={selectedEdgeId} />}
+      {selectedNodeData && (
+        <ResizableSidePanel side="right" initialWidth={420} minWidth={320} maxWidth={700}>
+          <NodeEditorPanel
+            nodeData={selectedNodeData}
+            onConditionsChanged={reloadGraph}
+          />
+        </ResizableSidePanel>
+      )}
+      {selectedEdgeId && !selectedNodeData && (
+        <ResizableSidePanel side="right" initialWidth={420} minWidth={320} maxWidth={700}>
+          <EdgeEditorPanel edgeId={selectedEdgeId} />
+        </ResizableSidePanel>
+      )}
       {validationPanelOpen && !selectedNodeData && !selectedEdgeId && <ValidationPanel />}
+      {localizationPanelOpen && !selectedNodeData && !selectedEdgeId && (
+        <LocalizationPanel />
+      )}
     </div>
   )
 }
@@ -142,7 +167,11 @@ export default function CanvasPage() {
 
   return (
     <div className="flex w-full h-full overflow-hidden">
-      {assetPanelOpen && <AssetBrowser />}
+      {assetPanelOpen && (
+        <ResizableSidePanel side="left" initialWidth={380} minWidth={280} maxWidth={600}>
+          <AssetBrowser />
+        </ResizableSidePanel>
+      )}
       <ReactFlowProvider>
         <GraphCanvas />
       </ReactFlowProvider>

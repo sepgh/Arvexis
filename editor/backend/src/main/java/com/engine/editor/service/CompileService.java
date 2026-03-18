@@ -122,7 +122,7 @@ public class CompileService {
                     job.setProgress(pct(doneItems[0], totalItems, 5, 55),
                         "Compiling scene \"" + sceneName + "\" at " + res + "…");
 
-                    compileScene(node, wh, fps, outFile, job);
+                    compileScene(node, wh, fps, config.getFfmpegThreads(), outFile, job);
                     compiledScenes.put(sceneId + "@" + res, outFile);
                     doneItems[0]++;
                 }
@@ -148,14 +148,14 @@ public class CompileService {
                         "Compiling transition [" + transType + "] at " + res + "…");
 
                     if ("video".equals(transType)) {
-                        compileVideoTransition(trans, fps, wh, outFile, job);
+                        compileVideoTransition(trans, fps, wh, config.getFfmpegThreads(), outFile, job);
                     } else {
                         String srcSceneId = (String) edge.get("sourceNodeId");
                         String tgtSceneId = (String) edge.get("targetNodeId");
                         Path srcVideo = compiledScenes.get(srcSceneId + "@" + res);
                         Path tgtVideo = compiledScenes.get(tgtSceneId + "@" + res);
                         compileBuiltinTransition(transType, transDur, wh, fps,
-                            srcVideo, tgtVideo, outFile, job);
+                            config.getFfmpegThreads(), srcVideo, tgtVideo, outFile, job);
                     }
                     doneItems[0]++;
                 }
@@ -343,7 +343,7 @@ public class CompileService {
 
     @SuppressWarnings("unchecked")
     private void compileScene(Map<String, Object> node, String resolution, int fps,
-                               Path outFile, PreviewJob job) throws Exception {
+                               Integer ffmpegThreads, Path outFile, PreviewJob job) throws Exception {
         List<Map<String, Object>> layerData  = (List<Map<String, Object>>) node.getOrDefault("videoLayers", List.of());
         List<Map<String, Object>> audioData  = (List<Map<String, Object>>) node.getOrDefault("audioTracks", List.of());
         String bgHex = (String) node.getOrDefault("backgroundColor", "#000000");
@@ -376,6 +376,7 @@ public class CompileService {
             .fps(fps)
             .duration(duration)
             .outputPath(outFile)
+            .ffmpegThreads(ffmpegThreads)
             .build();
 
         videoProcessor.compositeWithProgress(spec, job);
@@ -385,6 +386,7 @@ public class CompileService {
 
     private void compileBuiltinTransition(String transType, double transDur,
                                           String resolution, int fps,
+                                          Integer ffmpegThreads,
                                           Path srcVideo, Path tgtVideo,
                                           Path outFile, PreviewJob job) throws Exception {
         String xfadeEffect = XFADE_MAP.getOrDefault(transType, "fade");
@@ -400,7 +402,7 @@ public class CompileService {
             String filter = String.format("[0:v][1:v]xfade=transition=%s:duration=%.3f:offset=%.3f[vout]",
                 xfadeEffect, transDur, padDur);
             List<String> cmd = FFmpegCommandBuilder.create()
-                .overwrite().hideBanner().logLevel("error")
+                .overwrite().hideBanner().logLevel("error").threads(ffmpegThreads)
                 .inputWithOptions(List.of("-f", "lavfi"), srcA)
                 .inputWithOptions(List.of("-f", "lavfi"), srcB)
                 .filterComplex(filter).mapVideo("[vout]")
@@ -411,7 +413,7 @@ public class CompileService {
             // Hard cut: just copy 1s from end of A and start of B
             String filter = "[0:v][1:v]concat=n=2:v=1[vout]";
             List<String> cmd = FFmpegCommandBuilder.create()
-                .overwrite().hideBanner().logLevel("error")
+                .overwrite().hideBanner().logLevel("error").threads(ffmpegThreads)
                 .inputWithOptions(List.of("-sseof", String.format("-%.3f", Math.min(1.0, transDur))),
                     srcVideo.toAbsolutePath().toString())
                 .inputWithOptions(List.of("-ss", "0", "-t", String.format("%.3f", Math.min(1.0, transDur))),
@@ -426,7 +428,7 @@ public class CompileService {
             String filter = String.format("[0:v][1:v]xfade=transition=%s:duration=%.3f:offset=0[vout]",
                 xfadeEffect, transDur);
             List<String> cmd = FFmpegCommandBuilder.create()
-                .overwrite().hideBanner().logLevel("error")
+                .overwrite().hideBanner().logLevel("error").threads(ffmpegThreads)
                 .inputWithOptions(List.of("-sseof", String.format("-%.3f", transDur)),
                     srcVideo.toAbsolutePath().toString())
                 .inputWithOptions(List.of("-ss", "0", "-t", String.format("%.3f", transDur)),
@@ -442,8 +444,8 @@ public class CompileService {
 
     @SuppressWarnings("unchecked")
     private void compileVideoTransition(Map<String, Object> trans, int fps,
-                                         String resolution, Path outFile,
-                                         PreviewJob job) throws Exception {
+                                         String resolution, Integer ffmpegThreads,
+                                         Path outFile, PreviewJob job) throws Exception {
         List<Map<String, Object>> layerData = (List<Map<String, Object>>) trans.getOrDefault("videoLayers", List.of());
         List<Map<String, Object>> audioData = (List<Map<String, Object>>) trans.getOrDefault("audioTracks", List.of());
 
@@ -467,7 +469,9 @@ public class CompileService {
             .videoLayers(layers).audioTracks(tracks)
             .backgroundColor("0x000000")
             .outputResolution(resolution).fps(fps).duration(duration)
-            .outputPath(outFile).build();
+            .outputPath(outFile)
+            .ffmpegThreads(ffmpegThreads)
+            .build();
 
         videoProcessor.compositeWithProgress(spec, job);
     }

@@ -12,5 +12,6 @@ public record CreateProjectRequest(
     Integer fps,
     Integer audioSampleRate,
     Integer audioBitRate,
-    Double decisionTimeoutSecs
+    Double decisionTimeoutSecs,
+    Integer ffmpegThreads
 ) {}

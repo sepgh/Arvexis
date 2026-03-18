@@ -1,5 +1,5 @@
 -- ============================================================
--- V1: Initial schema for the Interactive Video Engine editor
+-- V1: Initial schema for Arvexis editor
 -- ============================================================
 
 -- Project-level configuration (single row enforced by CHECK id = 1)
@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS project_config (
     audio_sample_rate       INTEGER NOT NULL DEFAULT 44100,
     audio_bit_rate          INTEGER NOT NULL DEFAULT 128,
     decision_timeout_secs   REAL    NOT NULL DEFAULT 5.0,
-    default_locale_code     TEXT
+    default_locale_code     TEXT,
+    ffmpeg_threads          INTEGER             -- NULL = Auto (let FFmpeg decide)
 );
 
 -- ============================================================
@@ -61,7 +62,7 @@ CREATE TABLE IF NOT EXISTS asset_tags (
 CREATE TABLE IF NOT EXISTS nodes (
     id                          TEXT PRIMARY KEY,
     name                        TEXT NOT NULL,
-    type                        TEXT NOT NULL CHECK (type IN ('scene', 'state', 'decision')),
+    type                        TEXT NOT NULL CHECK (type IN ('scene', 'state', 'condition')),
     is_root                     INTEGER NOT NULL DEFAULT 0,
     is_end                      INTEGER NOT NULL DEFAULT 0,
     background_color            TEXT,
@@ -96,12 +97,13 @@ CREATE TABLE IF NOT EXISTS node_state_assignments (
     expression       TEXT    NOT NULL
 );
 
--- SpEL boolean conditions for a decision node (ordered; last row is else)
+-- SpEL boolean conditions for a condition node (ordered; last row is else)
 CREATE TABLE IF NOT EXISTS node_decision_conditions (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     node_id         TEXT    NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
     condition_order INTEGER NOT NULL,
-    expression      TEXT    NOT NULL,
+    name            TEXT,               -- user-defined exit label shown on canvas
+    expression      TEXT,               -- NULL for the else branch
     is_else         INTEGER NOT NULL DEFAULT 0
 );
 
@@ -120,11 +122,12 @@ CREATE TABLE IF NOT EXISTS scene_decisions (
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS edges (
-    id                    TEXT PRIMARY KEY,
-    source_node_id        TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
-    source_decision_key   TEXT,       -- set when source is a scene node
-    source_condition_order INTEGER,   -- set when source is a decision node
-    target_node_id        TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE
+    id                      TEXT PRIMARY KEY,
+    source_node_id          TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+    source_decision_key     TEXT,   -- set when source is a scene node
+    source_condition_order  INTEGER,-- legacy order index (kept for compatibility)
+    source_condition_name   TEXT,   -- stable handle id when source is a condition node
+    target_node_id          TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE
 );
 
 -- Transition config attached to an edge (only valid when target is a scene node)

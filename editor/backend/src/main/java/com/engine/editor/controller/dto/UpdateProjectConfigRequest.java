@@ -12,5 +12,6 @@ public record UpdateProjectConfigRequest(
     Integer audioSampleRate,
     Integer audioBitRate,
     Double decisionTimeoutSecs,
-    String defaultLocaleCode
+    String defaultLocaleCode,
+    Integer ffmpegThreads
 ) {}

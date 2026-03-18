@@ -197,13 +197,14 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, backgroundCol
 
       {/* Computed duration */}
       {data?.computedDuration != null && (
-        <div className="px-4 py-2 text-xs text-muted-foreground border-b border-border/50 flex items-center justify-between">
+        <div className="text-muted-foreground border-b border-border/50 flex items-center justify-between" style={{ padding: '14px 24px', fontSize: 14 }}>
           <span>Duration: <span className="text-foreground font-medium">{data.computedDuration.toFixed(2)}s</span>
           {saving && <span className="ml-2">Saving…</span>}</span>
           <button
             onClick={handlePreview}
             disabled={previewing}
-            className="text-xs px-2 py-0.5 rounded-md bg-primary/15 text-primary hover:bg-primary/25 disabled:opacity-50 transition-colors border border-primary/30"
+            className="rounded-md bg-primary/15 text-primary hover:bg-primary/25 disabled:opacity-50 transition-colors border border-primary/30"
+            style={{ padding: '7px 14px', fontSize: 14 }}
           >
             {previewing ? '…' : '▶ Preview'}
           </button>
@@ -217,16 +218,17 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, backgroundCol
             key={s.id}
             onClick={() => setSection(s.id)}
             className={[
-              'flex-1 py-2 text-xs font-medium transition-colors',
+              'flex-1 font-medium transition-colors',
               section === s.id ? 'text-foreground border-b-2 border-primary -mb-px' : 'text-muted-foreground hover:text-foreground',
             ].join(' ')}
+            style={{ padding: '14px 0', fontSize: 14 }}
           >
             {s.label}
           </button>
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-3">
+      <div className="flex-1 overflow-y-auto flex flex-col" style={{ padding: 20, gap: 16 }}>
         {/* ── Video Layers ── */}
         {section === 'layers' && (
           <>
@@ -240,7 +242,7 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, backgroundCol
               />
             ))}
             {!data?.videoLayers.length && (
-              <p className="text-xs text-muted-foreground text-center py-4">No video layers. Add from the list below.</p>
+              <p className="text-sm text-muted-foreground text-center py-4">No video layers. Add from the list below.</p>
             )}
             <AssetPicker label="Add video layer" assets={assets} onPick={addVideoLayer} />
           </>
@@ -258,7 +260,7 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, backgroundCol
               />
             ))}
             {!data?.audioTracks.length && (
-              <p className="text-xs text-muted-foreground text-center py-4">No audio tracks.</p>
+              <p className="text-sm text-muted-foreground text-center py-4">No audio tracks.</p>
             )}
             <AssetPicker label="Add audio track" assets={audioAssets} onPick={addAudioTrack} />
           </>
@@ -276,13 +278,13 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, backgroundCol
                     d.isDefault ? 'bg-amber-400 border-amber-400' : 'border-muted-foreground hover:border-amber-400',
                   ].join(' ')}
                 />
-                <span className="flex-1 text-xs text-foreground truncate">{d.decisionKey}</span>
-                {d.isDefault && <span className="text-[10px] text-amber-400">default</span>}
+                <span className="flex-1 text-sm text-foreground truncate">{d.decisionKey}</span>
+                {d.isDefault && <span className="text-xs text-amber-400">default</span>}
                 <button onClick={() => removeDecision(d.id)} className="text-muted-foreground hover:text-red-400 text-sm leading-none">×</button>
               </div>
             ))}
             {!data?.decisions.length && (
-              <p className="text-xs text-muted-foreground text-center py-2">No decisions defined. Scene uses default CONTINUE.</p>
+              <p className="text-sm text-muted-foreground text-center py-2">No decisions defined. Scene uses default CONTINUE.</p>
             )}
             <div className="flex gap-2 mt-1">
               <input
@@ -295,7 +297,8 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, backgroundCol
               <button
                 onClick={addDecision}
                 disabled={!newDecisionKey.trim()}
-                className="px-3 py-1 text-xs rounded-lg bg-primary text-primary-foreground disabled:opacity-40"
+                className="rounded-lg bg-primary text-primary-foreground disabled:opacity-40"
+                style={{ padding: '8px 16px', fontSize: 14 }}
               >
                 Add
               </button>
@@ -314,12 +317,12 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, backgroundCol
                 className="w-4 h-4 accent-red-400"
               />
               <div>
-                <span className="text-xs font-medium text-foreground">End node</span>
-                <p className="text-[10px] text-muted-foreground">The game ends when this scene finishes.</p>
+                <span className="font-medium text-foreground" style={{ fontSize: 14 }}>End node</span>
+                <p className="text-muted-foreground" style={{ fontSize: 13 }}>The game ends when this scene finishes.</p>
               </div>
             </label>
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs text-muted-foreground">Background color</label>
+              <label className="text-muted-foreground" style={{ fontSize: 14 }}>Background color</label>
               <div className="flex items-center gap-2">
                 <input
                   type="color"
@@ -327,13 +330,14 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, backgroundCol
                   onChange={e => setBgColor(e.target.value)}
                   className="w-10 h-8 rounded border border-border bg-transparent cursor-pointer"
                 />
-                <span className="text-xs text-muted-foreground font-mono">{bgColor}</span>
+                <span className="text-sm text-muted-foreground font-mono">{bgColor}</span>
               </div>
             </div>
             <button
               onClick={saveProperties}
               disabled={saving}
-              className="px-4 py-2 text-xs rounded-lg bg-primary text-primary-foreground disabled:opacity-40 font-medium"
+              className="rounded-lg bg-primary text-primary-foreground disabled:opacity-40 font-medium"
+              style={{ padding: '10px 20px', fontSize: 14 }}
             >
               {saving ? 'Saving…' : 'Save'}
             </button>
@@ -358,11 +362,11 @@ function VideoLayerRow({ layer, index, total, onRemove, onMoveUp, onMoveDown, on
       layer.alphaError ? 'border-red-500/60 bg-red-500/5' : 'border-border/50 bg-muted/40',
     ].join(' ')}>
       <div className="flex items-center gap-2">
-        <span className="text-[10px] text-muted-foreground w-4 shrink-0">#{index + 1}</span>
+        <span className="text-xs text-muted-foreground w-5 shrink-0">#{index + 1}</span>
         {layer.hasAlpha && (
-          <span className="text-[9px] px-1 py-px rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">α</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">α</span>
         )}
-        <span className="flex-1 text-xs text-foreground truncate">{layer.assetFileName}</span>
+        <span className="flex-1 text-sm text-foreground truncate">{layer.assetFileName}</span>
         <div className="flex items-center gap-0.5">
           <button onClick={onMoveUp}  disabled={index === 0}          className="w-5 h-5 text-muted-foreground hover:text-foreground disabled:opacity-30 flex items-center justify-center text-xs">↑</button>
           <button onClick={onMoveDown} disabled={index === total - 1} className="w-5 h-5 text-muted-foreground hover:text-foreground disabled:opacity-30 flex items-center justify-center text-xs">↓</button>
@@ -373,7 +377,7 @@ function VideoLayerRow({ layer, index, total, onRemove, onMoveUp, onMoveDown, on
         <p className="text-[10px] text-red-400">Non-bottom layer must have alpha channel</p>
       )}
       <div className="flex items-center gap-2">
-        <label className="text-[10px] text-muted-foreground shrink-0">start-at</label>
+        <label className="text-xs text-muted-foreground shrink-0">start-at</label>
         <input
           type="number" min="0" step="0.1"
           value={localStartAt}
@@ -393,9 +397,9 @@ function AudioTrackRow({ track, index, total, onRemove, onMoveUp, onMoveDown }: 
 }) {
   return (
     <div className="rounded-lg border border-border/50 bg-muted/40 p-2.5 flex items-center gap-2">
-      <span className="text-[10px] text-muted-foreground w-4 shrink-0">#{index + 1}</span>
-      <span className="flex-1 text-xs text-foreground truncate">{track.assetFileName}</span>
-      {track.duration != null && <span className="text-[10px] text-muted-foreground">{track.duration.toFixed(1)}s</span>}
+      <span className="text-xs text-muted-foreground w-5 shrink-0">#{index + 1}</span>
+      <span className="flex-1 text-sm text-foreground truncate">{track.assetFileName}</span>
+      {track.duration != null && <span className="text-xs text-muted-foreground">{track.duration.toFixed(1)}s</span>}
       <div className="flex items-center gap-0.5">
         <button onClick={onMoveUp}   disabled={index === 0}          className="w-5 h-5 text-muted-foreground hover:text-foreground disabled:opacity-30 flex items-center justify-center text-xs">↑</button>
         <button onClick={onMoveDown} disabled={index === total - 1}  className="w-5 h-5 text-muted-foreground hover:text-foreground disabled:opacity-30 flex items-center justify-center text-xs">↓</button>

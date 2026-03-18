@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -24,7 +25,7 @@ import java.util.UUID;
 @Service
 public class GraphService {
 
-    private static final Set<String> VALID_NODE_TYPES  = Set.of("scene", "state", "decision");
+    private static final Set<String> VALID_NODE_TYPES  = Set.of("scene", "state", "condition");
     private static final Set<String> VALID_TRANSITIONS = Set.of(
         "none", "fade_in", "fade_out", "crossfade",
         "slide_left", "slide_right", "wipe", "dissolve", "cut", "video"
@@ -59,15 +60,21 @@ public class GraphService {
     }
 
     public List<GraphNode> listNodes() {
-        return projectService.requireJdbc().query(
+        JdbcTemplate jdbc = projectService.requireJdbc();
+        List<GraphNode> nodes = jdbc.query(
             "SELECT * FROM nodes ORDER BY pos_y, pos_x", this::mapNode);
+        nodes.forEach(n -> n.setExits(loadExits(jdbc, n)));
+        return nodes;
     }
 
     public GraphNode getNode(String id) {
-        List<GraphNode> rows = projectService.requireJdbc().query(
+        JdbcTemplate jdbc = projectService.requireJdbc();
+        List<GraphNode> rows = jdbc.query(
             "SELECT * FROM nodes WHERE id = ?", this::mapNode, id);
         if (rows.isEmpty()) throw new ProjectException("Node not found: " + id);
-        return rows.get(0);
+        GraphNode n = rows.get(0);
+        n.setExits(loadExits(jdbc, n));
+        return n;
     }
 
     public GraphNode updateNode(String id, UpdateNodeRequest req) {
@@ -119,24 +126,48 @@ public class GraphService {
         requireNodeExists(jdbc, req.sourceNodeId());
         requireNodeExists(jdbc, req.targetNodeId());
 
-        // Prevent duplicate edges between the same source/target/decision-key
-        Integer dup = jdbc.queryForObject("""
-            SELECT COUNT(*) FROM edges
-            WHERE source_node_id=? AND target_node_id=?
-              AND (source_decision_key IS ? OR source_decision_key=?)
-            """, Integer.class,
-            req.sourceNodeId(), req.targetNodeId(),
-            req.sourceDecisionKey(), req.sourceDecisionKey());
-        if (dup != null && dup > 0)
-            throw new ProjectException("An identical edge already exists between these nodes");
+        // Enforce one edge per exit: check source handle is not already used
+        if (req.sourceDecisionKey() != null) {
+            Integer dup = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM edges WHERE source_node_id=? AND source_decision_key=?",
+                Integer.class, req.sourceNodeId(), req.sourceDecisionKey());
+            if (dup != null && dup > 0)
+                throw new ProjectException(
+                    "Exit '" + req.sourceDecisionKey() + "' already has an outgoing edge");
+        } else if (req.sourceConditionName() != null) {
+            Integer dup = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM edges WHERE source_node_id=? AND source_condition_name=?",
+                Integer.class, req.sourceNodeId(), req.sourceConditionName());
+            if (dup != null && dup > 0)
+                throw new ProjectException(
+                    "Condition exit '" + req.sourceConditionName() + "' already has an outgoing edge");
+        } else {
+            // State node: only one outgoing edge allowed
+            Integer dup = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM edges WHERE source_node_id=?",
+                Integer.class, req.sourceNodeId());
+            if (dup != null && dup > 0)
+                throw new ProjectException("This node already has an outgoing edge");
+        }
+
+        // Resolve source_condition_order from condition name for runtime compat
+        Integer condOrder = null;
+        if (req.sourceConditionName() != null) {
+            List<Integer> orders = jdbc.queryForList(
+                "SELECT condition_order FROM node_decision_conditions WHERE node_id=? AND name=?",
+                Integer.class, req.sourceNodeId(), req.sourceConditionName());
+            if (!orders.isEmpty()) condOrder = orders.get(0);
+        } else {
+            condOrder = req.sourceConditionOrder();
+        }
 
         String id = UUID.randomUUID().toString();
         jdbc.update("""
             INSERT INTO edges (id, source_node_id, target_node_id,
-                               source_decision_key, source_condition_order)
-            VALUES (?, ?, ?, ?, ?)
+                               source_decision_key, source_condition_order, source_condition_name)
+            VALUES (?, ?, ?, ?, ?, ?)
             """, id, req.sourceNodeId(), req.targetNodeId(),
-                req.sourceDecisionKey(), req.sourceConditionOrder());
+                req.sourceDecisionKey(), condOrder, req.sourceConditionName());
 
         return getEdge(id);
     }
@@ -207,6 +238,7 @@ public class GraphService {
         e.setSourceDecisionKey(rs.getString("source_decision_key"));
         int condOrder = rs.getInt("source_condition_order");
         e.setSourceConditionOrder(rs.wasNull() ? null : condOrder);
+        e.setSourceConditionName(rs.getString("source_condition_name"));
         e.setTargetNodeId(rs.getString("target_node_id"));
         return e;
     }
@@ -230,5 +262,37 @@ public class GraphService {
             "SELECT COUNT(*) FROM nodes WHERE id=?", Integer.class, nodeId);
         if (count == null || count == 0)
             throw new ProjectException("Node not found: " + nodeId);
+    }
+
+    private List<GraphNode.NodeExit> loadExits(JdbcTemplate jdbc, GraphNode node) {
+        List<GraphNode.NodeExit> exits = new ArrayList<>();
+        if ("scene".equals(node.getType())) {
+            List<java.util.Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT decision_key, is_default FROM scene_decisions WHERE node_id=? ORDER BY decision_order",
+                node.getId());
+            if (rows.isEmpty()) {
+                exits.add(new GraphNode.NodeExit("CONTINUE", "Continue", true));
+            } else {
+                for (var r : rows) {
+                    exits.add(new GraphNode.NodeExit(
+                        (String) r.get("decision_key"),
+                        (String) r.get("decision_key"),
+                        ((Number) r.get("is_default")).intValue() == 1
+                    ));
+                }
+            }
+        } else if ("condition".equals(node.getType())) {
+            List<java.util.Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT name, condition_order, is_else FROM node_decision_conditions WHERE node_id=? ORDER BY condition_order",
+                node.getId());
+            for (var r : rows) {
+                String rawName = (String) r.get("name");
+                boolean isElse = ((Number) r.get("is_else")).intValue() == 1;
+                String key  = rawName != null ? rawName : (isElse ? "else" : "cond-" + r.get("condition_order"));
+                String label = rawName != null ? rawName : (isElse ? "else" : "Condition " + r.get("condition_order"));
+                exits.add(new GraphNode.NodeExit(key, label, isElse));
+            }
+        }
+        return exits;
     }
 }

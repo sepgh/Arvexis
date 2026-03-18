@@ -102,10 +102,10 @@ public class GameEngine {
                         throw new IllegalArgumentException("State node has no outgoing edge: " + targetId);
                     currentEdge = outs.get(0);
                 }
-                case "decision" -> {
+                case "condition" -> {
                     Manifest.EdgeData matched = evaluateConditions(target, state);
                     if (matched == null)
-                        throw new IllegalArgumentException("No matching condition in decision node: " + targetId);
+                        throw new IllegalArgumentException("No matching condition in condition node: " + targetId);
                     currentEdge = matched;
                 }
                 default -> throw new IllegalArgumentException("Unknown node type: " + target.type);

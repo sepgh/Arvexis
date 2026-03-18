@@ -62,6 +62,25 @@ async function mutate<T>(path: string, init: RequestInit): Promise<T> {
   }
 }
 
+async function mutateForm<T>(path: string, form: FormData): Promise<T> {
+  setSaving()
+  try {
+    const res = await fetch(`${BASE_URL}${path}`, { method: 'POST', body: form })
+    if (!res.ok) {
+      let message = `HTTP ${res.status}: ${res.statusText}`
+      try { const b = await res.json(); if (b?.message) message = b.message } catch { /* ignore */ }
+      throw new Error(message)
+    }
+    const result = await res.json() as T
+    onMutationDone()
+    return result
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Upload failed'
+    onMutationError(msg)
+    throw e
+  }
+}
+
 const apiClient = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: unknown) =>
@@ -70,6 +89,7 @@ const apiClient = {
     mutate<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
   delete: <T>(path: string) =>
     mutate<T>(path, { method: 'DELETE' }),
+  postForm: <T>(path: string, form: FormData) => mutateForm<T>(path, form),
 }
 
 export default apiClient

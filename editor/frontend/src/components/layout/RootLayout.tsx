@@ -12,8 +12,10 @@ export default function RootLayout({ children }: RootLayoutProps) {
   const projectConfig = useEditorStore((s) => s.projectConfig)
   const assetPanelOpen = useEditorStore((s) => s.assetPanelOpen)
   const toggleAssetPanel = useEditorStore((s) => s.toggleAssetPanel)
-  const validationPanelOpen = useEditorStore((s) => s.validationPanelOpen)
-  const toggleValidationPanel = useEditorStore((s) => s.toggleValidationPanel)
+  const validationPanelOpen    = useEditorStore((s) => s.validationPanelOpen)
+  const toggleValidationPanel   = useEditorStore((s) => s.toggleValidationPanel)
+  const localizationPanelOpen   = useEditorStore((s) => s.localizationPanelOpen)
+  const toggleLocalizationPanel = useEditorStore((s) => s.toggleLocalizationPanel)
   const [manifestGenerating, setManifestGenerating] = useState(false)
   const [manifestReady, setManifestReady] = useState(false)
   const [manifestError, setManifestError] = useState<string | null>(null)
@@ -78,32 +80,33 @@ export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden">
       {/* Header */}
-      <header className="flex items-center justify-between h-12 px-4 bg-card border-b border-border shrink-0">
+      <header className="flex items-center justify-between bg-card border-b border-border shrink-0" style={{ height: 56, paddingLeft: 28, paddingRight: 28 }}>
         <div className="flex items-center gap-3">
-          <span className="text-sm font-semibold text-foreground tracking-wide">
-            Interactive Video Engine
+          <span className="font-semibold text-foreground tracking-wide" style={{ fontSize: 18 }}>
+            Arvexis
           </span>
           {projectConfig && (
             <>
               <span className="text-muted-foreground">/</span>
-              <span className="text-sm text-foreground">{projectConfig.name}</span>
+              <span className="text-foreground" style={{ fontSize: 18 }}>{projectConfig.name}</span>
             </>
           )}
         </div>
 
         {projectConfig && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center" style={{ gap: 10 }}>
             <SaveIndicator />
             <div className="w-px h-4 bg-border" />
             <button
               onClick={toggleAssetPanel}
               title="Toggle asset browser"
               className={[
-                'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
+                'flex items-center rounded-md font-medium transition-colors',
                 assetPanelOpen
                   ? 'bg-primary/15 text-primary border border-primary/30'
                   : 'text-muted-foreground hover:text-foreground hover:bg-accent border border-transparent',
               ].join(' ')}
+              style={{ padding: '8px 14px', fontSize: 14, gap: 7 }}
             >
               {/* Film strip icon */}
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -118,14 +121,32 @@ export default function RootLayout({ children }: RootLayoutProps) {
               Assets
             </button>
             <button
+              onClick={toggleLocalizationPanel}
+              title="Localization"
+              className={[
+                'flex items-center rounded-md font-medium transition-colors',
+                localizationPanelOpen
+                  ? 'bg-primary/15 text-primary border border-primary/30'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent border border-transparent',
+              ].join(' ')}
+              style={{ padding: '8px 14px', fontSize: 14, gap: 7 }}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.2"/>
+                <path d="M7 1.5C5.5 3.5 4.5 5.2 4.5 7s1 3.5 2.5 5.5M7 1.5C8.5 3.5 9.5 5.2 9.5 7s-1 3.5-2.5 5.5M1.5 7h11" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              </svg>
+              Locales
+            </button>
+            <button
               onClick={toggleValidationPanel}
               title="Validate graph"
               className={[
-                'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
+                'flex items-center rounded-md font-medium transition-colors',
                 validationPanelOpen
                   ? 'bg-primary/15 text-primary border border-primary/30'
                   : 'text-muted-foreground hover:text-foreground hover:bg-accent border border-transparent',
               ].join(' ')}
+              style={{ padding: '8px 14px', fontSize: 14, gap: 7 }}
             >
               {/* Checkmark shield icon */}
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -142,12 +163,13 @@ export default function RootLayout({ children }: RootLayoutProps) {
                 disabled={manifestGenerating}
                 title="Generate JSON manifest"
                 className={[
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
+                  'flex items-center rounded-md font-medium transition-colors',
                   manifestError
                     ? 'bg-red-500/10 text-red-400 border border-red-500/20'
                     : 'text-muted-foreground hover:text-foreground hover:bg-accent border border-transparent',
                   manifestGenerating ? 'opacity-50' : '',
                 ].join(' ')}
+                style={{ padding: '8px 14px', fontSize: 14, gap: 7 }}
               >
                 {/* Braces icon */}
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -160,7 +182,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
                 <a
                   href={manifestDownloadUrl()}
                   download="manifest.json"
-                  className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium text-green-400 hover:text-green-300 bg-green-500/10 border border-green-500/20 transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium text-green-400 hover:text-green-300 bg-green-500/10 border border-green-500/20 transition-colors"
                   title="Download manifest.json"
                 >
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -178,7 +200,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
               disabled={compileActive}
               title="Compile project (scene videos + HLS)"
               className={[
-                'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
+                'flex items-center rounded-md font-medium transition-colors',
                 compileFailed
                   ? 'bg-red-500/10 text-red-400 border border-red-500/20'
                   : compileDone
@@ -186,6 +208,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
                   : 'text-muted-foreground hover:text-foreground hover:bg-accent border border-transparent',
                 compileActive ? 'opacity-50' : '',
               ].join(' ')}
+              style={{ padding: '8px 14px', fontSize: 14, gap: 7 }}
             >
               {/* Triangle play icon */}
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">

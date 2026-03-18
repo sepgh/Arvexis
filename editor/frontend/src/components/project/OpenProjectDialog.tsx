@@ -35,18 +35,18 @@ export default function OpenProjectDialog({ onClose }: OpenProjectDialogProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
       <div className="w-full max-w-md bg-card border border-border rounded-xl shadow-2xl flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="text-base font-semibold text-foreground">Open Project</h2>
+        <div className="flex items-center justify-between border-b border-border" style={{ padding: '20px 28px' }}>
+          <h2 className="font-semibold text-foreground" style={{ fontSize: 20 }}>Open Project</h2>
           <button
             onClick={onClose}
-            className="text-muted-foreground hover:text-foreground transition-colors text-xl leading-none"
+            className="text-muted-foreground hover:text-foreground transition-colors text-2xl leading-none p-1"
           >
             ×
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4 px-6 py-5">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-5 px-7 py-6">
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-foreground">
               Project Directory <span className="text-primary">*</span>
@@ -75,14 +75,15 @@ export default function OpenProjectDialog({ onClose }: OpenProjectDialogProps) {
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground border border-border rounded-lg transition-colors"
+              className="px-5 py-2.5 text-sm text-muted-foreground hover:text-foreground border border-border rounded-lg transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting || !dirPath.trim()}
-              className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
+              className="font-medium bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
+              style={{ padding: '10px 24px', fontSize: 14 }}
             >
               {submitting ? 'Opening…' : 'Open Project'}
             </button>

@@ -11,6 +11,7 @@ interface EditorState {
   selectedNodeId: string | null
   selectedEdgeId: string | null
   validationPanelOpen: boolean
+  localizationPanelOpen: boolean
   saveStatus: SaveStatus
   saveError: string | null
   setProjectConfig: (config: ProjectConfig) => void
@@ -20,6 +21,7 @@ interface EditorState {
   setSelectedNodeId: (id: string | null) => void
   setSelectedEdgeId: (id: string | null) => void
   toggleValidationPanel: () => void
+  toggleLocalizationPanel: () => void
   setSaveStatus: (status: SaveStatus, error?: string | null) => void
 }
 
@@ -31,6 +33,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   selectedNodeId: null,
   selectedEdgeId: null,
   validationPanelOpen: false,
+  localizationPanelOpen: false,
   saveStatus: 'idle',
   saveError: null,
 
@@ -38,7 +41,7 @@ export const useEditorStore = create<EditorState>((set) => ({
     set({ projectConfig: config, isProjectOpen: true }),
 
   clearProject: () =>
-    set({ projectConfig: null, isProjectOpen: false, assetPanelOpen: false, selectedNodeId: null, selectedEdgeId: null, validationPanelOpen: false, saveStatus: 'idle', saveError: null }),
+    set({ projectConfig: null, isProjectOpen: false, assetPanelOpen: false, selectedNodeId: null, selectedEdgeId: null, validationPanelOpen: false, localizationPanelOpen: false, saveStatus: 'idle', saveError: null }),
 
   setAppLoading: (loading) =>
     set({ appLoading: loading }),
@@ -54,6 +57,9 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   toggleValidationPanel: () =>
     set((s) => ({ validationPanelOpen: !s.validationPanelOpen })),
+
+  toggleLocalizationPanel: () =>
+    set((s) => ({ localizationPanelOpen: !s.localizationPanelOpen })),
 
   setSaveStatus: (status, error = null) =>
     set({ saveStatus: status, saveError: error ?? null }),

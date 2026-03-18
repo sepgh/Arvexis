@@ -35,3 +35,18 @@ export function removeTag(assetId: string, tag: string): Promise<void> {
 export function listTags(): Promise<string[]> {
   return apiClient.get<string[]>('/tags')
 }
+
+export function listFolders(): Promise<string[]> {
+  return apiClient.get<string[]>('/assets/folders')
+}
+
+export function createFolder(path: string): Promise<{ path: string }> {
+  return apiClient.post<{ path: string }>('/assets/folder', { path })
+}
+
+export function uploadAsset(file: File, folder?: string): Promise<Asset> {
+  const form = new FormData()
+  form.append('file', file)
+  if (folder) form.append('folder', folder)
+  return apiClient.postForm<Asset>('/assets/upload', form)
+}

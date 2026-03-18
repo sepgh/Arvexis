@@ -1,0 +1,168 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v1.0.0)"
+        required: true
+        type: string
+
+jobs:
+  # ── Build native binaries on each platform ──────────────────────────────────
+  build-native:
+    name: Native binary — ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: Linux x64
+            artifact: arvexis-editor-linux-x64
+            binary: editor/backend/target/arvexis-editor
+
+          - os: windows-latest
+            name: Windows x64
+            artifact: arvexis-editor-windows-x64
+            binary: editor/backend/target/arvexis-editor.exe
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up GraalVM JDK 21
+        uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: "21"
+          distribution: "graalvm-community"
+          cache: maven
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: editor/frontend/package-lock.json
+
+      - name: Build frontend
+        run: |
+          cd editor/frontend
+          npm ci
+          npm run build
+
+      - name: Build native binary
+        run: |
+          cd editor/backend
+          mvn -Pnative native:compile -DskipTests -q
+
+      - name: Upload binary (Linux)
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.binary }}
+
+      - name: Upload binary (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.binary }}
+
+  # ── Also build the cross-platform JAR ───────────────────────────────────────
+  build-jar:
+    name: JAR (cross-platform)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: "temurin"
+          cache: maven
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: editor/frontend/package-lock.json
+
+      - name: Build frontend + JAR
+        run: |
+          cd editor/frontend
+          npm ci
+          npm run build
+          cd ../backend
+          mvn package -DskipTests -q
+
+      - name: Upload JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: arvexis-editor-jar
+          path: editor/backend/target/editor-backend-*.jar
+
+  # ── Create draft GitHub release with all artifacts ──────────────────────────
+  release:
+    name: Create draft release
+    needs: [build-native, build-jar]
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Rename JAR for release
+        run: |
+          JAR=$(find artifacts/arvexis-editor-jar -name "*.jar" | head -1)
+          cp "$JAR" artifacts/arvexis-editor.jar
+
+      - name: Create draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          name: "Arvexis Editor ${{ github.event.inputs.tag || github.ref_name }}"
+          body: |
+            ## Downloads
+
+            | Platform | File |
+            |----------|------|
+            | Linux x64 (native, no JVM) | `arvexis-editor-linux-x64` |
+            | Windows x64 (native, no JVM) | `arvexis-editor-windows-x64.exe` |
+            | All platforms (requires Java 21) | `arvexis-editor.jar` |
+
+            **Run the JAR:**
+            ```
+            java -jar arvexis-editor.jar
+            ```
+            Then open http://localhost:8080
+
+            **CLI options:**
+            ```
+            java -jar arvexis-editor.jar \
+              --server.port=9090 \
+              --editor.log.path=/custom/logs \
+              --logging.level.com.engine.editor=DEBUG
+            ```
+          files: |
+            artifacts/arvexis-editor-linux-x64/arvexis-editor
+            artifacts/arvexis-editor-windows-x64/arvexis-editor.exe
+            artifacts/arvexis-editor.jar

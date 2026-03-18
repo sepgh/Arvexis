@@ -36,23 +36,23 @@ export default function ValidationPanel() {
   const totalWarnings = report?.warnings.length  ?? 0
 
   return (
-    <div className="flex flex-col w-80 shrink-0 border-l border-border bg-card overflow-hidden h-full">
+    <div className="flex flex-col shrink-0 border-l border-border bg-card overflow-hidden h-full" style={{ width: 420 }}>
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-border shrink-0">
+      <div className="flex items-center gap-2 px-5 py-4 border-b border-border shrink-0">
         <div className="flex-1 min-w-0">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Graph</span>
-          <p className="text-sm font-medium text-foreground mt-0.5">Validation</p>
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Graph</span>
+          <p className="text-base font-medium text-foreground mt-1">Validation</p>
         </div>
         <button
           onClick={run}
           disabled={loading}
-          className="text-xs px-2 py-1 rounded-md bg-muted hover:bg-accent text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors"
+          className="text-sm px-3 py-1.5 rounded-md bg-muted hover:bg-accent text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors"
         >
           {loading ? '…' : '↻ Run'}
         </button>
         <button
           onClick={toggleValidationPanel}
-          className="text-muted-foreground hover:text-foreground text-lg leading-none"
+          className="text-muted-foreground hover:text-foreground text-xl leading-none p-1"
         >
           ×
         </button>
@@ -61,11 +61,11 @@ export default function ValidationPanel() {
       {/* Summary bar */}
       {report && (
         <div className="flex border-b border-border shrink-0">
-          <div className={`flex-1 py-2 text-center text-xs font-medium ${totalErrors > 0 ? 'text-red-400' : 'text-muted-foreground'}`}>
+          <div className={`flex-1 py-3 text-center text-sm font-medium ${totalErrors > 0 ? 'text-red-400' : 'text-muted-foreground'}`}>
             {totalErrors} error{totalErrors !== 1 ? 's' : ''}
           </div>
           <div className="w-px bg-border" />
-          <div className={`flex-1 py-2 text-center text-xs font-medium ${totalWarnings > 0 ? 'text-amber-400' : 'text-muted-foreground'}`}>
+          <div className={`flex-1 py-3 text-center text-sm font-medium ${totalWarnings > 0 ? 'text-amber-400' : 'text-muted-foreground'}`}>
             {totalWarnings} warning{totalWarnings !== 1 ? 's' : ''}
           </div>
         </div>
@@ -134,24 +134,24 @@ function IssueGroup({ title, issues, color, onIssueClick }: {
   const clickable = (issue: ValidationIssue) => !!(issue.nodeId || issue.edgeId)
 
   return (
-    <div className="px-3 py-3 flex flex-col gap-2">
-      <p className={`text-[10px] font-semibold uppercase tracking-wider ${c.heading}`}>{title}</p>
+    <div className="px-4 py-4 flex flex-col gap-2.5">
+      <p className={`text-xs font-semibold uppercase tracking-wider ${c.heading}`}>{title}</p>
       {issues.map((issue, i) => (
         <button
           key={i}
           onClick={() => clickable(issue) && onIssueClick(issue)}
           disabled={!clickable(issue)}
           className={[
-            'w-full text-left rounded-lg border p-2.5 flex items-start gap-2.5 transition-colors',
+            'w-full text-left rounded-lg border p-3 flex items-start gap-3 transition-colors',
             c.item,
             !clickable(issue) ? 'cursor-default' : 'cursor-pointer',
           ].join(' ')}
         >
           <span className={`w-2 h-2 rounded-full ${c.dot} mt-0.5 shrink-0`} />
           <div className="flex-1 min-w-0">
-            <p className="text-xs text-foreground leading-snug">{issue.message}</p>
+            <p className="text-sm text-foreground leading-snug">{issue.message}</p>
             {clickable(issue) && (
-              <p className="text-[10px] text-muted-foreground mt-0.5">Click to highlight →</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Click to highlight →</p>
             )}
           </div>
         </button>

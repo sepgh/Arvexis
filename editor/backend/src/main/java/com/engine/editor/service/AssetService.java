@@ -174,6 +174,86 @@ public class AssetService {
         return asset;
     }
 
+    // ── Upload / folder management ────────────────────────────────────────────
+
+    public Asset uploadAsset(String subfolder, String fileName, byte[] bytes) {
+        String assetsDir = projectService.getConfig().getAssetsDirectory();
+        if (assetsDir == null || assetsDir.isBlank())
+            throw new ProjectException("Project assets directory is not configured");
+
+        Path root = Paths.get(assetsDir);
+        Path dir  = (subfolder != null && !subfolder.isBlank())
+            ? root.resolve(subfolder).normalize()
+            : root;
+        // Prevent path traversal
+        if (!dir.startsWith(root))
+            throw new ProjectException("Invalid subfolder path");
+
+        try {
+            Files.createDirectories(dir);
+        } catch (IOException e) {
+            throw new ProjectException("Failed to create directory: " + e.getMessage(), e);
+        }
+
+        Path dest = dir.resolve(fileName);
+        if (Files.exists(dest))
+            throw new ProjectException("File already exists: " + fileName);
+
+        try {
+            Files.write(dest, bytes);
+        } catch (IOException e) {
+            throw new ProjectException("Failed to write file: " + e.getMessage(), e);
+        }
+
+        String mediaType = detectMediaType(dest);
+        if (mediaType == null)
+            throw new ProjectException("Unsupported file type: " + fileName);
+
+        Asset asset = analyzeFile(dest, mediaType, root);
+        if (asset == null)
+            throw new ProjectException("Failed to analyse uploaded file — check FFprobe is available");
+
+        insertAsset(projectService.requireJdbc(), asset);
+        return getAsset(asset.getId());
+    }
+
+    public void createFolder(String subfolder) {
+        if (subfolder == null || subfolder.isBlank())
+            throw new ProjectException("Subfolder name must not be blank");
+
+        String assetsDir = projectService.getConfig().getAssetsDirectory();
+        if (assetsDir == null || assetsDir.isBlank())
+            throw new ProjectException("Project assets directory is not configured");
+
+        Path root = Paths.get(assetsDir);
+        Path dir  = root.resolve(subfolder).normalize();
+        if (!dir.startsWith(root))
+            throw new ProjectException("Invalid subfolder path");
+
+        try {
+            Files.createDirectories(dir);
+        } catch (IOException e) {
+            throw new ProjectException("Failed to create folder: " + e.getMessage(), e);
+        }
+    }
+
+    public List<String> listFolders() {
+        String assetsDir = projectService.getConfig().getAssetsDirectory();
+        if (assetsDir == null || assetsDir.isBlank()) return List.of();
+        Path root = Paths.get(assetsDir);
+        if (!Files.isDirectory(root)) return List.of();
+        try (Stream<Path> walk = Files.walk(root, 3)) {
+            return walk
+                .filter(Files::isDirectory)
+                .filter(p -> !p.equals(root))
+                .map(p -> root.relativize(p).toString())
+                .sorted()
+                .toList();
+        } catch (IOException e) {
+            return List.of();
+        }
+    }
+
     // ── Tags ─────────────────────────────────────────────────────────────────
 
     public Asset addTag(String assetId, String tag) {

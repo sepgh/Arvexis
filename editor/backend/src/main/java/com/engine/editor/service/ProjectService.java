@@ -99,6 +99,7 @@ public class ProjectService {
         config.setAudioSampleRate(req.audioSampleRate() != null ? req.audioSampleRate() : 44100);
         config.setAudioBitRate(req.audioBitRate() != null ? req.audioBitRate() : 128);
         config.setDecisionTimeoutSecs(req.decisionTimeoutSecs() != null ? req.decisionTimeoutSecs() : 5.0);
+        config.setFfmpegThreads(req.ffmpegThreads());  // null = Auto
 
         insertConfig(config);
         currentConfig     = config;
@@ -168,6 +169,7 @@ public class ProjectService {
         if (req.audioBitRate() != null)           currentConfig.setAudioBitRate(req.audioBitRate());
         if (req.decisionTimeoutSecs() != null)    currentConfig.setDecisionTimeoutSecs(req.decisionTimeoutSecs());
         if (req.defaultLocaleCode() != null)      currentConfig.setDefaultLocaleCode(req.defaultLocaleCode());
+        if (req.ffmpegThreads() != null)            currentConfig.setFfmpegThreads(req.ffmpegThreads());
 
         saveConfig(currentConfig);
         return currentConfig;
@@ -233,8 +235,8 @@ public class ProjectService {
             INSERT INTO project_config
                 (id, name, assets_directory, output_directory, preview_resolution,
                  compile_resolutions, fps, audio_sample_rate, audio_bit_rate,
-                 decision_timeout_secs, default_locale_code)
-            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 decision_timeout_secs, default_locale_code, ffmpeg_threads)
+            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             config.getName(),
             config.getAssetsDirectory(),
@@ -245,7 +247,8 @@ public class ProjectService {
             config.getAudioSampleRate(),
             config.getAudioBitRate(),
             config.getDecisionTimeoutSecs(),
-            config.getDefaultLocaleCode()
+            config.getDefaultLocaleCode(),
+            config.getFfmpegThreads()
         );
     }
 
@@ -255,7 +258,8 @@ public class ProjectService {
                 name = ?, assets_directory = ?, output_directory = ?,
                 preview_resolution = ?, compile_resolutions = ?, fps = ?,
                 audio_sample_rate = ?, audio_bit_rate = ?,
-                decision_timeout_secs = ?, default_locale_code = ?
+                decision_timeout_secs = ?, default_locale_code = ?,
+                ffmpeg_threads = ?
             WHERE id = 1
             """,
             config.getName(),
@@ -267,7 +271,8 @@ public class ProjectService {
             config.getAudioSampleRate(),
             config.getAudioBitRate(),
             config.getDecisionTimeoutSecs(),
-            config.getDefaultLocaleCode()
+            config.getDefaultLocaleCode(),
+            config.getFfmpegThreads()
         );
     }
 
@@ -286,6 +291,8 @@ public class ProjectService {
                 c.setAudioBitRate(rs.getInt("audio_bit_rate"));
                 c.setDecisionTimeoutSecs(rs.getDouble("decision_timeout_secs"));
                 c.setDefaultLocaleCode(rs.getString("default_locale_code"));
+                int threads = rs.getInt("ffmpeg_threads");
+                c.setFfmpegThreads(rs.wasNull() ? null : threads);
                 return c;
             }
         );

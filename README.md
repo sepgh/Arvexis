@@ -1,6 +1,6 @@
-# Interactive Video Engine
+# Arvexis
 
-A node-based authoring tool for building interactive video experiences and artistic games. Authors compose a directed graph of scenes, decisions, and state mutations in a visual editor; the engine compiles it into a self-contained, offline-capable playable package.
+A node-based authoring tool for building interactive video experiences and artistic games. Authors compose a directed graph of scenes, conditions, and state mutations in a visual editor; the engine compiles it into a self-contained, offline-capable playable package.
 
 ---
 
@@ -9,7 +9,7 @@ A node-based authoring tool for building interactive video experiences and artis
 1. **Author** — Open the editor in a browser. Build a graph of nodes:
    - **Scene nodes** — video layers composited over each other, with audio tracks, decision buttons, and an optional end flag.
    - **State nodes** — SpEL expressions that mutate global variables (e.g. `#VISIT_COUNT = #VISIT_COUNT + 1`).
-   - **Decision nodes** — ordered SpEL boolean conditions that route the player along different edges.
+   - **Condition nodes** — ordered SpEL boolean conditions that route the player along different edges.
 2. **Preview** — Compile individual scenes or transitions at preview resolution and watch the result in-browser without leaving the editor.
 3. **Compile** — Run the full pipeline: FFmpeg compositing → HLS conversion → packaging. Downloads a `dist.zip` containing a self-contained runtime.
 4. **Play** — Extract `dist.zip` and run `./start.sh` (Linux/macOS) or `start.bat` (Windows). Open `http://localhost:8090` in any browser — no internet connection required.

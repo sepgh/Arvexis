@@ -1,4 +1,6 @@
-We are building a Node-Based Interactive Video Engine to build artistic games and interactive video experiences. Below is the description of the system and its parts in detail, as well as design decisions and constraints.
+# Arvexis
+
+We are building **Arvexis** — a Node-Based Interactive Video Engine to build artistic games and interactive video experiences. Below is the description of the system and its parts in detail, as well as design decisions and constraints.
 
 
 # Tech Stack
@@ -29,6 +31,15 @@ The project is modeled as a **directed graph** with the following rules:
 Assets (video, audio files) are managed separately in the project, stored in a configurable directory. The engine user can organize assets in subdirectories and assign **tags** (flat list of reusable string tags shared across files).
 
 Assets can be referenced in scenes or transitions by directory/file name or discovered through tags.
+
+### Asset Upload & Folder Management
+
+The editor supports uploading media files directly through the UI:
+- `POST /api/assets/upload` — multipart upload; optionally specify a `folder` destination
+- `POST /api/assets/folder` — create a new subfolder within the assets directory
+- `GET /api/assets/folders` — list all existing subdirectories
+
+Safety constraints: paths are resolved relative to the configured assets directory; path traversal (`..`) is rejected.
 
 ### Supported Formats
 
@@ -95,18 +106,23 @@ SpEL supports all needed operations: math (`+`, `-`, `*`, `/`, `%`), logic (`and
 A state node has exactly **one outgoing edge** (it processes mutations and immediately continues to the next node).
 
 
-## Decision Node
+## Condition Node
 
-A decision node contains an **ordered list of conditions**. Each condition is a **SpEL expression** that evaluates to a boolean.
+A condition node contains an **ordered list of conditions**. Each condition is a **SpEL expression** that evaluates to a boolean.
 
 Examples:
 - `#VISIT_COUNT > 3`
 - `#HAS_KEY == true and #SCORE >= 50`
 - `(#A > 5 and #B != 3) or #C == true`
 
-There is always an **`any/else`** condition as the last item in the list (fallback).
+There is always an **`else`** condition as the last item in the list (fallback).
 
-Each condition is an outgoing edge. When a condition is met, the graph follows that edge immediately (first match wins).
+Each condition has:
+- A **name** (user-defined, shown as the exit handle label on the canvas node)
+- A **SpEL boolean expression** (null for the else branch)
+- An outgoing edge identified by the condition name (`source_condition_name`)
+
+When a condition is met, the graph follows that edge immediately (first match wins).
 
 
 ## Transitions

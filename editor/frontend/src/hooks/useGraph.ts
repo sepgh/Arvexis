@@ -27,7 +27,7 @@ export type FlowEdge = Edge<FlowEdgeData>
 const NODE_DEFAULT_NAMES: Record<NodeType, string> = {
   scene: 'New Scene',
   state: 'New State',
-  decision: 'New Decision',
+  condition: 'New Condition',
 }
 
 export function useGraph() {
@@ -65,10 +65,16 @@ export function useGraph() {
   }
 
   function toFlowEdge(ge: GraphEdge): FlowEdge {
+    // The React Flow sourceHandle must match the handle id on the source node
+    const sourceHandle = ge.sourceDecisionKey
+      ?? ge.sourceConditionName
+      ?? undefined
     return {
       id: ge.id,
       source: ge.sourceNodeId,
       target: ge.targetNodeId,
+      sourceHandle: sourceHandle ?? null,
+      type: 'labeled',
       data: ge as FlowEdgeData,
     }
   }
@@ -90,16 +96,51 @@ export function useGraph() {
 
   const onConnect = useCallback(async (connection: Connection) => {
     if (!connection.source || !connection.target) return
+
+    // Resolve what kind of exit the handle represents
+    const handle = connection.sourceHandle ?? undefined
+    const sourceNode = nodes.find(n => n.id === connection.source)
+    const sourceType = sourceNode?.data.type
+
+    // Enforce single-edge-per-exit in the frontend before hitting the API
+    if (handle) {
+      const alreadyUsed = edges.some(
+        e => e.source === connection.source && e.sourceHandle === handle
+      )
+      if (alreadyUsed) {
+        console.warn('Exit already has an outgoing edge:', handle)
+        return
+      }
+    } else if (sourceType === 'state') {
+      const alreadyUsed = edges.some(e => e.source === connection.source)
+      if (alreadyUsed) {
+        console.warn('State node already has an outgoing edge')
+        return
+      }
+    }
+
+    // Build the request based on handle type
+    let sourceDecisionKey: string | undefined
+    let sourceConditionName: string | undefined
+
+    if (sourceType === 'scene' && handle) {
+      sourceDecisionKey = handle
+    } else if (sourceType === 'condition' && handle) {
+      sourceConditionName = handle
+    }
+
     try {
       const ge = await graphApi.createEdge({
         sourceNodeId: connection.source,
         targetNodeId: connection.target,
+        sourceDecisionKey,
+        sourceConditionName,
       })
       setEdges((eds) => addEdge(toFlowEdge(ge), eds))
     } catch (e) {
       console.error('Failed to create edge:', e)
     }
-  }, [])
+  }, [nodes, edges])
 
   const onNodeDragStop = useCallback<OnNodeDrag<FlowNode>>(
     async (_event, node) => {

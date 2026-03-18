@@ -132,6 +132,7 @@ public class ScenePreviewService {
                 .fps(fps)
                 .duration(duration)
                 .outputPath(outFile)
+                .ffmpegThreads(config.getFfmpegThreads())
                 .build();
 
             job.setProgress(25, "Starting FFmpeg…");

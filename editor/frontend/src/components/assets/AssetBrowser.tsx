@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Asset, ScanResult } from '@/types'
-import { listAssets, scanAssets, listTags } from '@/api/assets'
+import { listAssets, scanAssets, listTags, uploadAsset, createFolder, listFolders } from '@/api/assets'
 import AssetDetail from './AssetDetail'
 
 type MediaFilter = 'all' | 'video' | 'audio'
@@ -15,16 +15,22 @@ export default function AssetBrowser() {
   const [search, setSearch] = useState('')
   const [mediaFilter, setMediaFilter] = useState<MediaFilter>('all')
   const [tagFilter, setTagFilter] = useState('')
-  const [selected, setSelected] = useState<Asset | null>(null)
+  const [selected, setSelected]       = useState<Asset | null>(null)
+  const [folders, setFolders]           = useState<string[]>([])
+  const [uploading, setUploading]       = useState(false)
+  const [uploadFolder, setUploadFolder] = useState('')
+  const [newFolderName, setNewFolderName] = useState('')
+  const [showFolderInput, setShowFolderInput] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const [fetched, tags] = await Promise.all([listAssets(), listTags()])
+      const [fetched, tags, fols] = await Promise.all([listAssets(), listTags(), listFolders()])
       setAssets(fetched)
       setAllTags(tags)
-      // Keep selected asset in sync
+      setFolders(fols)
       if (selected) {
         const refreshed = fetched.find((a) => a.id === selected.id)
         setSelected(refreshed ?? null)
@@ -37,6 +43,35 @@ export default function AssetBrowser() {
   }, [selected])
 
   useEffect(() => { load() }, [])
+
+  async function handleUpload(files: FileList | null) {
+    if (!files || files.length === 0) return
+    setUploading(true)
+    setError(null)
+    try {
+      for (const file of Array.from(files)) {
+        await uploadAsset(file, uploadFolder || undefined)
+      }
+      await load()
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Upload failed')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function handleCreateFolder() {
+    if (!newFolderName.trim()) return
+    setError(null)
+    try {
+      await createFolder(newFolderName.trim())
+      setNewFolderName('')
+      setShowFolderInput(false)
+      await load()
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to create folder')
+    }
+  }
 
   async function handleScan() {
     setScanning(true)
@@ -79,27 +114,27 @@ export default function AssetBrowser() {
   return (
     <div className="flex h-full overflow-hidden">
       {/* Panel */}
-      <div className="flex flex-col w-72 shrink-0 border-r border-border bg-card overflow-hidden">
+      <div className="flex flex-col w-full shrink-0 border-r border-border bg-card overflow-hidden">
         {/* Toolbar */}
-        <div className="flex flex-col gap-2 px-3 py-3 border-b border-border shrink-0">
+        <div className="flex flex-col border-b border-border shrink-0" style={{ padding: '16px 16px', gap: 10 }}>
           {/* Search */}
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search assets…"
-            className="input-base text-xs py-1.5"
+            className="input-base text-sm py-2"
           />
 
           {/* Media type filter + Scan */}
           <div className="flex items-center gap-1">
-            <div className="flex rounded-md overflow-hidden border border-border text-xs flex-1">
+            <div className="flex rounded-md overflow-hidden border border-border text-sm flex-1">
               {(['all', 'video', 'audio'] as MediaFilter[]).map((f) => (
                 <button
                   key={f}
                   onClick={() => setMediaFilter(f)}
                   className={[
-                    'flex-1 py-1 capitalize transition-colors',
+                    'flex-1 capitalize transition-colors',
                     mediaFilter === f
                       ? 'bg-primary text-primary-foreground'
                       : 'text-muted-foreground hover:text-foreground hover:bg-accent',
@@ -113,7 +148,7 @@ export default function AssetBrowser() {
               onClick={handleScan}
               disabled={scanning}
               title="Scan assets directory"
-              className="flex items-center justify-center w-8 h-7 rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-40 transition-colors shrink-0"
+              className="flex items-center justify-center w-9 h-9 rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-40 transition-colors shrink-0"
             >
               <svg width="13" height="13" viewBox="0 0 13 13" fill="none" className={scanning ? 'animate-spin' : ''}>
                 <path d="M6.5 1.5A5 5 0 1 1 2 6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
@@ -146,6 +181,63 @@ export default function AssetBrowser() {
                 ))}
             </div>
           )}
+        </div>
+
+        {/* Upload bar */}
+        <div className="px-4 py-3 border-b border-border/50 flex flex-col gap-2 shrink-0">
+          <div className="flex items-center gap-1.5">
+            <select
+              value={uploadFolder}
+              onChange={e => setUploadFolder(e.target.value)}
+              className="input-base text-sm py-1.5 flex-1 min-w-0"
+            >
+              <option value="">(root folder)</option>
+              {folders.map(f => <option key={f} value={f}>{f}</option>)}
+            </select>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              title="Upload media files"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-40 transition-colors shrink-0"
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M6 1v7M3 4l3-3 3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M1 9.5h10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+              </svg>
+              {uploading ? 'Uploading…' : 'Upload'}
+            </button>
+            <button
+              onClick={() => setShowFolderInput(v => !v)}
+              title="New folder"
+              className="flex items-center justify-center w-9 h-9 rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-accent transition-colors shrink-0"
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M1 3.5h4l1.5-1.5H11v7H1z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+                <path d="M6 6v3M4.5 7.5h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              </svg>
+            </button>
+          </div>
+          {showFolderInput && (
+            <div className="flex items-center gap-1.5">
+              <input
+                autoFocus
+                value={newFolderName}
+                onChange={e => setNewFolderName(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleCreateFolder(); if (e.key === 'Escape') { setShowFolderInput(false); setNewFolderName('') } }}
+                placeholder="New folder name…"
+                className="input-base text-xs py-1 flex-1"
+              />
+              <button onClick={handleCreateFolder} className="text-xs px-2 py-1 rounded-md bg-primary text-primary-foreground hover:opacity-90">Create</button>
+            </div>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="video/*,audio/*,.mp4,.mov,.avi,.mkv,.webm,.mp3,.wav,.aac,.flac,.ogg"
+            className="hidden"
+            onChange={e => handleUpload(e.target.files)}
+          />
         </div>
 
         {/* Scan result toast */}
@@ -199,7 +291,7 @@ export default function AssetBrowser() {
         </div>
 
         {/* Footer count */}
-        <div className="px-3 py-2 border-t border-border text-xs text-muted-foreground shrink-0">
+        <div className="px-4 py-2.5 border-t border-border text-sm text-muted-foreground shrink-0">
           {filtered.length} / {assets.length} assets
         </div>
       </div>

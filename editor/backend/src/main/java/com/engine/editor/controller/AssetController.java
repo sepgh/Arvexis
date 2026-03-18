@@ -7,10 +7,14 @@ import com.engine.editor.controller.dto.ScanResultResponse;
 import com.engine.editor.model.Asset;
 import com.engine.editor.service.AssetCompatibilityChecker;
 import com.engine.editor.service.AssetService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
@@ -63,6 +67,30 @@ public class AssetController {
     @GetMapping("/tags")
     public ResponseEntity<List<String>> listTags() {
         return ResponseEntity.ok(assetService.listAllTags());
+    }
+
+    @PostMapping("/assets/upload")
+    public ResponseEntity<Asset> upload(
+        @RequestParam("file")                       MultipartFile file,
+        @RequestParam(value = "folder", required = false) String folder
+    ) throws IOException {
+        Asset created = assetService.uploadAsset(
+            folder, file.getOriginalFilename(), file.getBytes());
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    }
+
+    @PostMapping("/assets/folder")
+    public ResponseEntity<Map<String, String>> createFolder(
+        @RequestBody Map<String, String> body
+    ) {
+        String path = body.get("path");
+        assetService.createFolder(path);
+        return ResponseEntity.ok(Map.of("path", path));
+    }
+
+    @GetMapping("/assets/folders")
+    public ResponseEntity<List<String>> listFolders() {
+        return ResponseEntity.ok(assetService.listFolders());
     }
 
     @PostMapping("/assets/compatibility-check")

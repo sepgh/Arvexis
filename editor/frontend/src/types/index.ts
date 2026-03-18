@@ -1,6 +1,13 @@
 // ── Node types ──────────────────────────────────────────────────────────────
 
-export type NodeType = 'scene' | 'state' | 'decision'
+export type NodeType = 'scene' | 'state' | 'condition'
+
+/** A single exit/output handle on a node (scene decision key or condition name). */
+export interface NodeExit {
+  key: string
+  label: string
+  isDefault: boolean
+}
 
 export interface GraphNode {
   id: string
@@ -12,6 +19,7 @@ export interface GraphNode {
   decisionAppearanceConfig?: DecisionAppearanceConfig
   posX: number
   posY: number
+  exits: NodeExit[]
 }
 
 export interface DecisionAppearanceConfig {
@@ -38,6 +46,7 @@ export interface GraphEdge {
   sourceNodeId: string
   sourceDecisionKey?: string
   sourceConditionOrder?: number
+  sourceConditionName?: string
   targetNodeId: string
   transition?: EdgeTransition
 }
@@ -124,16 +133,20 @@ export interface StateDataResponse {
 export interface ConditionData {
   id: number
   conditionOrder: number
+  name: string | null
   expression: string | null
   isElse: boolean
   edgeId: string | null
   targetNodeName: string | null
 }
 
-export interface DecisionDataResponse {
+export interface ConditionDataResponse {
   nodeId: string
   conditions: ConditionData[]
 }
+
+/** @deprecated renamed to ConditionDataResponse */
+export type DecisionDataResponse = ConditionDataResponse
 
 export interface SpelValidateResponse {
   valid: boolean
@@ -202,6 +215,31 @@ export interface ProjectConfig {
   audioBitRate: number
   decisionTimeoutSecs: number
   defaultLocaleCode?: string
+  ffmpegThreads?: number | null    // null = Auto (let FFmpeg decide)
+}
+
+// ── Localization ─────────────────────────────────────────────────────────────
+
+export interface Locale {
+  code: string
+  name: string
+}
+
+export interface SubtitleEntry {
+  id: string
+  sceneId: string
+  localeCode: string
+  startTime: number
+  endTime: number
+  text: string
+}
+
+export interface DecisionTranslation {
+  id: string
+  decisionKey: string
+  sceneId: string
+  localeCode: string
+  label: string
 }
 
 // ── API response wrappers ────────────────────────────────────────────────────

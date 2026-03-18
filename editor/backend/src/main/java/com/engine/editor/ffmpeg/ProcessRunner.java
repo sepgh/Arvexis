@@ -29,7 +29,7 @@ public final class ProcessRunner {
      * @throws IOException if the process cannot be started or streams cannot be read
      */
     public static ProcessResult run(List<String> command, int timeoutSeconds) throws IOException {
-        log.debug("Running: {}", String.join(" ", command));
+        log.info("FFmpeg: {}", String.join(" ", command));
 
         ProcessBuilder pb = new ProcessBuilder(command);
         pb.redirectErrorStream(false);
@@ -69,8 +69,10 @@ public final class ProcessRunner {
         String stdout = outDrainer.getContent();
         String stderr = errDrainer.getContent();
 
+        if (!stdout.isBlank()) log.debug("FFmpeg stdout:\n{}", stdout.stripTrailing());
+        if (!stderr.isBlank()) log.debug("FFmpeg stderr:\n{}", stderr.stripTrailing());
         if (exitCode != 0) {
-            log.debug("Process exited with code {}: {}", exitCode, stderr);
+            log.warn("FFmpeg exited with code {}", exitCode);
         }
 
         return new ProcessResult(exitCode, stdout, stderr);

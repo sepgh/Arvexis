@@ -78,9 +78,9 @@ export default function SpelInput({ value, onChange, onBlur, mode, placeholder, 
         <div
           ref={overlayRef}
           aria-hidden
-          className="absolute inset-0 px-3 py-2 text-xs font-mono whitespace-pre-wrap break-words pointer-events-none overflow-hidden"
+          className="absolute inset-0 font-mono whitespace-pre-wrap break-words pointer-events-none overflow-hidden"
           dangerouslySetInnerHTML={{ __html: highlight(value) + '\u200b' }}
-          style={{ color: 'transparent' }}
+          style={{ color: 'transparent', padding: '10px 14px', fontSize: 14 }}
         />
         {/* Actual textarea — caret visible, text transparent */}
         <textarea
@@ -92,14 +92,15 @@ export default function SpelInput({ value, onChange, onBlur, mode, placeholder, 
           placeholder={placeholder}
           rows={2}
           spellCheck={false}
-          className="relative w-full px-3 py-2 text-xs font-mono bg-transparent resize-none outline-none"
-          style={{ caretColor: 'white', color: 'transparent' }}
+          className="relative w-full font-mono bg-transparent resize-y outline-none"
+          style={{ caretColor: 'white', color: 'transparent', padding: '10px 14px', fontSize: 14, minHeight: 56 }}
         />
         {/* Visible text layer — same position as textarea */}
         <div
           aria-hidden
-          className="absolute inset-0 px-3 py-2 text-xs font-mono whitespace-pre-wrap break-words pointer-events-none overflow-hidden"
+          className="absolute inset-0 font-mono whitespace-pre-wrap break-words pointer-events-none overflow-hidden"
           dangerouslySetInnerHTML={{ __html: highlight(value) + '\u200b' }}
+          style={{ padding: '10px 14px', fontSize: 14 }}
         />
       </div>
       {validState === 'invalid' && errorMsg && (

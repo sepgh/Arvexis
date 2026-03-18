@@ -131,7 +131,7 @@ public class ManifestService {
         switch (type) {
             case "scene"    -> fillSceneNode(n, nodeId, config, jdbc);
             case "state"    -> fillStateNode(n, nodeId, jdbc);
-            case "decision" -> fillDecisionNode(n, nodeId, jdbc);
+            case "condition" -> fillConditionNode(n, nodeId, jdbc);
         }
         return n;
     }
@@ -222,7 +222,7 @@ public class ManifestService {
         n.put("assignments", list);
     }
 
-    private void fillDecisionNode(Map<String, Object> n, String nodeId, JdbcTemplate jdbc) {
+    private void fillConditionNode(Map<String, Object> n, String nodeId, JdbcTemplate jdbc) {
         List<Map<String, Object>> rows = jdbc.queryForList("""
             SELECT condition_order, expression, is_else FROM node_decision_conditions
             WHERE node_id=? ORDER BY condition_order

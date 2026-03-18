@@ -18,6 +18,7 @@ export interface CreateProjectPayload {
   audioSampleRate?: number
   audioBitRate?: number
   decisionTimeoutSecs?: number
+  ffmpegThreads?: number | null
 }
 
 export function getProjectStatus(): Promise<ProjectStatus> {

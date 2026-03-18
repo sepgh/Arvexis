@@ -22,6 +22,7 @@ export interface CreateEdgePayload {
   targetNodeId: string
   sourceDecisionKey?: string
   sourceConditionOrder?: number
+  sourceConditionName?: string
 }
 
 export interface UpdateEdgePayload {

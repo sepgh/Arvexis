@@ -27,21 +27,21 @@ export default function AssetDetail({ asset, allTags, onClose, onAssetUpdated }:
   const isVideo = asset.mediaType === 'video'
 
   return (
-    <div className="flex flex-col h-full bg-card border-l border-border w-72 shrink-0">
+    <div className="flex flex-col h-full bg-card border-l border-border w-80 shrink-0">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <span className="text-xs font-medium text-foreground truncate pr-2" title={asset.fileName}>
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+        <span className="text-sm font-medium text-foreground truncate pr-2" title={asset.fileName}>
           {asset.fileName}
         </span>
         <button
           onClick={onClose}
-          className="text-muted-foreground hover:text-foreground shrink-0 text-lg leading-none"
+          className="text-muted-foreground hover:text-foreground shrink-0 text-xl leading-none p-1"
         >
           ×
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+      <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-4">
         {/* Type + Alpha badges */}
         <div className="flex items-center gap-2 flex-wrap">
           <span className={[
@@ -71,7 +71,7 @@ export default function AssetDetail({ asset, allTags, onClose, onAssetUpdated }:
 
         {/* Tags */}
         <div className="flex flex-col gap-2">
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Tags</span>
+          <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Tags</span>
           {asset.tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {asset.tags.map((tag) => (
@@ -99,8 +99,8 @@ export default function AssetDetail({ asset, allTags, onClose, onAssetUpdated }:
 
         {/* Full path */}
         <div className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Path</span>
-          <p className="text-xs text-muted-foreground font-mono break-all leading-relaxed">
+          <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Path</span>
+          <p className="text-sm text-muted-foreground font-mono break-all leading-relaxed">
             {asset.filePath}
           </p>
         </div>
@@ -113,8 +113,8 @@ function MetaRow({ label, value }: { label: string; value: string | null | undef
   if (!value) return null
   return (
     <div className="flex justify-between items-center gap-2">
-      <span className="text-xs text-muted-foreground shrink-0">{label}</span>
-      <span className="text-xs text-foreground text-right truncate">{value}</span>
+      <span className="text-sm text-muted-foreground shrink-0">{label}</span>
+      <span className="text-sm text-foreground text-right truncate">{value}</span>
     </div>
   )
 }

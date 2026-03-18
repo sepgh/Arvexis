@@ -87,12 +87,13 @@ public class TransitionPreviewService {
             job.setProgress(15, "Building FFmpeg command…");
             if (job.isCancelRequested()) { job.markCancelled(); return; }
 
+            Integer threads = config.getFfmpegThreads();
             if ("video".equals(transType)) {
-                compileVideoTransition(edgeId, jdbc, config, resolution, fps, outFile, transDur, job);
+                compileVideoTransition(edgeId, jdbc, config, resolution, fps, threads, outFile, transDur, job);
             } else if ("cut".equals(transType) || !XFADE_MAP.containsKey(transType)) {
-                compileCutTransition(resolution, fps, outFile, job);
+                compileCutTransition(resolution, fps, threads, outFile, job);
             } else {
-                compileBuiltinTransition(transType, transDur, resolution, fps, outFile, job);
+                compileBuiltinTransition(transType, transDur, resolution, fps, threads, outFile, job);
             }
 
             if (job.isCancelRequested()) { job.markCancelled(); return; }
@@ -107,8 +108,8 @@ public class TransitionPreviewService {
     // ── Built-in: xfade between two solid-color frames ────────────────────────
 
     private void compileBuiltinTransition(String transType, double transDur,
-                                          String resolution, int fps, Path outFile,
-                                          PreviewJob job) throws Exception {
+                                          String resolution, int fps, Integer ffmpegThreads,
+                                          Path outFile, PreviewJob job) throws Exception {
         String xfadeEffect = XFADE_MAP.get(transType);
         double padDur   = 1.0;
         double totalDur = padDur + transDur + padDur;
@@ -121,7 +122,7 @@ public class TransitionPreviewService {
             xfadeEffect, transDur, offset);
 
         List<String> cmd = FFmpegCommandBuilder.create()
-            .overwrite().hideBanner().logLevel("error")
+            .overwrite().hideBanner().logLevel("error").threads(ffmpegThreads)
             .inputWithOptions(List.of("-f", "lavfi"), srcA)
             .inputWithOptions(List.of("-f", "lavfi"), srcB)
             .filterComplex(filter).mapVideo("[vout]")
@@ -138,13 +139,13 @@ public class TransitionPreviewService {
 
     // ── Cut: 1s color A, hard cut to 1s color B ───────────────────────────────
 
-    private void compileCutTransition(String resolution, int fps, Path outFile,
-                                       PreviewJob job) throws Exception {
+    private void compileCutTransition(String resolution, int fps, Integer ffmpegThreads,
+                                       Path outFile, PreviewJob job) throws Exception {
         String srcA = String.format("color=c=0x3b82f6:s=%s:r=%d:d=1.0", resolution, fps);
         String srcB = String.format("color=c=0xf59e0b:s=%s:r=%d:d=1.0", resolution, fps);
 
         List<String> cmd = FFmpegCommandBuilder.create()
-            .overwrite().hideBanner().logLevel("error")
+            .overwrite().hideBanner().logLevel("error").threads(ffmpegThreads)
             .inputWithOptions(List.of("-f", "lavfi"), srcA)
             .inputWithOptions(List.of("-f", "lavfi"), srcB)
             .filterComplex("[0:v][1:v]concat=n=2:v=1:a=0[vout]").mapVideo("[vout]")
@@ -163,7 +164,7 @@ public class TransitionPreviewService {
 
     private void compileVideoTransition(String edgeId, JdbcTemplate jdbc,
                                         ProjectConfigData config,
-                                        String resolution, int fps,
+                                        String resolution, int fps, Integer ffmpegThreads,
                                         Path outFile, double fallbackDur,
                                         PreviewJob job) throws Exception {
         List<Map<String, Object>> layerRows = jdbc.queryForList("""
@@ -205,6 +206,7 @@ public class TransitionPreviewService {
             .fps(fps)
             .duration(duration)
             .outputPath(outFile)
+            .ffmpegThreads(ffmpegThreads)
             .build();
 
         job.setProgress(25, "Starting FFmpeg…");
