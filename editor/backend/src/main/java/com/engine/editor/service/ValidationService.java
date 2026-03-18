@@ -102,8 +102,11 @@ public class ValidationService {
         }
 
         // ── Error: transition on edge not targeting scene ──────────────────────
-        List<Map<String, Object>> transEdges = jdbc.queryForList(
-            "SELECT edge_id FROM edge_transitions");
+        // Only check transitions on edges that actually exist (filter out orphaned transition records)
+        List<Map<String, Object>> transEdges = jdbc.queryForList("""
+            SELECT et.edge_id FROM edge_transitions et
+            JOIN edges e ON e.id = et.edge_id
+            """);
         for (Map<String, Object> row : transEdges) {
             String eId = (String) row.get("edge_id");
             Integer c = jdbc.queryForObject("""

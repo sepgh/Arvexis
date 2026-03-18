@@ -198,7 +198,7 @@ export default function AssetBrowser() {
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
               title="Upload media files"
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-40 transition-colors shrink-0"
+              className="flex items-center justify-center gap-1.5 h-9 px-3 text-sm rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-40 transition-colors shrink-0"
             >
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                 <path d="M6 1v7M3 4l3-3 3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
@@ -225,9 +225,9 @@ export default function AssetBrowser() {
                 onChange={e => setNewFolderName(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') handleCreateFolder(); if (e.key === 'Escape') { setShowFolderInput(false); setNewFolderName('') } }}
                 placeholder="New folder name…"
-                className="input-base text-xs py-1 flex-1"
+                className="input-base text-sm py-1.5 flex-1"
               />
-              <button onClick={handleCreateFolder} className="text-xs px-2 py-1 rounded-md bg-primary text-primary-foreground hover:opacity-90">Create</button>
+              <button onClick={handleCreateFolder} className="text-sm px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:opacity-90">Create</button>
             </div>
           )}
           <input
@@ -324,13 +324,13 @@ function AssetRow({
     <button
       onClick={onClick}
       className={[
-        'w-full flex items-center gap-2 px-3 py-2 text-left transition-colors border-b border-border/30',
+        'w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors border-b border-border/30',
         selected ? 'bg-primary/10' : 'hover:bg-accent',
       ].join(' ')}
     >
       {/* Type icon */}
       <div className={[
-        'w-7 h-7 rounded shrink-0 flex items-center justify-center text-xs',
+        'w-8 h-8 rounded shrink-0 flex items-center justify-center',
         isVideo ? 'bg-blue-500/15 text-blue-400' : 'bg-purple-500/15 text-purple-400',
       ].join(' ')}>
         {isVideo ? (
@@ -352,24 +352,24 @@ function AssetRow({
       {/* Info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-foreground truncate">{asset.fileName}</span>
+          <span className="text-sm text-foreground truncate">{asset.fileName}</span>
           {isVideo && asset.hasAlpha && (
-            <span className="text-[10px] px-1 py-px rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 shrink-0">
+            <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 shrink-0">
               α
             </span>
           )}
         </div>
         <div className="flex items-center gap-2 mt-0.5">
           {asset.duration != null && (
-            <span className="text-[10px] text-muted-foreground">
+            <span className="text-xs text-muted-foreground">
               {formatDurationShort(asset.duration)}
             </span>
           )}
           {asset.resolution && (
-            <span className="text-[10px] text-muted-foreground">{asset.resolution}</span>
+            <span className="text-xs text-muted-foreground">{asset.resolution}</span>
           )}
           {asset.tags.length > 0 && (
-            <span className="text-[10px] text-muted-foreground truncate">
+            <span className="text-xs text-muted-foreground truncate">
               {asset.tags.join(', ')}
             </span>
           )}

@@ -433,30 +433,53 @@ function AudioTrackRow({ track, index, total, onRemove, onMoveUp, onMoveDown }: 
 
 function AssetPicker({ label, assets, onPick }: { label: string; assets: Asset[]; onPick: (a: Asset) => void }) {
   const [open, setOpen] = useState(false)
-  if (!assets.length) return <p className="text-xs text-muted-foreground text-center py-1">No assets scanned yet.</p>
+  const [search, setSearch] = useState('')
+
+  if (!assets.length) return <p className="text-sm text-muted-foreground text-center py-2">No assets scanned yet.</p>
+
+  const filtered = search
+    ? assets.filter(a => a.fileName.toLowerCase().includes(search.toLowerCase()))
+    : assets
+
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-2">
       <button
         onClick={() => setOpen(o => !o)}
-        className="text-xs text-primary hover:underline text-left"
+        className="text-sm text-primary hover:underline text-left font-medium"
       >
         {open ? '▲' : '▼'} {label}
       </button>
       {open && (
-        <div className="flex flex-col border border-border rounded-lg overflow-hidden max-h-40 overflow-y-auto">
-          {assets.map(a => (
-            <button
-              key={a.id}
-              onClick={() => { onPick(a); setOpen(false) }}
-              className="text-left px-3 py-1.5 text-xs text-foreground hover:bg-accent border-b border-border/30 last:border-0 flex items-center gap-2"
-            >
-              {a.mediaType === 'video' && a.hasAlpha && (
-                <span className="text-[9px] px-1 py-px rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 shrink-0">α</span>
-              )}
-              <span className="truncate">{a.fileName}</span>
-              {a.duration != null && <span className="text-muted-foreground shrink-0">{a.duration.toFixed(1)}s</span>}
-            </button>
-          ))}
+        <div className="flex flex-col border border-border rounded-lg overflow-hidden bg-muted/20">
+          <div className="p-2 border-b border-border/50">
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search assets…"
+              className="input-base text-sm py-1.5 w-full"
+              autoFocus
+            />
+          </div>
+          <div className="flex flex-col max-h-64 overflow-y-auto">
+            {filtered.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No matching assets</p>
+            ) : (
+              filtered.map(a => (
+                <button
+                  key={a.id}
+                  onClick={() => { onPick(a); setOpen(false); setSearch('') }}
+                  className="text-left px-4 py-2.5 text-sm text-foreground hover:bg-accent border-b border-border/30 last:border-0 flex items-center gap-3"
+                >
+                  {a.mediaType === 'video' && a.hasAlpha && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 shrink-0">α</span>
+                  )}
+                  <span className="flex-1 truncate">{a.fileName}</span>
+                  {a.duration != null && <span className="text-muted-foreground shrink-0">{a.duration.toFixed(1)}s</span>}
+                </button>
+              ))
+            )}
+          </div>
         </div>
       )}
     </div>
