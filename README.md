@@ -1,6 +1,12 @@
 # Arvexis
 
-A node-based authoring tool for building interactive video experiences and artistic games. Authors compose a directed graph of scenes, conditions, and state mutations in a visual editor; the engine compiles it into a self-contained, offline-capable playable package.
+<p>
+  
+  <img width="10%" src="https://github.com/sepgh/Arvexis/blob/main/assets/logo.png" align="left" />
+  A node-based authoring tool for building interactive video experiences and artistic games. Authors compose a directed graph of scenes, conditions, and state mutations in a visual editor; the engine compiles it into a self-contained, offline-capable playable package.
+</p>
+
+
 
 ---
 
