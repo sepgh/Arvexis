@@ -245,7 +245,7 @@ public class CompileService {
         Path startSh = distDir.resolve("start.sh");
         Files.writeString(startSh,
             "#!/bin/sh\n" +
-            "# Interactive Video Engine — Runtime\n" +
+            "# Arvexis — Runtime\n" +
             "# Usage: ./start.sh [--port 8090]\n" +
             "java -jar runtime.jar \"$@\"\n",
             StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
@@ -260,7 +260,7 @@ public class CompileService {
         // start.bat
         Files.writeString(distDir.resolve("start.bat"),
             "@echo off\r\n" +
-            "REM Interactive Video Engine — Runtime\r\n" +
+            "REM Arvexis — Runtime\r\n" +
             "java -jar runtime.jar %*\r\n",
             StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
 

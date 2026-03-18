@@ -25,7 +25,7 @@ public class Main {
 
         Path manifestFile = Path.of("manifest.json").toAbsolutePath();
 
-        System.out.println("=== Interactive Video Engine — Runtime ===");
+        System.out.println("=== Arvexis — Runtime ===");
         System.out.println("  Manifest : " + manifestFile);
         System.out.println("  Output   : " + outputDir);
         System.out.println("  Port     : " + port);

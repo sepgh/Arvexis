@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - "v*.*.*"
+      - "v*"
   workflow_dispatch:
     inputs:
       tag:
@@ -59,15 +59,11 @@ jobs:
           cd editor/backend
           mvn -Pnative native:compile -DskipTests -q
 
-      - name: Upload binary (Linux)
+      - name: Make binary executable (Linux)
         if: runner.os == 'Linux'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact }}
-          path: ${{ matrix.binary }}
+        run: chmod +x ${{ matrix.binary }}
 
-      - name: Upload binary (Windows)
-        if: runner.os == 'Windows'
+      - name: Upload native binary
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
@@ -114,6 +110,7 @@ jobs:
   release:
     name: Create draft release
     needs: [build-native, build-jar]
+    if: always() && !cancelled()
     runs-on: ubuntu-latest
 
     permissions:
@@ -128,10 +125,21 @@ jobs:
         with:
           path: artifacts
 
-      - name: Rename JAR for release
+      - name: List downloaded artifacts
+        run: find artifacts -type f
+
+      - name: Prepare release files
         run: |
+          mkdir -p release
+          # Copy Linux binary
+          cp artifacts/arvexis-editor-linux-x64/arvexis-editor release/arvexis-editor-linux-x64 || echo "Linux binary not found"
+          chmod +x release/arvexis-editor-linux-x64 || true
+          # Copy Windows binary
+          cp artifacts/arvexis-editor-windows-x64/arvexis-editor.exe release/arvexis-editor-windows-x64.exe || echo "Windows binary not found"
+          # Copy JAR
           JAR=$(find artifacts/arvexis-editor-jar -name "*.jar" | head -1)
-          cp "$JAR" artifacts/arvexis-editor.jar
+          cp "$JAR" release/arvexis-editor.jar || echo "JAR not found"
+          ls -la release/
 
       - name: Create draft release
         uses: softprops/action-gh-release@v2
@@ -163,6 +171,7 @@ jobs:
               --logging.level.com.engine.editor=DEBUG
             ```
           files: |
-            artifacts/arvexis-editor-linux-x64/arvexis-editor
-            artifacts/arvexis-editor-windows-x64/arvexis-editor.exe
-            artifacts/arvexis-editor.jar
+            release/arvexis-editor-linux-x64
+            release/arvexis-editor-windows-x64.exe
+            release/arvexis-editor.jar
+          fail_on_unmatched_files: false

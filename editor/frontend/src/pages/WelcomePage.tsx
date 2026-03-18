@@ -30,7 +30,7 @@ export default function WelcomePage() {
         </div>
         <div className="text-center">
           <h1 className="font-semibold text-foreground tracking-tight" style={{ fontSize: 32 }}>
-            Interactive Video Engine
+            Arvexis
           </h1>
           <p className="text-muted-foreground" style={{ fontSize: 16, marginTop: 8 }}>
             Node-based editor for interactive video experiences

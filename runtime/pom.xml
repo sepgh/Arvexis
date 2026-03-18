@@ -7,7 +7,7 @@
     <groupId>com.engine</groupId>
     <artifactId>runtime</artifactId>
     <version>1.0.0</version>
-    <name>Interactive Video Engine — Compiled Runtime</name>
+    <name>Arvexis — Compiled Runtime</name>
 
     <properties>
         <java.version>21</java.version>
