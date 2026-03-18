@@ -60,11 +60,15 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, backgroundCol
 
   // ── Video layers ─────────────────────────────────────────────────────────
 
+  function toLayerReq(vl: VideoLayerData): VideoLayerRequest {
+    return { assetId: vl.assetId, startAt: vl.startAt, freezeLastFrame: vl.freezeLastFrame }
+  }
+
   async function addVideoLayer(asset: Asset) {
     if (!data) return
     const newLayers: VideoLayerRequest[] = [
-      ...data.videoLayers.map(vl => ({ assetId: vl.assetId, startAt: vl.startAt })),
-      { assetId: asset.id, startAt: 0 },
+      ...data.videoLayers.map(toLayerReq),
+      { assetId: asset.id, startAt: 0, freezeLastFrame: false },
     ]
     const result = await withSave(() => saveVideoLayers(nodeId, newLayers))
     if (result) setData(result)
@@ -72,9 +76,7 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, backgroundCol
 
   async function removeVideoLayer(layerId: number) {
     if (!data) return
-    const newLayers = data.videoLayers
-      .filter(vl => vl.id !== layerId)
-      .map(vl => ({ assetId: vl.assetId, startAt: vl.startAt }))
+    const newLayers = data.videoLayers.filter(vl => vl.id !== layerId).map(toLayerReq)
     const result = await withSave(() => saveVideoLayers(nodeId, newLayers))
     if (result) setData(result)
   }
@@ -85,14 +87,23 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, backgroundCol
     const idx = layers.findIndex(l => l.id === layerId)
     if (idx + dir < 0 || idx + dir >= layers.length) return
     ;[layers[idx], layers[idx + dir]] = [layers[idx + dir], layers[idx]]
-    const result = await withSave(() => saveVideoLayers(nodeId, layers.map(l => ({ assetId: l.assetId, startAt: l.startAt }))))
+    const result = await withSave(() => saveVideoLayers(nodeId, layers.map(toLayerReq)))
     if (result) setData(result)
   }
 
   async function updateLayerStartAt(layerId: number, startAt: number) {
     if (!data) return
     const newLayers = data.videoLayers.map(vl =>
-      vl.id === layerId ? { assetId: vl.assetId, startAt } : { assetId: vl.assetId, startAt: vl.startAt }
+      ({ ...toLayerReq(vl), ...(vl.id === layerId ? { startAt } : {}) })
+    )
+    const result = await withSave(() => saveVideoLayers(nodeId, newLayers))
+    if (result) setData(result)
+  }
+
+  async function updateLayerFreeze(layerId: number, freezeLastFrame: boolean) {
+    if (!data) return
+    const newLayers = data.videoLayers.map(vl =>
+      ({ ...toLayerReq(vl), ...(vl.id === layerId ? { freezeLastFrame } : {}) })
     )
     const result = await withSave(() => saveVideoLayers(nodeId, newLayers))
     if (result) setData(result)
@@ -239,6 +250,7 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, backgroundCol
                 onMoveUp={() => moveVideoLayer(vl.id, -1)}
                 onMoveDown={() => moveVideoLayer(vl.id, 1)}
                 onStartAtChange={v => updateLayerStartAt(vl.id, v)}
+                onFreezeChange={v => updateLayerFreeze(vl.id, v)}
               />
             ))}
             {!data?.videoLayers.length && (
@@ -350,10 +362,11 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, backgroundCol
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function VideoLayerRow({ layer, index, total, onRemove, onMoveUp, onMoveDown, onStartAtChange }: {
+function VideoLayerRow({ layer, index, total, onRemove, onMoveUp, onMoveDown, onStartAtChange, onFreezeChange }: {
   layer: VideoLayerData; index: number; total: number
   onRemove: () => void; onMoveUp: () => void; onMoveDown: () => void
   onStartAtChange: (v: number) => void
+  onFreezeChange: (v: boolean) => void
 }) {
   const [localStartAt, setLocalStartAt] = useState(String(layer.startAt))
 
@@ -387,6 +400,15 @@ function VideoLayerRow({ layer, index, total, onRemove, onMoveUp, onMoveDown, on
         />
         <span className="text-[10px] text-muted-foreground">s</span>
       </div>
+      <label className="flex items-center gap-2 cursor-pointer select-none">
+        <input
+          type="checkbox"
+          checked={layer.freezeLastFrame}
+          onChange={e => onFreezeChange(e.target.checked)}
+          className="w-3.5 h-3.5 accent-primary"
+        />
+        <span className="text-[11px] text-muted-foreground">Hold last frame</span>
+      </label>
     </div>
   )
 }

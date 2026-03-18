@@ -168,7 +168,7 @@ public class TransitionPreviewService {
                                         Path outFile, double fallbackDur,
                                         PreviewJob job) throws Exception {
         List<Map<String, Object>> layerRows = jdbc.queryForList("""
-            SELECT tvl.layer_order, tvl.start_at, a.file_path, a.duration
+            SELECT tvl.layer_order, tvl.start_at, tvl.freeze_last_frame, a.file_path, a.duration, a.has_alpha
             FROM transition_video_layers tvl
             JOIN assets a ON a.id = tvl.asset_id
             WHERE tvl.edge_id = ? ORDER BY tvl.layer_order
@@ -184,8 +184,10 @@ public class TransitionPreviewService {
         List<VideoLayerSpec> videoLayers = new ArrayList<>();
         for (int i = 0; i < layerRows.size(); i++) {
             Map<String, Object> row = layerRows.get(i);
+            boolean hasAlpha = row.get("has_alpha") instanceof Number n ? n.intValue() == 1 : Boolean.TRUE.equals(row.get("has_alpha"));
+            boolean freeze   = row.get("freeze_last_frame") instanceof Number n ? n.intValue() == 1 : Boolean.TRUE.equals(row.get("freeze_last_frame"));
             videoLayers.add(new VideoLayerSpec(
-                Path.of((String) row.get("file_path")), toDouble(row.get("start_at")), i));
+                Path.of((String) row.get("file_path")), toDouble(row.get("start_at")), i, hasAlpha, freeze));
         }
 
         List<AudioTrackSpec> audioTracks = new ArrayList<>();

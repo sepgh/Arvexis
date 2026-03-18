@@ -7,14 +7,21 @@ public class VideoLayerSpec {
     private final Path filePath;
     private final double startAt;
     private final int order;
+    private final boolean hasAlpha;
 
-    public VideoLayerSpec(Path filePath, double startAt, int order) {
+    private final boolean freezeLastFrame;
+
+    public VideoLayerSpec(Path filePath, double startAt, int order, boolean hasAlpha, boolean freezeLastFrame) {
         this.filePath = filePath;
         this.startAt = startAt;
         this.order = order;
+        this.hasAlpha = hasAlpha;
+        this.freezeLastFrame = freezeLastFrame;
     }
 
     public Path getFilePath() { return filePath; }
     public double getStartAt() { return startAt; }
     public int getOrder() { return order; }
+    public boolean isHasAlpha() { return hasAlpha; }
+    public boolean isFreezeLastFrame() { return freezeLastFrame; }
 }

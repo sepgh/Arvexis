@@ -24,7 +24,7 @@ public class SceneNodeService {
 
     public record VideoLayerData(
         long id, int layerOrder, String assetId, String assetFileName,
-        boolean hasAlpha, Double duration, double startAt, boolean alphaError
+        boolean hasAlpha, Double duration, double startAt, boolean alphaError, boolean freezeLastFrame
     ) {}
 
     public record AudioTrackData(
@@ -69,10 +69,11 @@ public class SceneNodeService {
             VideoLayerRequest r = reqs.get(i);
             if (r.assetId() == null) throw new ProjectException("assetId is required for each layer");
             requireAssetExists(jdbc, r.assetId());
+            int freeze = Boolean.TRUE.equals(r.freezeLastFrame()) ? 1 : 0;
             jdbc.update("""
-                INSERT INTO node_video_layers (node_id, asset_id, layer_order, start_at)
-                VALUES (?, ?, ?, ?)
-                """, nodeId, r.assetId(), i, r.startAt() != null ? r.startAt() : 0.0);
+                INSERT INTO node_video_layers (node_id, asset_id, layer_order, start_at, freeze_last_frame)
+                VALUES (?, ?, ?, ?, ?)
+                """, nodeId, r.assetId(), i, r.startAt() != null ? r.startAt() : 0.0, freeze);
         }
         return getSceneData(nodeId);
     }
@@ -131,7 +132,7 @@ public class SceneNodeService {
     private List<VideoLayerData> loadVideoLayers(JdbcTemplate jdbc, String nodeId) {
         List<VideoLayerData> rows = jdbc.query("""
             SELECT nvl.id, nvl.layer_order, nvl.asset_id, nvl.start_at,
-                   a.file_name, a.has_alpha, a.duration
+                   nvl.freeze_last_frame, a.file_name, a.has_alpha, a.duration
             FROM node_video_layers nvl
             JOIN assets a ON a.id = nvl.asset_id
             WHERE nvl.node_id = ?
@@ -144,7 +145,7 @@ public class SceneNodeService {
             boolean alphaError = i > 0 && !vl.hasAlpha();
             if (alphaError) {
                 rows.set(i, new VideoLayerData(vl.id(), vl.layerOrder(), vl.assetId(),
-                    vl.assetFileName(), vl.hasAlpha(), vl.duration(), vl.startAt(), true));
+                    vl.assetFileName(), vl.hasAlpha(), vl.duration(), vl.startAt(), true, vl.freezeLastFrame()));
             }
         }
         return rows;
@@ -159,7 +160,8 @@ public class SceneNodeService {
             rs.getInt("has_alpha") == 1,
             rs.getObject("duration") != null ? rs.getDouble("duration") : null,
             rs.getDouble("start_at"),
-            false
+            false,
+            rs.getInt("freeze_last_frame") == 1
         );
     }
 

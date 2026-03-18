@@ -30,7 +30,7 @@ public class TransitionService {
 
     public record TransitionLayerData(
         long id, int layerOrder, String assetId, String assetFileName,
-        boolean hasAlpha, Double duration, double startAt, boolean alphaError
+        boolean hasAlpha, Double duration, double startAt, boolean alphaError, boolean freezeLastFrame
     ) {}
 
     public record TransitionAudioData(
@@ -125,10 +125,11 @@ public class TransitionService {
             VideoLayerRequest r = reqs.get(i);
             if (r.assetId() == null) throw new ProjectException("assetId required");
             requireAssetExists(jdbc, r.assetId());
+            int freeze = Boolean.TRUE.equals(r.freezeLastFrame()) ? 1 : 0;
             jdbc.update("""
-                INSERT INTO transition_video_layers (edge_id, asset_id, layer_order, start_at)
-                VALUES (?, ?, ?, ?)
-                """, edgeId, r.assetId(), i, r.startAt() != null ? r.startAt() : 0.0);
+                INSERT INTO transition_video_layers (edge_id, asset_id, layer_order, start_at, freeze_last_frame)
+                VALUES (?, ?, ?, ?, ?)
+                """, edgeId, r.assetId(), i, r.startAt() != null ? r.startAt() : 0.0, freeze);
         }
         return getTransition(edgeId);
     }
@@ -158,7 +159,7 @@ public class TransitionService {
     private List<TransitionLayerData> loadVideoLayers(JdbcTemplate jdbc, String edgeId) {
         List<TransitionLayerData> rows = jdbc.query("""
             SELECT tvl.id, tvl.layer_order, tvl.asset_id, tvl.start_at,
-                   a.file_name, a.has_alpha, a.duration
+                   tvl.freeze_last_frame, a.file_name, a.has_alpha, a.duration
             FROM transition_video_layers tvl
             JOIN assets a ON a.id = tvl.asset_id
             WHERE tvl.edge_id = ? ORDER BY tvl.layer_order
@@ -167,14 +168,15 @@ public class TransitionService {
                 rs.getString("asset_id"), rs.getString("file_name"),
                 rs.getInt("has_alpha") == 1,
                 rs.getObject("duration") != null ? rs.getDouble("duration") : null,
-                rs.getDouble("start_at"), false
+                rs.getDouble("start_at"), false,
+                rs.getInt("freeze_last_frame") == 1
             ), edgeId);
 
         for (int i = 0; i < rows.size(); i++) {
             TransitionLayerData vl = rows.get(i);
             if (i > 0 && !vl.hasAlpha()) {
                 rows.set(i, new TransitionLayerData(vl.id(), vl.layerOrder(), vl.assetId(),
-                    vl.assetFileName(), vl.hasAlpha(), vl.duration(), vl.startAt(), true));
+                    vl.assetFileName(), vl.hasAlpha(), vl.duration(), vl.startAt(), true, vl.freezeLastFrame()));
             }
         }
         return rows;

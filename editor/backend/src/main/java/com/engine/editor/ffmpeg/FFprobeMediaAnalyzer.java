@@ -101,7 +101,7 @@ public class FFprobeMediaAnalyzer {
 
             String pixFmt = videoStream.path("pix_fmt").asText(null);
             info.setPixelFormat(pixFmt);
-            info.setHasAlpha(detectAlpha(pixFmt));
+            info.setHasAlpha(detectAlpha(pixFmt, videoStream, streams));
 
             String rFrameRate = videoStream.path("r_frame_rate").asText(null);
             if (rFrameRate != null) {
@@ -147,9 +147,29 @@ public class FFprobeMediaAnalyzer {
         return null;
     }
 
-    private boolean detectAlpha(String pixFmt) {
-        if (pixFmt == null) return false;
-        return ALPHA_PIXEL_FORMATS.contains(pixFmt.toLowerCase());
+    private boolean detectAlpha(String pixFmt, JsonNode videoStream, JsonNode streams) {
+        if (pixFmt != null && ALPHA_PIXEL_FORMATS.contains(pixFmt.toLowerCase())) {
+            return true;
+        }
+        // VP9+alpha in WebM signals alpha via an alpha_mode=1 tag on the single video stream
+        // (the alpha plane is stored as block additions, not a separate stream).
+        if (videoStream != null
+                && "1".equals(videoStream.path("tags").path("alpha_mode").asText(null))) {
+            return true;
+        }
+        // Fallback: some encoders do produce a dedicated second video stream for the alpha plane.
+        return countStreams(streams, "video") > 1;
+    }
+
+    private int countStreams(JsonNode streams, String codecType) {
+        if (streams == null || !streams.isArray()) return 0;
+        int count = 0;
+        for (JsonNode stream : streams) {
+            if (codecType.equals(stream.path("codec_type").asText())) {
+                count++;
+            }
+        }
+        return count;
     }
 
     private Double parseFrameRate(String rational) {

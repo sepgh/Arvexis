@@ -1,3 +1,3 @@
 package com.engine.editor.controller.dto;
 
-public record VideoLayerRequest(String assetId, Double startAt) {}
+public record VideoLayerRequest(String assetId, Double startAt, Boolean freezeLastFrame) {}

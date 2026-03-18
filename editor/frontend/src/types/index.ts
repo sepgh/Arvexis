@@ -93,6 +93,7 @@ export interface VideoLayerData {
   duration: number | null
   startAt: number
   alphaError: boolean
+  freezeLastFrame: boolean
 }
 
 export interface AudioTrackData {
@@ -159,6 +160,7 @@ export interface TransitionLayerData {
   id: number
   layerOrder: number
   assetId: string
+  freezeLastFrame: boolean
   assetFileName: string
   hasAlpha: boolean
   duration: number | null

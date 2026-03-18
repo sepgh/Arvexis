@@ -172,11 +172,17 @@ public class FFmpegVideoProcessor implements VideoProcessor {
 
         List<VideoLayerSpec> layers = spec.getVideoLayers();
         for (VideoLayerSpec layer : layers) {
+            List<String> preOpts = new ArrayList<>();
+            if (layer.isHasAlpha()) {
+                preOpts.add("-vcodec");
+                preOpts.add("libvpx-vp9");
+            }
             if (layer.getStartAt() > 0) {
-                builder.inputWithOptions(
-                    List.of("-itsoffset", String.format("%.6f", layer.getStartAt())),
-                    layer.getFilePath().toAbsolutePath().toString()
-                );
+                preOpts.add("-itsoffset");
+                preOpts.add(String.format("%.6f", layer.getStartAt()));
+            }
+            if (!preOpts.isEmpty()) {
+                builder.inputWithOptions(preOpts, layer.getFilePath().toAbsolutePath().toString());
             } else {
                 builder.input(layer.getFilePath().toAbsolutePath().toString());
             }
@@ -231,7 +237,8 @@ public class FFmpegVideoProcessor implements VideoProcessor {
         for (int i = 0; i < layers.size(); i++) {
             int inputIdx = i + 1;
             String nextLabel = (i == layers.size() - 1) ? "[vout]" : "[ov" + i + "]";
-            parts.add(currentVideo + "[" + inputIdx + ":v]overlay=0:0" + nextLabel);
+            String eofAction = layers.get(i).isFreezeLastFrame() ? "repeat" : "pass";
+            parts.add(currentVideo + "[" + inputIdx + ":v]overlay=0:0:format=auto:eof_action=" + eofAction + nextLabel);
             currentVideo = nextLabel;
         }
 

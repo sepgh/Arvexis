@@ -88,11 +88,15 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
   }
 
   // Video layers
+  function toLayerReq(l: TransitionLayerData): VideoLayerRequest {
+    return { assetId: l.assetId, startAt: l.startAt, freezeLastFrame: l.freezeLastFrame }
+  }
+
   async function addVideoLayer(asset: Asset) {
     if (!data) return
     const layers: VideoLayerRequest[] = [
-      ...data.videoLayers.map(l => ({ assetId: l.assetId, startAt: l.startAt })),
-      { assetId: asset.id, startAt: 0 },
+      ...data.videoLayers.map(toLayerReq),
+      { assetId: asset.id, startAt: 0, freezeLastFrame: false },
     ]
     const result = await withSave(() => saveTransitionLayers(edgeId, layers))
     if (result) setData(result)
@@ -100,8 +104,7 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
 
   async function removeVideoLayer(layerId: number) {
     if (!data) return
-    const layers = data.videoLayers.filter(l => l.id !== layerId)
-      .map(l => ({ assetId: l.assetId, startAt: l.startAt }))
+    const layers = data.videoLayers.filter(l => l.id !== layerId).map(toLayerReq)
     const result = await withSave(() => saveTransitionLayers(edgeId, layers))
     if (result) setData(result)
   }
@@ -112,7 +115,16 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
     const idx = arr.findIndex(l => l.id === layerId)
     if (idx + dir < 0 || idx + dir >= arr.length) return
     ;[arr[idx], arr[idx + dir]] = [arr[idx + dir], arr[idx]]
-    const result = await withSave(() => saveTransitionLayers(edgeId, arr.map(l => ({ assetId: l.assetId, startAt: l.startAt }))))
+    const result = await withSave(() => saveTransitionLayers(edgeId, arr.map(toLayerReq)))
+    if (result) setData(result)
+  }
+
+  async function updateLayerFreeze(layerId: number, freezeLastFrame: boolean) {
+    if (!data) return
+    const layers = data.videoLayers.map(l =>
+      ({ ...toLayerReq(l), ...(l.id === layerId ? { freezeLastFrame } : {}) })
+    )
+    const result = await withSave(() => saveTransitionLayers(edgeId, layers))
     if (result) setData(result)
   }
 
@@ -253,6 +265,7 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
                 onRemove={() => removeVideoLayer(vl.id)}
                 onMoveUp={() => moveVideoLayer(vl.id, -1)}
                 onMoveDown={() => moveVideoLayer(vl.id, 1)}
+                onFreezeChange={v => updateLayerFreeze(vl.id, v)}
               />
             ))}
             {!data?.videoLayers.length && (
@@ -284,23 +297,35 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function VideoLayerRow({ layer, index, total, onRemove, onMoveUp, onMoveDown }: {
+function VideoLayerRow({ layer, index, total, onRemove, onMoveUp, onMoveDown, onFreezeChange }: {
   layer: TransitionLayerData; index: number; total: number
   onRemove: () => void; onMoveUp: () => void; onMoveDown: () => void
+  onFreezeChange: (v: boolean) => void
 }) {
   return (
-    <div className={['rounded-lg border p-2.5 flex items-center gap-2',
+    <div className={['rounded-lg border p-2.5 flex flex-col gap-2',
       layer.alphaError ? 'border-red-500/60 bg-red-500/5' : 'border-border/50 bg-muted/40',
     ].join(' ')}>
-      <span className="text-xs text-muted-foreground w-5 shrink-0">#{index + 1}</span>
-      {layer.hasAlpha && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">α</span>}
-      <span className="flex-1 text-sm text-foreground truncate">{layer.assetFileName}</span>
-      {layer.alphaError && <span className="text-xs text-red-400 shrink-0">no α</span>}
-      <div className="flex gap-0.5">
-        <button onClick={onMoveUp}   disabled={index === 0}         className="w-5 h-5 text-muted-foreground hover:text-foreground disabled:opacity-30 flex items-center justify-center text-xs">↑</button>
-        <button onClick={onMoveDown} disabled={index === total - 1} className="w-5 h-5 text-muted-foreground hover:text-foreground disabled:opacity-30 flex items-center justify-center text-xs">↓</button>
-        <button onClick={onRemove} className="w-5 h-5 text-muted-foreground hover:text-red-400 flex items-center justify-center">×</button>
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-muted-foreground w-5 shrink-0">#{index + 1}</span>
+        {layer.hasAlpha && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">α</span>}
+        <span className="flex-1 text-sm text-foreground truncate">{layer.assetFileName}</span>
+        {layer.alphaError && <span className="text-xs text-red-400 shrink-0">no α</span>}
+        <div className="flex gap-0.5">
+          <button onClick={onMoveUp}   disabled={index === 0}         className="w-5 h-5 text-muted-foreground hover:text-foreground disabled:opacity-30 flex items-center justify-center text-xs">↑</button>
+          <button onClick={onMoveDown} disabled={index === total - 1} className="w-5 h-5 text-muted-foreground hover:text-foreground disabled:opacity-30 flex items-center justify-center text-xs">↓</button>
+          <button onClick={onRemove} className="w-5 h-5 text-muted-foreground hover:text-red-400 flex items-center justify-center">×</button>
+        </div>
       </div>
+      <label className="flex items-center gap-2 cursor-pointer select-none">
+        <input
+          type="checkbox"
+          checked={layer.freezeLastFrame}
+          onChange={e => onFreezeChange(e.target.checked)}
+          className="w-3.5 h-3.5 accent-primary"
+        />
+        <span className="text-[11px] text-muted-foreground">Hold last frame</span>
+      </label>
     </div>
   )
 }
