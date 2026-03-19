@@ -1,6 +1,7 @@
 package com.engine.editor.ffmpeg;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Assumptions;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -30,6 +31,9 @@ class FFprobeMediaAnalyzerTest {
      */
     @Test
     void detectsAlphaFromVp9AlphaModeTag() throws IOException, URISyntaxException {
+        Assumptions.assumeFalse(Boolean.parseBoolean(System.getenv("GITHUB_ACTIONS")),
+                "Skipping ffprobe-dependent test on GitHub Actions");
+
         Path file = Path.of(getClass().getClassLoader()
                 .getResource("vp9_alpha_mode_tag.webm").toURI());
 

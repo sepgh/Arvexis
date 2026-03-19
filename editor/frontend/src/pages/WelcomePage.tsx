@@ -12,21 +12,7 @@ export default function WelcomePage() {
       {/* Logo / title area */}
       <div className="flex flex-col items-center gap-3 mb-12">
         <div className="rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center" style={{ width: 88, height: 88 }}>
-          <svg
-            width="32"
-            height="32"
-            viewBox="0 0 32 32"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <rect x="2" y="6" width="20" height="14" rx="2" fill="currentColor" className="text-primary" opacity="0.8" />
-            <polygon points="24,8 30,13 24,18" fill="currentColor" className="text-primary" />
-            <circle cx="8" cy="24" r="2.5" fill="currentColor" className="text-muted-foreground" />
-            <circle cx="16" cy="24" r="2.5" fill="currentColor" className="text-muted-foreground" />
-            <circle cx="24" cy="24" r="2.5" fill="currentColor" className="text-muted-foreground" />
-            <line x1="10.5" y1="24" x2="13.5" y2="24" stroke="currentColor" className="text-muted-foreground" strokeWidth="1.5" />
-            <line x1="18.5" y1="24" x2="21.5" y2="24" stroke="currentColor" className="text-muted-foreground" strokeWidth="1.5" />
-          </svg>
+          <img src="/logo.png" alt="Arvexis Logo" className="w-16 h-16 object-contain" />
         </div>
         <div className="text-center">
           <h1 className="font-semibold text-foreground tracking-tight" style={{ fontSize: 32 }}>

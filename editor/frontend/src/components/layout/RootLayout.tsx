@@ -82,6 +82,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
       {/* Header */}
       <header className="flex items-center justify-between bg-card border-b border-border shrink-0" style={{ height: 56, paddingLeft: 28, paddingRight: 28 }}>
         <div className="flex items-center gap-3">
+          <img src="/logo.png" alt="Arvexis" className="h-7 w-auto" />
           <span className="font-semibold text-foreground tracking-wide" style={{ fontSize: 18 }}>
             Arvexis
           </span>
