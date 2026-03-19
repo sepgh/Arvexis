@@ -14,6 +14,7 @@ public class ProjectConfigData {
     private int audioBitRate;
     private double decisionTimeoutSecs;
     private String defaultLocaleCode;
+    private String defaultBackgroundColor;
     private Integer ffmpegThreads;   // null = Auto (let FFmpeg decide)
 
     public ProjectConfigData() {}
@@ -47,6 +48,9 @@ public class ProjectConfigData {
 
     public String getDefaultLocaleCode() { return defaultLocaleCode; }
     public void setDefaultLocaleCode(String defaultLocaleCode) { this.defaultLocaleCode = defaultLocaleCode; }
+
+    public String getDefaultBackgroundColor() { return defaultBackgroundColor; }
+    public void setDefaultBackgroundColor(String defaultBackgroundColor) { this.defaultBackgroundColor = defaultBackgroundColor; }
 
     public Integer getFfmpegThreads() { return ffmpegThreads; }
     public void setFfmpegThreads(Integer ffmpegThreads) { this.ffmpegThreads = ffmpegThreads; }

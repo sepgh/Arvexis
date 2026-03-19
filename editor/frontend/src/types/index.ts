@@ -217,6 +217,7 @@ export interface ProjectConfig {
   audioBitRate: number
   decisionTimeoutSecs: number
   defaultLocaleCode?: string
+  defaultBackgroundColor?: string
   ffmpegThreads?: number | null    // null = Auto (let FFmpeg decide)
 }
 

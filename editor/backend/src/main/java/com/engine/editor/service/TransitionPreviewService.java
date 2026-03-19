@@ -200,10 +200,13 @@ public class TransitionPreviewService {
         double duration = computeDuration(layerRows, audioRows);
         if (duration <= 0) duration = fallbackDur;
 
+        String bgHex = config.getDefaultBackgroundColor() != null ? config.getDefaultBackgroundColor() : "#000000";
+        String ffmpegBg = bgHex.replaceFirst("^#", "0x");
+
         CompositeSpec spec = CompositeSpec.builder()
             .videoLayers(videoLayers)
             .audioTracks(audioTracks)
-            .backgroundColor("0x000000")
+            .backgroundColor(ffmpegBg)
             .outputResolution(resolution)
             .fps(fps)
             .duration(duration)

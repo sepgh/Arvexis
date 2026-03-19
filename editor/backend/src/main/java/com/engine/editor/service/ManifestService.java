@@ -139,8 +139,10 @@ public class ManifestService {
     private void fillSceneNode(Map<String, Object> n, String nodeId,
                                 ProjectConfigData config, JdbcTemplate jdbc) {
         n.put("backgroundColor",
-            jdbc.queryForObject("SELECT COALESCE(background_color,'#000000') FROM nodes WHERE id=?",
-                String.class, nodeId));
+            jdbc.queryForObject("SELECT CASE WHEN background_color IS NULL OR TRIM(background_color) = '' THEN ? ELSE background_color END FROM nodes WHERE id=?",
+                String.class,
+                config.getDefaultBackgroundColor() != null ? config.getDefaultBackgroundColor() : "#000000",
+                nodeId));
 
         // Decision appearance
         String cfg = (String) jdbc.queryForMap("SELECT * FROM nodes WHERE id=?", nodeId)
@@ -371,6 +373,7 @@ public class ManifestService {
         p.put("audioBitRate",        c.getAudioBitRate());
         p.put("decisionTimeoutSecs", c.getDecisionTimeoutSecs());
         p.put("defaultLocaleCode",   c.getDefaultLocaleCode());
+        p.put("defaultBackgroundColor", c.getDefaultBackgroundColor());
         return p;
     }
 

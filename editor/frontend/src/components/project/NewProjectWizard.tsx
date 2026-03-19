@@ -9,14 +9,6 @@ interface NewProjectWizardProps {
 const FPS_OPTIONS = [24, 30, 60]
 const RESOLUTION_OPTIONS = ['1280x720', '1920x1080', '2560x1440', '3840x2160']
 const SAMPLE_RATE_OPTIONS = [44100, 48000]
-const THREAD_OPTIONS: { label: string; value: number | null }[] = [
-  { label: 'Auto', value: null },
-  { label: '1', value: 1 },
-  { label: '2', value: 2 },
-  { label: '4', value: 4 },
-  { label: '8', value: 8 },
-  { label: '16', value: 16 },
-]
 
 export default function NewProjectWizard({ onClose }: NewProjectWizardProps) {
   const setProjectConfig = useEditorStore((s) => s.setProjectConfig)
@@ -27,13 +19,23 @@ export default function NewProjectWizard({ onClose }: NewProjectWizardProps) {
   const [previewRes, setPreviewRes] = useState('1280x720')
   const [sampleRate, setSampleRate] = useState(44100)
   const [decisionTimeout, setDecisionTimeout] = useState(5)
-  const [ffmpegThreads, setFfmpegThreads] = useState<number | null>(null)
+  const [defaultBackgroundColor, setDefaultBackgroundColor] = useState('#000000')
+  const [ffmpegThreads, setFfmpegThreads] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!name.trim() || !dirPath.trim()) return
+
+    const ffmpegThreadsTrimmed = ffmpegThreads.trim()
+    if (ffmpegThreadsTrimmed !== '') {
+      const parsedThreads = Number(ffmpegThreadsTrimmed)
+      if (!Number.isInteger(parsedThreads) || parsedThreads < 1) {
+        setError('FFmpeg threads must be a positive whole number or left blank for Auto')
+        return
+      }
+    }
 
     setSubmitting(true)
     setError(null)
@@ -46,7 +48,8 @@ export default function NewProjectWizard({ onClose }: NewProjectWizardProps) {
         previewResolution: previewRes,
         audioSampleRate: sampleRate,
         decisionTimeoutSecs: decisionTimeout,
-        ffmpegThreads,
+        defaultBackgroundColor,
+        ffmpegThreads: ffmpegThreadsTrimmed === '' ? null : Number(ffmpegThreadsTrimmed),
       })
       setProjectConfig(config)
       onClose()
@@ -147,17 +150,28 @@ export default function NewProjectWizard({ onClose }: NewProjectWizardProps) {
             </Field>
           </div>
 
-          <Field label="FFmpeg Threads" hint="Auto lets FFmpeg choose based on available CPU cores">
-            <select
-              value={ffmpegThreads ?? ''}
-              onChange={(e) => setFfmpegThreads(e.target.value === '' ? null : Number(e.target.value))}
-              className="input-base"
-            >
-              {THREAD_OPTIONS.map((opt) => (
-                <option key={String(opt.value)} value={opt.value ?? ''}>{opt.label}</option>
-              ))}
-            </select>
-          </Field>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Default Background Color" hint="Used when scenes or video transitions don't override the background">
+              <input
+                type="color"
+                value={defaultBackgroundColor}
+                onChange={(e) => setDefaultBackgroundColor(e.target.value)}
+                className="w-full h-10 rounded border border-border bg-transparent cursor-pointer"
+              />
+            </Field>
+
+            <Field label="FFmpeg Threads" hint="Leave blank for Auto, or enter the number of CPU cores/threads to use">
+              <input
+                type="number"
+                value={ffmpegThreads}
+                onChange={(e) => setFfmpegThreads(e.target.value)}
+                min={1}
+                step={1}
+                placeholder="Auto"
+                className="input-base"
+              />
+            </Field>
+          </div>
 
           {error && (
             <div className="text-sm text-destructive-foreground bg-destructive rounded-md px-3 py-2">

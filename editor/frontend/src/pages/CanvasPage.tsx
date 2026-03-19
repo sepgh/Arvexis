@@ -22,6 +22,7 @@ import ConditionNode from '@/components/canvas/nodes/DecisionNode'
 import NodeEditorPanel from '@/components/editor/NodeEditorPanel'
 import EdgeEditorPanel from '@/components/editor/EdgeEditorPanel'
 import ValidationPanel from '@/components/editor/ValidationPanel'
+import ProjectSettingsPanel from '@/components/editor/ProjectSettingsPanel'
 import LabeledEdge from '@/components/canvas/LabeledEdge'
 import ResizableSidePanel from '@/components/layout/ResizableSidePanel'
 import LocalizationPanel from '@/components/editor/LocalizationPanel'
@@ -46,6 +47,7 @@ function GraphCanvas() {
   const setSelectedEdgeId       = useEditorStore(s => s.setSelectedEdgeId)
   const validationPanelOpen     = useEditorStore(s => s.validationPanelOpen)
   const localizationPanelOpen   = useEditorStore(s => s.localizationPanelOpen)
+  const projectSettingsPanelOpen = useEditorStore(s => s.projectSettingsPanelOpen)
 
   const {
     nodes,
@@ -157,6 +159,11 @@ function GraphCanvas() {
       {validationPanelOpen && !selectedNodeData && !selectedEdgeId && <ValidationPanel />}
       {localizationPanelOpen && !selectedNodeData && !selectedEdgeId && (
         <LocalizationPanel />
+      )}
+      {projectSettingsPanelOpen && (
+        <ResizableSidePanel side="right" initialWidth={460} minWidth={360} maxWidth={720}>
+          <ProjectSettingsPanel />
+        </ResizableSidePanel>
       )}
     </div>
   )

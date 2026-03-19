@@ -18,6 +18,23 @@ export interface CreateProjectPayload {
   audioSampleRate?: number
   audioBitRate?: number
   decisionTimeoutSecs?: number
+  defaultBackgroundColor?: string
+  ffmpegThreads?: number | null
+}
+
+export interface UpdateProjectConfigPayload {
+  name?: string
+  assetsDirectory?: string
+  outputDirectory?: string
+  previewResolution?: string
+  compileResolutions?: string[]
+  fps?: number
+  audioSampleRate?: number
+  audioBitRate?: number
+  decisionTimeoutSecs?: number
+  defaultLocaleCode?: string
+  defaultBackgroundColor?: string
+  ffmpegThreadsAuto?: boolean
   ffmpegThreads?: number | null
 }
 
@@ -35,4 +52,8 @@ export function openProject(directoryPath: string): Promise<ProjectConfig> {
 
 export function getProjectConfig(): Promise<ProjectConfig> {
   return apiClient.get<ProjectConfig>('/project/config')
+}
+
+export function updateProjectConfig(payload: UpdateProjectConfigPayload): Promise<ProjectConfig> {
+  return apiClient.put<ProjectConfig>('/project/config', payload)
 }

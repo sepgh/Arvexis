@@ -69,8 +69,9 @@ public class ScenePreviewService {
 
             // Load node background color
             String bgColor = jdbc.queryForObject(
-                "SELECT COALESCE(background_color, '#000000') FROM nodes WHERE id=?",
-                String.class, nodeId);
+                "SELECT CASE WHEN background_color IS NULL OR TRIM(background_color) = '' THEN ? ELSE background_color END FROM nodes WHERE id=?",
+                String.class, config.getDefaultBackgroundColor() != null ? config.getDefaultBackgroundColor() : "#000000",
+                nodeId);
             // Normalize hex color for ffmpeg (remove #)
             String ffmpegBg = bgColor != null ? bgColor.replaceFirst("^#", "0x") : "0x000000";
 

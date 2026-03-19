@@ -16,6 +16,8 @@ export default function RootLayout({ children }: RootLayoutProps) {
   const toggleValidationPanel   = useEditorStore((s) => s.toggleValidationPanel)
   const localizationPanelOpen   = useEditorStore((s) => s.localizationPanelOpen)
   const toggleLocalizationPanel = useEditorStore((s) => s.toggleLocalizationPanel)
+  const projectSettingsPanelOpen = useEditorStore((s) => s.projectSettingsPanelOpen)
+  const toggleProjectSettingsPanel = useEditorStore((s) => s.toggleProjectSettingsPanel)
   const [manifestGenerating, setManifestGenerating] = useState(false)
   const [manifestReady, setManifestReady] = useState(false)
   const [manifestError, setManifestError] = useState<string | null>(null)
@@ -137,6 +139,22 @@ export default function RootLayout({ children }: RootLayoutProps) {
                 <path d="M7 1.5C5.5 3.5 4.5 5.2 4.5 7s1 3.5 2.5 5.5M7 1.5C8.5 3.5 9.5 5.2 9.5 7s-1 3.5-2.5 5.5M1.5 7h11" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
               </svg>
               Locales
+            </button>
+            <button
+              onClick={toggleProjectSettingsPanel}
+              title="Project settings"
+              className={[
+                'flex items-center rounded-md font-medium transition-colors',
+                projectSettingsPanelOpen
+                  ? 'bg-primary/15 text-primary border border-primary/30'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent border border-transparent',
+              ].join(' ')}
+              style={{ padding: '8px 14px', fontSize: 14, gap: 7 }}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M5.4 1.5h3.2l.4 1.5 1.5.6 1.3-.9 2.2 2.2-.9 1.3.6 1.5 1.5.4v3.2l-1.5.4-.6 1.5.9 1.3-2.2 2.2-1.3-.9-1.5.6-.4 1.5H5.4l-.4-1.5-1.5-.6-1.3.9-2.2-2.2.9-1.3-.6-1.5L0 8.7V5.5l1.5-.4.6-1.5-.9-1.3 2.2-2.2 1.3.9 1.5-.6.4-1.5Zm1.6 3a2.6 2.6 0 100 5.2 2.6 2.6 0 000-5.2Z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round"/>
+              </svg>
+              Project Settings
             </button>
             <button
               onClick={toggleValidationPanel}

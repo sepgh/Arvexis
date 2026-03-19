@@ -13,5 +13,6 @@ public record CreateProjectRequest(
     Integer audioSampleRate,
     Integer audioBitRate,
     Double decisionTimeoutSecs,
+    String defaultBackgroundColor,
     Integer ffmpegThreads
 ) {}

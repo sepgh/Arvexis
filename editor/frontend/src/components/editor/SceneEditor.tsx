@@ -7,6 +7,7 @@ import {
 import { listAssets } from '@/api/assets'
 import { updateNode } from '@/api/graph'
 import { startScenePreview, type PreviewJobStatus } from '@/api/preview'
+import { useEditorStore } from '@/store'
 import PreviewModal from './PreviewModal'
 
 interface SceneEditorProps {
@@ -18,6 +19,9 @@ interface SceneEditorProps {
 type Section = 'layers' | 'audio' | 'decisions' | 'props'
 
 export default function SceneEditor({ nodeId, isEnd: initialIsEnd, backgroundColor: initialBg }: SceneEditorProps) {
+  const projectDefaultBackgroundColor = useEditorStore(
+    (s) => s.projectConfig?.defaultBackgroundColor ?? '#000000'
+  )
   const [data, setData]     = useState<SceneDataResponse | null>(null)
   const [assets, setAssets] = useState<Asset[]>([])
   const [loading, setLoading] = useState(true)
@@ -27,9 +31,14 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, backgroundCol
 
   // Properties state
   const [isEnd, setIsEnd]   = useState(initialIsEnd)
-  const [bgColor, setBgColor] = useState(initialBg ?? '#000000')
+  const [bgColor, setBgColor] = useState(initialBg ?? projectDefaultBackgroundColor)
   const [previewJob, setPreviewJob] = useState<PreviewJobStatus | null>(null)
   const [previewing, setPreviewing] = useState(false)
+
+  useEffect(() => {
+    setIsEnd(initialIsEnd)
+    setBgColor(initialBg ?? projectDefaultBackgroundColor)
+  }, [initialIsEnd, initialBg, projectDefaultBackgroundColor, nodeId])
 
   async function handlePreview() {
     setPreviewing(true)

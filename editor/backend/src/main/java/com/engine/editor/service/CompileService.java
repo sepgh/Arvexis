@@ -122,7 +122,7 @@ public class CompileService {
                     job.setProgress(pct(doneItems[0], totalItems, 5, 55),
                         "Compiling scene \"" + sceneName + "\" at " + res + "…");
 
-                    compileScene(node, wh, fps, config.getFfmpegThreads(), outFile, job);
+                    compileScene(node, config, wh, fps, config.getFfmpegThreads(), outFile, job);
                     compiledScenes.put(sceneId + "@" + res, outFile);
                     doneItems[0]++;
                 }
@@ -148,7 +148,7 @@ public class CompileService {
                         "Compiling transition [" + transType + "] at " + res + "…");
 
                     if ("video".equals(transType)) {
-                        compileVideoTransition(trans, fps, wh, config.getFfmpegThreads(), outFile, job);
+                        compileVideoTransition(trans, config, fps, wh, config.getFfmpegThreads(), outFile, job);
                     } else {
                         String srcSceneId = (String) edge.get("sourceNodeId");
                         String tgtSceneId = (String) edge.get("targetNodeId");
@@ -342,11 +342,16 @@ public class CompileService {
     // ── Scene compilation ─────────────────────────────────────────────────────
 
     @SuppressWarnings("unchecked")
-    private void compileScene(Map<String, Object> node, String resolution, int fps,
-                               Integer ffmpegThreads, Path outFile, PreviewJob job) throws Exception {
+    private void compileScene(Map<String, Object> node, ProjectConfigData config,
+                               String resolution, int fps, Integer ffmpegThreads,
+                               Path outFile, PreviewJob job) throws Exception {
         List<Map<String, Object>> layerData  = (List<Map<String, Object>>) node.getOrDefault("videoLayers", List.of());
         List<Map<String, Object>> audioData  = (List<Map<String, Object>>) node.getOrDefault("audioTracks", List.of());
-        String bgHex = (String) node.getOrDefault("backgroundColor", "#000000");
+        String bgHex = config.getDefaultBackgroundColor() != null ? config.getDefaultBackgroundColor() : "#000000";
+        Object nodeBg = node.get("backgroundColor");
+        if (nodeBg instanceof String s && !s.isBlank()) {
+            bgHex = s;
+        }
         String ffmpegBg = bgHex.replaceFirst("^#", "0x");
 
         List<VideoLayerSpec> layers = new ArrayList<>();
@@ -445,8 +450,8 @@ public class CompileService {
     // ── Video-based transition ────────────────────────────────────────────────
 
     @SuppressWarnings("unchecked")
-    private void compileVideoTransition(Map<String, Object> trans, int fps,
-                                         String resolution, Integer ffmpegThreads,
+    private void compileVideoTransition(Map<String, Object> trans, ProjectConfigData config,
+                                         int fps, String resolution, Integer ffmpegThreads,
                                          Path outFile, PreviewJob job) throws Exception {
         List<Map<String, Object>> layerData = (List<Map<String, Object>>) trans.getOrDefault("videoLayers", List.of());
         List<Map<String, Object>> audioData = (List<Map<String, Object>>) trans.getOrDefault("audioTracks", List.of());
@@ -470,9 +475,12 @@ public class CompileService {
         double duration = toDouble(trans.get("duration"));
         if (duration <= 0) duration = 2.0;
 
+        String bgHex = config.getDefaultBackgroundColor() != null ? config.getDefaultBackgroundColor() : "#000000";
+        String ffmpegBg = bgHex.replaceFirst("^#", "0x");
+
         CompositeSpec spec = CompositeSpec.builder()
             .videoLayers(layers).audioTracks(tracks)
-            .backgroundColor("0x000000")
+            .backgroundColor(ffmpegBg)
             .outputResolution(resolution).fps(fps).duration(duration)
             .outputPath(outFile)
             .ffmpegThreads(ffmpegThreads)
