@@ -77,7 +77,7 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
   // ── Video layers ─────────────────────────────────────────────────────────
 
   function toLayerReq(vl: VideoLayerData): VideoLayerRequest {
-    return { assetId: vl.assetId, startAt: vl.startAt, freezeLastFrame: vl.freezeLastFrame }
+    return { assetId: vl.assetId, startAt: vl.startAt, startAtFrames: vl.startAtFrames, freezeLastFrame: vl.freezeLastFrame }
   }
 
   async function addVideoLayer(asset: Asset) {
@@ -116,6 +116,15 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
     if (result) setData(result)
   }
 
+  async function updateLayerStartAtFrames(layerId: number, startAtFrames: number | null) {
+    if (!data) return
+    const newLayers = data.videoLayers.map(vl =>
+      ({ ...toLayerReq(vl), ...(vl.id === layerId ? { startAtFrames } : {}) })
+    )
+    const result = await withSave(() => saveVideoLayers(nodeId, newLayers))
+    if (result) setData(result)
+  }
+
   async function updateLayerFreeze(layerId: number, freezeLastFrame: boolean) {
     if (!data) return
     const newLayers = data.videoLayers.map(vl =>
@@ -132,11 +141,15 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
     listAssets({ mediaType: 'audio' }).then(setAudioAssets).catch(() => {})
   }, [])
 
+  function toAudioReq(t: AudioTrackData): AudioTrackRequest {
+    return { assetId: t.assetId, startAt: t.startAt, startAtFrames: t.startAtFrames }
+  }
+
   async function addAudioTrack(asset: Asset) {
     if (!data) return
     const newTracks: AudioTrackRequest[] = [
-      ...data.audioTracks.map(t => ({ assetId: t.assetId, startAt: t.startAt })),
-      { assetId: asset.id, startAt: 0 },
+      ...data.audioTracks.map(toAudioReq),
+      { assetId: asset.id, startAt: 0, startAtFrames: null },
     ]
     const result = await withSave(() => saveAudioTracks(nodeId, newTracks))
     if (result) setData(result)
@@ -146,7 +159,7 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
     if (!data) return
     const newTracks = data.audioTracks
       .filter(t => t.id !== trackId)
-      .map(t => ({ assetId: t.assetId, startAt: t.startAt }))
+      .map(toAudioReq)
     const result = await withSave(() => saveAudioTracks(nodeId, newTracks))
     if (result) setData(result)
   }
@@ -157,7 +170,25 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
     const idx = tracks.findIndex(t => t.id === trackId)
     if (idx + dir < 0 || idx + dir >= tracks.length) return
     ;[tracks[idx], tracks[idx + dir]] = [tracks[idx + dir], tracks[idx]]
-    const result = await withSave(() => saveAudioTracks(nodeId, tracks.map(t => ({ assetId: t.assetId, startAt: t.startAt }))))
+    const result = await withSave(() => saveAudioTracks(nodeId, tracks.map(toAudioReq)))
+    if (result) setData(result)
+  }
+
+  async function updateAudioStartAt(trackId: number, startAt: number) {
+    if (!data) return
+    const newTracks = data.audioTracks.map(t =>
+      ({ ...toAudioReq(t), ...(t.id === trackId ? { startAt } : {}) })
+    )
+    const result = await withSave(() => saveAudioTracks(nodeId, newTracks))
+    if (result) setData(result)
+  }
+
+  async function updateAudioStartAtFrames(trackId: number, startAtFrames: number | null) {
+    if (!data) return
+    const newTracks = data.audioTracks.map(t =>
+      ({ ...toAudioReq(t), ...(t.id === trackId ? { startAtFrames } : {}) })
+    )
+    const result = await withSave(() => saveAudioTracks(nodeId, newTracks))
     if (result) setData(result)
   }
 
@@ -271,6 +302,7 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
                 onMoveUp={() => moveVideoLayer(vl.id, -1)}
                 onMoveDown={() => moveVideoLayer(vl.id, 1)}
                 onStartAtChange={v => updateLayerStartAt(vl.id, v)}
+                onStartAtFramesChange={v => updateLayerStartAtFrames(vl.id, v)}
                 onFreezeChange={v => updateLayerFreeze(vl.id, v)}
               />
             ))}
@@ -290,6 +322,8 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
                 onRemove={() => removeAudioTrack(t.id)}
                 onMoveUp={() => moveAudioTrack(t.id, -1)}
                 onMoveDown={() => moveAudioTrack(t.id, 1)}
+                onStartAtChange={v => updateAudioStartAt(t.id, v)}
+                onStartAtFramesChange={v => updateAudioStartAtFrames(t.id, v)}
               />
             ))}
             {!data?.audioTracks.length && (
@@ -419,13 +453,21 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function VideoLayerRow({ layer, index, total, onRemove, onMoveUp, onMoveDown, onStartAtChange, onFreezeChange }: {
+function VideoLayerRow({ layer, index, total, onRemove, onMoveUp, onMoveDown, onStartAtChange, onStartAtFramesChange, onFreezeChange }: {
   layer: VideoLayerData; index: number; total: number
   onRemove: () => void; onMoveUp: () => void; onMoveDown: () => void
   onStartAtChange: (v: number) => void
+  onStartAtFramesChange: (v: number | null) => void
   onFreezeChange: (v: boolean) => void
 }) {
-  const [localStartAt, setLocalStartAt] = useState(String(layer.startAt))
+  const [localMs, setLocalMs] = useState(String(Math.round(layer.startAt * 1000)))
+  const [localFrames, setLocalFrames] = useState(layer.startAtFrames != null ? String(layer.startAtFrames) : '')
+  const hasFrames = layer.startAtFrames != null
+
+  useEffect(() => {
+    setLocalMs(String(Math.round(layer.startAt * 1000)))
+    setLocalFrames(layer.startAtFrames != null ? String(layer.startAtFrames) : '')
+  }, [layer.startAt, layer.startAtFrames])
 
   return (
     <div className={['rounded-lg border p-2.5 flex flex-col gap-2',
@@ -449,13 +491,25 @@ function VideoLayerRow({ layer, index, total, onRemove, onMoveUp, onMoveDown, on
       <div className="flex items-center gap-2">
         <label className="text-xs text-muted-foreground shrink-0">start-at</label>
         <input
-          type="number" min="0" step="0.1"
-          value={localStartAt}
-          onChange={e => setLocalStartAt(e.target.value)}
-          onBlur={() => { const v = parseFloat(localStartAt); if (!isNaN(v) && v >= 0) onStartAtChange(v) }}
-          className="input-base text-xs py-0.5 w-20"
+          type="number" min="0" step="1"
+          value={localMs}
+          onChange={e => setLocalMs(e.target.value)}
+          onBlur={() => { const v = parseInt(localMs); if (!isNaN(v) && v >= 0) onStartAtChange(v / 1000) }}
+          className={`input-base text-xs py-0.5 w-20 ${hasFrames ? 'opacity-40' : ''}`}
         />
-        <span className="text-[10px] text-muted-foreground">s</span>
+        <span className="text-[10px] text-muted-foreground">ms</span>
+        <input
+          type="number" min="0" step="1"
+          value={localFrames}
+          onChange={e => setLocalFrames(e.target.value)}
+          onBlur={() => {
+            if (localFrames.trim() === '') { onStartAtFramesChange(null) }
+            else { const v = parseInt(localFrames); if (!isNaN(v) && v >= 0) onStartAtFramesChange(v) }
+          }}
+          className={`input-base text-xs py-0.5 w-16 ${hasFrames ? 'ring-1 ring-primary/50' : ''}`}
+          placeholder="—"
+        />
+        <span className="text-[10px] text-muted-foreground whitespace-nowrap">FPS</span>
       </div>
       <label className="flex items-center gap-2 cursor-pointer select-none">
         <input
@@ -470,19 +524,55 @@ function VideoLayerRow({ layer, index, total, onRemove, onMoveUp, onMoveDown, on
   )
 }
 
-function AudioTrackRow({ track, index, total, onRemove, onMoveUp, onMoveDown }: {
+function AudioTrackRow({ track, index, total, onRemove, onMoveUp, onMoveDown, onStartAtChange, onStartAtFramesChange }: {
   track: AudioTrackData; index: number; total: number
   onRemove: () => void; onMoveUp: () => void; onMoveDown: () => void
+  onStartAtChange: (v: number) => void
+  onStartAtFramesChange: (v: number | null) => void
 }) {
+  const [localMs, setLocalMs] = useState(String(Math.round(track.startAt * 1000)))
+  const [localFrames, setLocalFrames] = useState(track.startAtFrames != null ? String(track.startAtFrames) : '')
+  const hasFrames = track.startAtFrames != null
+
+  useEffect(() => {
+    setLocalMs(String(Math.round(track.startAt * 1000)))
+    setLocalFrames(track.startAtFrames != null ? String(track.startAtFrames) : '')
+  }, [track.startAt, track.startAtFrames])
+
   return (
-    <div className="rounded-lg border border-border/50 bg-muted/40 p-2.5 flex items-center gap-2">
-      <span className="text-xs text-muted-foreground w-5 shrink-0">#{index + 1}</span>
-      <span className="flex-1 text-sm text-foreground truncate">{track.assetFileName}</span>
-      {track.duration != null && <span className="text-xs text-muted-foreground">{track.duration.toFixed(1)}s</span>}
-      <div className="flex items-center gap-0.5">
-        <button onClick={onMoveUp}   disabled={index === 0}          className="w-5 h-5 text-muted-foreground hover:text-foreground disabled:opacity-30 flex items-center justify-center text-xs">↑</button>
-        <button onClick={onMoveDown} disabled={index === total - 1}  className="w-5 h-5 text-muted-foreground hover:text-foreground disabled:opacity-30 flex items-center justify-center text-xs">↓</button>
-        <button onClick={onRemove} className="w-5 h-5 text-muted-foreground hover:text-red-400 flex items-center justify-center">×</button>
+    <div className="rounded-lg border border-border/50 bg-muted/40 p-2.5 flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-muted-foreground w-5 shrink-0">#{index + 1}</span>
+        <span className="flex-1 text-sm text-foreground truncate">{track.assetFileName}</span>
+        {track.duration != null && <span className="text-xs text-muted-foreground">{track.duration.toFixed(1)}s</span>}
+        <div className="flex items-center gap-0.5">
+          <button onClick={onMoveUp}   disabled={index === 0}          className="w-5 h-5 text-muted-foreground hover:text-foreground disabled:opacity-30 flex items-center justify-center text-xs">↑</button>
+          <button onClick={onMoveDown} disabled={index === total - 1}  className="w-5 h-5 text-muted-foreground hover:text-foreground disabled:opacity-30 flex items-center justify-center text-xs">↓</button>
+          <button onClick={onRemove} className="w-5 h-5 text-muted-foreground hover:text-red-400 flex items-center justify-center">×</button>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <label className="text-xs text-muted-foreground shrink-0">start-at</label>
+        <input
+          type="number" min="0" step="1"
+          value={localMs}
+          onChange={e => setLocalMs(e.target.value)}
+          onBlur={() => { const v = parseInt(localMs); if (!isNaN(v) && v >= 0) onStartAtChange(v / 1000) }}
+          className={`input-base text-xs py-0.5 w-20 ${hasFrames ? 'opacity-40' : ''}`}
+        />
+        <span className="text-[10px] text-muted-foreground">ms</span>
+        <input
+          type="number" min="0" step="1"
+          value={localFrames}
+          onChange={e => setLocalFrames(e.target.value)}
+          onBlur={() => {
+            if (localFrames.trim() === '') { onStartAtFramesChange(null) }
+            else { const v = parseInt(localFrames); if (!isNaN(v) && v >= 0) onStartAtFramesChange(v) }
+          }}
+          className={`input-base text-xs py-0.5 w-16 ${hasFrames ? 'ring-1 ring-primary/50' : ''}`}
+          placeholder="—"
+        />
+        <span className="text-[10px] text-muted-foreground whitespace-nowrap">FPS</span>
       </div>
     </div>
   )

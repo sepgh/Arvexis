@@ -168,14 +168,14 @@ public class TransitionPreviewService {
                                         Path outFile, double fallbackDur,
                                         PreviewJob job) throws Exception {
         List<Map<String, Object>> layerRows = jdbc.queryForList("""
-            SELECT tvl.layer_order, tvl.start_at, tvl.freeze_last_frame, a.file_path, a.duration, a.has_alpha
+            SELECT tvl.layer_order, tvl.start_at, tvl.start_at_frames, tvl.freeze_last_frame, a.file_path, a.duration, a.has_alpha
             FROM transition_video_layers tvl
             JOIN assets a ON a.id = tvl.asset_id
             WHERE tvl.edge_id = ? ORDER BY tvl.layer_order
             """, edgeId);
 
         List<Map<String, Object>> audioRows = jdbc.queryForList("""
-            SELECT tat.track_order, tat.start_at, a.file_path, a.duration
+            SELECT tat.track_order, tat.start_at, tat.start_at_frames, a.file_path, a.duration
             FROM transition_audio_tracks tat
             JOIN assets a ON a.id = tat.asset_id
             WHERE tat.edge_id = ? ORDER BY tat.track_order
@@ -187,17 +187,17 @@ public class TransitionPreviewService {
             boolean hasAlpha = row.get("has_alpha") instanceof Number n ? n.intValue() == 1 : Boolean.TRUE.equals(row.get("has_alpha"));
             boolean freeze   = row.get("freeze_last_frame") instanceof Number n ? n.intValue() == 1 : Boolean.TRUE.equals(row.get("freeze_last_frame"));
             videoLayers.add(new VideoLayerSpec(
-                Path.of((String) row.get("file_path")), toDouble(row.get("start_at")), i, hasAlpha, freeze));
+                Path.of((String) row.get("file_path")), resolveStartAt(row.get("start_at"), row.get("start_at_frames"), fps), i, hasAlpha, freeze));
         }
 
         List<AudioTrackSpec> audioTracks = new ArrayList<>();
         for (int i = 0; i < audioRows.size(); i++) {
             Map<String, Object> row = audioRows.get(i);
             audioTracks.add(new AudioTrackSpec(
-                Path.of((String) row.get("file_path")), toDouble(row.get("start_at")), i));
+                Path.of((String) row.get("file_path")), resolveStartAt(row.get("start_at"), row.get("start_at_frames"), fps), i));
         }
 
-        double duration = computeDuration(layerRows, audioRows);
+        double duration = computeDuration(layerRows, audioRows, fps);
         if (duration <= 0) duration = fallbackDur;
 
         String bgHex = config.getDefaultBackgroundColor() != null ? config.getDefaultBackgroundColor() : "#000000";
@@ -218,17 +218,24 @@ public class TransitionPreviewService {
         videoProcessor.compositeWithProgress(spec, job);
     }
 
-    private double computeDuration(List<Map<String, Object>> layers, List<Map<String, Object>> audio) {
+    private double computeDuration(List<Map<String, Object>> layers, List<Map<String, Object>> audio, int fps) {
         double max = 0;
         for (Map<String, Object> row : layers) {
             Object dur = row.get("duration");
-            if (dur != null) max = Math.max(max, toDouble(dur) + toDouble(row.get("start_at")));
+            if (dur != null) max = Math.max(max, toDouble(dur) + resolveStartAt(row.get("start_at"), row.get("start_at_frames"), fps));
         }
         for (Map<String, Object> row : audio) {
             Object dur = row.get("duration");
-            if (dur != null) max = Math.max(max, toDouble(dur) + toDouble(row.get("start_at")));
+            if (dur != null) max = Math.max(max, toDouble(dur) + resolveStartAt(row.get("start_at"), row.get("start_at_frames"), fps));
         }
         return max;
+    }
+
+    private double resolveStartAt(Object startAtSeconds, Object startAtFrames, int fps) {
+        if (startAtFrames instanceof Number n && n.intValue() >= 0) {
+            return n.intValue() / (double) fps;
+        }
+        return toDouble(startAtSeconds);
     }
 
     private double toDouble(Object val) {

@@ -89,14 +89,32 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
 
   // Video layers
   function toLayerReq(l: TransitionLayerData): VideoLayerRequest {
-    return { assetId: l.assetId, startAt: l.startAt, freezeLastFrame: l.freezeLastFrame }
+    return { assetId: l.assetId, startAt: l.startAt, startAtFrames: l.startAtFrames, freezeLastFrame: l.freezeLastFrame }
+  }
+
+  async function updateLayerStartAt(layerId: number, startAt: number) {
+    if (!data) return
+    const layers = data.videoLayers.map(l =>
+      ({ ...toLayerReq(l), ...(l.id === layerId ? { startAt } : {}) })
+    )
+    const result = await withSave(() => saveTransitionLayers(edgeId, layers))
+    if (result) setData(result)
+  }
+
+  async function updateLayerStartAtFrames(layerId: number, startAtFrames: number | null) {
+    if (!data) return
+    const layers = data.videoLayers.map(l =>
+      ({ ...toLayerReq(l), ...(l.id === layerId ? { startAtFrames } : {}) })
+    )
+    const result = await withSave(() => saveTransitionLayers(edgeId, layers))
+    if (result) setData(result)
   }
 
   async function addVideoLayer(asset: Asset) {
     if (!data) return
     const layers: VideoLayerRequest[] = [
       ...data.videoLayers.map(toLayerReq),
-      { assetId: asset.id, startAt: 0, freezeLastFrame: false },
+      { assetId: asset.id, startAt: 0, startAtFrames: null, freezeLastFrame: false },
     ]
     const result = await withSave(() => saveTransitionLayers(edgeId, layers))
     if (result) setData(result)
@@ -129,11 +147,15 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
   }
 
   // Audio tracks
+  function toAudioReq(t: TransitionAudioData): AudioTrackRequest {
+    return { assetId: t.assetId, startAt: t.startAt, startAtFrames: t.startAtFrames }
+  }
+
   async function addAudioTrack(asset: Asset) {
     if (!data) return
     const tracks: AudioTrackRequest[] = [
-      ...data.audioTracks.map(t => ({ assetId: t.assetId, startAt: t.startAt })),
-      { assetId: asset.id, startAt: 0 },
+      ...data.audioTracks.map(toAudioReq),
+      { assetId: asset.id, startAt: 0, startAtFrames: null },
     ]
     const result = await withSave(() => saveTransitionAudio(edgeId, tracks))
     if (result) setData(result)
@@ -141,8 +163,25 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
 
   async function removeAudioTrack(trackId: number) {
     if (!data) return
-    const tracks = data.audioTracks.filter(t => t.id !== trackId)
-      .map(t => ({ assetId: t.assetId, startAt: t.startAt }))
+    const tracks = data.audioTracks.filter(t => t.id !== trackId).map(toAudioReq)
+    const result = await withSave(() => saveTransitionAudio(edgeId, tracks))
+    if (result) setData(result)
+  }
+
+  async function updateAudioStartAt(trackId: number, startAt: number) {
+    if (!data) return
+    const tracks = data.audioTracks.map(t =>
+      ({ ...toAudioReq(t), ...(t.id === trackId ? { startAt } : {}) })
+    )
+    const result = await withSave(() => saveTransitionAudio(edgeId, tracks))
+    if (result) setData(result)
+  }
+
+  async function updateAudioStartAtFrames(trackId: number, startAtFrames: number | null) {
+    if (!data) return
+    const tracks = data.audioTracks.map(t =>
+      ({ ...toAudioReq(t), ...(t.id === trackId ? { startAtFrames } : {}) })
+    )
     const result = await withSave(() => saveTransitionAudio(edgeId, tracks))
     if (result) setData(result)
   }
@@ -265,6 +304,8 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
                 onRemove={() => removeVideoLayer(vl.id)}
                 onMoveUp={() => moveVideoLayer(vl.id, -1)}
                 onMoveDown={() => moveVideoLayer(vl.id, 1)}
+                onStartAtChange={v => updateLayerStartAt(vl.id, v)}
+                onStartAtFramesChange={v => updateLayerStartAtFrames(vl.id, v)}
                 onFreezeChange={v => updateLayerFreeze(vl.id, v)}
               />
             ))}
@@ -282,6 +323,8 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
               <AudioTrackRow
                 key={t.id} track={t} index={i}
                 onRemove={() => removeAudioTrack(t.id)}
+                onStartAtChange={v => updateAudioStartAt(t.id, v)}
+                onStartAtFramesChange={v => updateAudioStartAtFrames(t.id, v)}
               />
             ))}
             {!data?.audioTracks.length && (
@@ -297,11 +340,22 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function VideoLayerRow({ layer, index, total, onRemove, onMoveUp, onMoveDown, onFreezeChange }: {
+function VideoLayerRow({ layer, index, total, onRemove, onMoveUp, onMoveDown, onStartAtChange, onStartAtFramesChange, onFreezeChange }: {
   layer: TransitionLayerData; index: number; total: number
   onRemove: () => void; onMoveUp: () => void; onMoveDown: () => void
+  onStartAtChange: (v: number) => void
+  onStartAtFramesChange: (v: number | null) => void
   onFreezeChange: (v: boolean) => void
 }) {
+  const [localMs, setLocalMs] = useState(String(Math.round(layer.startAt * 1000)))
+  const [localFrames, setLocalFrames] = useState(layer.startAtFrames != null ? String(layer.startAtFrames) : '')
+  const hasFrames = layer.startAtFrames != null
+
+  useEffect(() => {
+    setLocalMs(String(Math.round(layer.startAt * 1000)))
+    setLocalFrames(layer.startAtFrames != null ? String(layer.startAtFrames) : '')
+  }, [layer.startAt, layer.startAtFrames])
+
   return (
     <div className={['rounded-lg border p-2.5 flex flex-col gap-2',
       layer.alphaError ? 'border-red-500/60 bg-red-500/5' : 'border-border/50 bg-muted/40',
@@ -317,6 +371,29 @@ function VideoLayerRow({ layer, index, total, onRemove, onMoveUp, onMoveDown, on
           <button onClick={onRemove} className="w-5 h-5 text-muted-foreground hover:text-red-400 flex items-center justify-center">×</button>
         </div>
       </div>
+      <div className="flex items-center gap-2">
+        <label className="text-xs text-muted-foreground shrink-0">start-at</label>
+        <input
+          type="number" min="0" step="1"
+          value={localMs}
+          onChange={e => setLocalMs(e.target.value)}
+          onBlur={() => { const v = parseInt(localMs); if (!isNaN(v) && v >= 0) onStartAtChange(v / 1000) }}
+          className={`input-base text-xs py-0.5 w-20 ${hasFrames ? 'opacity-40' : ''}`}
+        />
+        <span className="text-[10px] text-muted-foreground">ms</span>
+        <input
+          type="number" min="0" step="1"
+          value={localFrames}
+          onChange={e => setLocalFrames(e.target.value)}
+          onBlur={() => {
+            if (localFrames.trim() === '') { onStartAtFramesChange(null) }
+            else { const v = parseInt(localFrames); if (!isNaN(v) && v >= 0) onStartAtFramesChange(v) }
+          }}
+          className={`input-base text-xs py-0.5 w-16 ${hasFrames ? 'ring-1 ring-primary/50' : ''}`}
+          placeholder="—"
+        />
+        <span className="text-[10px] text-muted-foreground whitespace-nowrap">FPS</span>
+      </div>
       <label className="flex items-center gap-2 cursor-pointer select-none">
         <input
           type="checkbox"
@@ -330,15 +407,51 @@ function VideoLayerRow({ layer, index, total, onRemove, onMoveUp, onMoveDown, on
   )
 }
 
-function AudioTrackRow({ track, index, onRemove }: {
+function AudioTrackRow({ track, index, onRemove, onStartAtChange, onStartAtFramesChange }: {
   track: TransitionAudioData; index: number; onRemove: () => void
+  onStartAtChange: (v: number) => void
+  onStartAtFramesChange: (v: number | null) => void
 }) {
+  const [localMs, setLocalMs] = useState(String(Math.round(track.startAt * 1000)))
+  const [localFrames, setLocalFrames] = useState(track.startAtFrames != null ? String(track.startAtFrames) : '')
+  const hasFrames = track.startAtFrames != null
+
+  useEffect(() => {
+    setLocalMs(String(Math.round(track.startAt * 1000)))
+    setLocalFrames(track.startAtFrames != null ? String(track.startAtFrames) : '')
+  }, [track.startAt, track.startAtFrames])
+
   return (
-    <div className="rounded-lg border border-border/50 bg-muted/40 p-2.5 flex items-center gap-2">
-      <span className="text-xs text-muted-foreground w-5 shrink-0">#{index + 1}</span>
-      <span className="flex-1 text-sm truncate">{track.assetFileName}</span>
-      {track.duration != null && <span className="text-xs text-muted-foreground">{track.duration.toFixed(1)}s</span>}
-      <button onClick={onRemove} className="w-5 h-5 text-muted-foreground hover:text-red-400 flex items-center justify-center">×</button>
+    <div className="rounded-lg border border-border/50 bg-muted/40 p-2.5 flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-muted-foreground w-5 shrink-0">#{index + 1}</span>
+        <span className="flex-1 text-sm truncate">{track.assetFileName}</span>
+        {track.duration != null && <span className="text-xs text-muted-foreground">{track.duration.toFixed(1)}s</span>}
+        <button onClick={onRemove} className="w-5 h-5 text-muted-foreground hover:text-red-400 flex items-center justify-center">×</button>
+      </div>
+      <div className="flex items-center gap-2">
+        <label className="text-xs text-muted-foreground shrink-0">start-at</label>
+        <input
+          type="number" min="0" step="1"
+          value={localMs}
+          onChange={e => setLocalMs(e.target.value)}
+          onBlur={() => { const v = parseInt(localMs); if (!isNaN(v) && v >= 0) onStartAtChange(v / 1000) }}
+          className={`input-base text-xs py-0.5 w-20 ${hasFrames ? 'opacity-40' : ''}`}
+        />
+        <span className="text-[10px] text-muted-foreground">ms</span>
+        <input
+          type="number" min="0" step="1"
+          value={localFrames}
+          onChange={e => setLocalFrames(e.target.value)}
+          onBlur={() => {
+            if (localFrames.trim() === '') { onStartAtFramesChange(null) }
+            else { const v = parseInt(localFrames); if (!isNaN(v) && v >= 0) onStartAtFramesChange(v) }
+          }}
+          className={`input-base text-xs py-0.5 w-16 ${hasFrames ? 'ring-1 ring-primary/50' : ''}`}
+          placeholder="—"
+        />
+        <span className="text-[10px] text-muted-foreground whitespace-nowrap">FPS</span>
+      </div>
     </div>
   )
 }
