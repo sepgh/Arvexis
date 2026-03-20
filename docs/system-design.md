@@ -1,6 +1,13 @@
 # Arvexis
 
-We are building **Arvexis** — a Node-Based Interactive Video Engine to build artistic games and interactive video experiences. Below is the description of the system and its parts in detail, as well as design decisions and constraints.
+We are building **Arvexis** — a node-based interactive video engine for artistic games and branching video experiences. This document describes the architecture and the feature set that is currently implemented, along with the design decisions and constraints that shape the system.
+
+## Current implementation snapshot
+
+- **Editor backend**: Spring Boot REST API, project lifecycle management, asset management, preview compilation, custom CSS storage, and compile/export orchestration.
+- **Editor frontend**: React + React Flow authoring UI with node editing, asset pickers, scene previews, project settings, and a custom CSS panel.
+- **Compiled runtime**: Browser-based client served by a lightweight Java server with a main menu, pause overlay, settings panel, save/resume support, and offline playback.
+- **Packaging**: The editor compiles a distributable runtime bundle that includes compiled media, custom CSS, and the server/client assets needed to run offline.
 
 
 # Tech Stack
@@ -63,13 +70,14 @@ A scene node contains:
 - An ordered list of **audio tracks**, each with:
   - Audio file reference (from assets)
   - `start-at`: timestamp (in seconds) into the scene timeline where this audio begins playing.
+- An optional **background music asset** selected from the project assets, which can play while the scene is active.
 - A **background color**: the base layer color behind all video layers, filling any remaining alpha-transparent areas.
 - An **`end` flag**: if set, reaching this scene ends the game/experience.
 - A **default decision**: which decision is auto-selected if the player doesn't choose in time.
 - **Decision button appearance configuration** (per scene):
   - **Timing**: buttons can appear **at a specific timestamp** during the scene, or **after the video ends**. Both options are available.
   - **Position**: handled by the compiled client (not baked into the video). The client provides layout options for button placement.
-  - **Style**: v1 uses a default style. Custom styling is deferred to a future version.
+  - **Style**: the compiled runtime now exposes configurable button colors and layout options through its settings overlay; deeper per-scene styling remains a future extension.
 
 **Scene duration** is determined by the longest layer (video or audio): `max(layer_duration + start_at)` across all video layers and audio tracks.
 
@@ -181,9 +189,11 @@ DecisionTranslation:
 - Project name
 - Project location (root directory)
 - Assets location (directory)
+- Project default background color
 - Compile resolutions: 2K, 1080p, 720p
 - Preview resolution
 - FPS: 24, 30
+- FFmpeg thread count (numeric value or automatic mode)
 - Audio sample rate
 - Audio bit rate
 - Output directory
@@ -235,6 +245,7 @@ The output is a **complete package** that works **offline by default**:
 - A Java-based server (executable JAR or similar)
 - A web-based client (HTML/JS/CSS)
 - All compiled video/audio assets
+- A base `default.css` runtime stylesheet plus the project-specific `custom.css` override when present
 - Documentation/instructions for hosting it online
 
 The package works on both **Linux and Windows**.
@@ -259,9 +270,10 @@ Compiled scenes and transitions are converted to **HLS** (HTTP Live Streaming) f
 2. Seamless client-side playback
 
 The server manages:
-- Serving video segments
+- Serving video segments and packaged assets
 - Returning available decisions/choices to the client
 - Managing game state and save/checkpoint
+- Exposing the current music URL and save-state status required by the runtime UI
 
 ### Preloading Strategy
 
@@ -279,6 +291,9 @@ The compiled client (web-based, served by the Java server) handles:
 - Displaying decision buttons (position managed by the client)
 - Sending decision selections to the server
 - Receiving and applying preload hints for upcoming transitions
+- Main menu, pause overlay, and settings panel for continue/new game, audio/video options, button layout, and resolution
+- Persisting player settings in localStorage and resuming saved games when available
+- Background music playback with a dedicated audio element
 - Restart game option
 
 

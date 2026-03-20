@@ -3,7 +3,7 @@
 <p>
   
   <img width="15%" src="https://github.com/sepgh/Arvexis/blob/main/assets/logo.png" align="left" />
-  A node-based authoring tool for building interactive video experiences and artistic games. Authors compose a directed graph of scenes, conditions, and state mutations in a visual editor; the engine compiles it into a self-contained, offline-capable playable package.
+  A node-based authoring tool for building interactive video experiences and artistic games. Authors compose a directed graph of scenes, conditions, and state mutations in a visual editor; the engine compiles it into a self-contained, offline-capable playable package with a branded runtime, menu flow, save/resume support, and configurable presentation.
 </p>
 
 
@@ -12,13 +12,61 @@
 
 ## What It Does
 
-1. **Author** — Open the editor in a browser. Build a graph of nodes:
-   - **Scene nodes** — video layers composited over each other, with audio tracks, decision buttons, and an optional end flag.
-   - **State nodes** — SpEL expressions that mutate global variables (e.g. `#VISIT_COUNT = #VISIT_COUNT + 1`).
-   - **Condition nodes** — ordered SpEL boolean conditions that route the player along different edges.
-2. **Preview** — Compile individual scenes or transitions at preview resolution and watch the result in-browser without leaving the editor.
-3. **Compile** — Run the full pipeline: FFmpeg compositing → HLS conversion → packaging. Downloads a `dist.zip` containing a self-contained runtime.
-4. **Play** — Extract `dist.zip` and run `./start.sh` (Linux/macOS) or `start.bat` (Windows). Open `http://localhost:8090` in any browser — no internet connection required.
+1. **Author interactive graphs** — Open the editor in a browser and build a node graph:
+   - **Scene nodes** — layered video compositing, audio tracks, optional background music, decision buttons, and an end flag.
+   - **State nodes** — SpEL expressions that mutate global variables such as `#VISIT_COUNT = #VISIT_COUNT + 1`.
+   - **Condition nodes** — ordered boolean conditions that route the player along different edges.
+2. **Manage assets and presentation** — Upload video/audio assets, organize folders, tag media, and assign scene-level properties such as background color, decision timeout behavior, and default decisions.
+3. **Preview quickly** — Compile individual scenes or transitions at preview resolution and watch the result in-browser without leaving the editor.
+4. **Customize the runtime** — Edit project CSS, tune project settings, and control runtime options such as menu flow, button styling, music behavior, and display preferences.
+5. **Compile and export** — Run the full pipeline: FFmpeg compositing → HLS conversion → packaging. The editor produces a `dist.zip` containing a self-contained runtime.
+6. **Play offline** — Extract `dist.zip` and run `./start.sh` (Linux/macOS) or `start.bat` (Windows). Open `http://localhost:8090` in any browser — no internet connection required.
+
+---
+
+## Available Features
+
+### Editor Features
+
+- **Visual graph authoring** with React Flow.
+- **Scene editing** with layered video and audio tracks.
+- **Background music selection** per scene from project assets.
+- **State mutation nodes** using Spring SpEL.
+- **Conditional branching** with ordered condition nodes and fallback logic.
+- **Asset management** for upload, folder creation, tagging, and media browsing.
+- **Preview compilation** for individual scenes and transitions.
+- **Project settings** for resolution, FPS, audio settings, output paths, and default background color.
+- **Custom CSS editing** for runtime branding and styling.
+- **Auto-save** of project state in the embedded SQLite database.
+
+### Runtime Features
+
+- **Main menu** with Continue, New Game, and Settings actions.
+- **Pause overlay** for in-game control and quick access to settings.
+- **Settings panel** for music volume, video volume, music toggle, button placement, button colors, and resolution.
+- **Save/resume support** across browser refreshes.
+- **Offline playback** from the packaged runtime bundle.
+- **Background music playback** during scenes.
+- **Freeze-frame decision UI** when a scene ends and the player needs to choose the next path.
+- **Decision preloading** to keep transitions smooth.
+
+### Packaging and Runtime Output
+
+- **Self-contained server/client bundle** for local or hosted playback.
+- **Compiled HLS video assets** for browser-friendly delivery.
+- **Included project CSS** with a base stylesheet plus optional `custom.css` override.
+- **Cross-platform output** for Linux and Windows.
+
+---
+
+## Why This Project Is Useful
+
+- **For interactive storytelling** — It gives creators a structured way to build branching narratives without hand-coding every path.
+- **For artistic games and video essays** — The engine is well-suited to experiences where video, audio, and decisions are the core medium.
+- **For rapid iteration** — The editor supports previews, asset management, and in-browser authoring, which makes experimentation faster.
+- **For offline distribution** — The final package can run without internet access, making it practical for exhibitions, installations, and local demos.
+- **For customization** — Runtime CSS and settings let creators tailor the player presentation to their project identity.
+- **For maintainability** — The graph model, manifest-driven compilation, and separated editor/runtime architecture keep the system easier to extend.
 
 ---
 
