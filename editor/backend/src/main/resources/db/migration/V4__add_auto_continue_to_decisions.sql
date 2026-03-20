@@ -1,0 +1,1 @@
+ALTER TABLE scene_decisions ADD COLUMN auto_continue INTEGER NOT NULL DEFAULT 0;

@@ -15,6 +15,7 @@ export interface GraphNode {
   type: NodeType
   isRoot: boolean
   isEnd: boolean
+  autoContinue: boolean
   backgroundColor?: string
   decisionAppearanceConfig?: DecisionAppearanceConfig
   posX: number

@@ -11,6 +11,7 @@ export interface CreateNodePayload {
 export interface UpdateNodePayload {
   name?: string
   isEnd?: boolean
+  autoContinue?: boolean
   backgroundColor?: string
   decisionAppearanceConfig?: string
   posX?: number

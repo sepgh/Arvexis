@@ -193,9 +193,24 @@ public class RuntimeServer {
         resp.put("duration",          scene != null ? scene.computedDuration : null);
         resp.put("decisionAppearanceConfig", scene != null ? scene.decisionAppearanceConfig : null);
         resp.put("decisionTimeoutSecs", engine.decisionTimeoutSecs());
-        resp.put("decisions",         decisions.stream().map(d ->
-            Map.of("key", d.key(), "isDefault", d.isDefault())).toList());
+        resp.put("decisions",         decisions.stream().map(d -> {
+            Map<String, Object> dm = new LinkedHashMap<>();
+            dm.put("key",       d.key());
+            dm.put("isDefault", d.isDefault());
+            return dm;
+        }).toList());
         resp.put("preloadUrls",       engine.preloadUrlsForScene(s.currentSceneId));
+        // Scene-level auto-continue: only active when there are no explicit decisions
+        boolean autoContinues = engine.sceneAutoContinues(s.currentSceneId);
+        resp.put("autoContinue", autoContinues);
+        if (autoContinues) {
+            try {
+                GameEngine.TraversalResult tr = engine.peek(s, "CONTINUE");
+                if (tr != null && tr.nextScene() != null) {
+                    resp.put("autoContinueNextSceneUrl", "/hls/" + tr.nextScene().id + "/master.m3u8");
+                }
+            } catch (Exception ignored) {}
+        }
         resp.put("variables",         Map.copyOf(s.variables));
         return resp;
     }

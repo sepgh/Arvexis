@@ -57,6 +57,7 @@ export default function NodeEditorPanel({ nodeData, onConditionsChanged }: NodeE
           <SceneEditor
             nodeId={nodeData.id}
             isEnd={nodeData.isEnd}
+            autoContinue={nodeData.autoContinue}
             backgroundColor={nodeData.backgroundColor ?? null}
           />
         )}

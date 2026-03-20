@@ -21,7 +21,6 @@ const decisionButtons = document.getElementById('decisionButtons');
 const countdownEl   = document.getElementById('countdown');
 const countdownNum  = document.getElementById('countdownNum');
 const countdownArc  = document.getElementById('countdownArc');
-const sceneTitle    = document.getElementById('sceneTitle');
 const spinner       = document.getElementById('spinner');
 const spinnerText   = document.getElementById('spinnerText');
 const errorBox      = document.getElementById('errorBox');
@@ -50,7 +49,6 @@ async function loadScene(state) {
   currentState = state;
   decisionMade = false;
 
-  sceneTitle.textContent  = state.currentSceneName || '';
   hideDecisions();
   hideCountdown();
   endScreen.classList.remove('visible');
@@ -65,14 +63,30 @@ async function loadScene(state) {
   // Start preloading transition HLS segments in background
   preloadTransitions(state.preloadUrls || []);
 
+  // Preload next scene HLS if an auto-continue decision is set
+  if (state.autoContinueNextSceneUrl) {
+    preloadScene(state.autoContinueNextSceneUrl);
+  }
+
   hideSpinner();
 
   videoEl.play().catch(() => {});
 
-  const duration   = state.duration || 0;
   const decisions  = state.decisions || [];
   const timeout    = state.decisionTimeoutSecs || 5;
   const isEnd      = state.isEnd;
+
+  // Scene-level auto-continue: no explicit decisions, flag set → play immediately on end
+  if (state.autoContinue && decisions.length === 0) {
+    videoEl.addEventListener('ended', async () => {
+      captureFreeze();
+      if (!decisionMade) {
+        decisionMade = true;
+        await makeDecision('CONTINUE');
+      }
+    }, { once: true });
+    return;
+  }
 
   // ── Decision appearance timing ───────────────────────────────────────────
   // decisionAppearanceConfig is a raw JSON string (or null) with shape:
@@ -166,6 +180,20 @@ function preloadTransitions(urls) {
     hls.attachMedia(dummy);
     preloadedHls[url] = hls;
   }
+}
+
+let preloadedSceneHls = {}; // url → Hls (preloaded scene HLS)
+
+function preloadScene(url) {
+  if (preloadedSceneHls[url]) return; // already preloading
+  if (typeof Hls === 'undefined' || !Hls.isSupported()) return;
+
+  const hls = new Hls({ enableWorker: false });
+  const dummy = document.createElement('video');
+  dummy.muted = true;
+  hls.loadSource(url);
+  hls.attachMedia(dummy);
+  preloadedSceneHls[url] = hls;
 }
 
 // ── Decisions ─────────────────────────────────────────────────────────────────
@@ -325,6 +353,8 @@ async function restartGame() {
   if (transHls)    { transHls.destroy();    transHls    = null; }
   for (const h of Object.values(preloadedHls)) h?.destroy?.();
   preloadedHls = {};
+  for (const h of Object.values(preloadedSceneHls)) h?.destroy?.();
+  preloadedSceneHls = {};
 
   try {
     const state = await apiFetch('/api/game/restart', { method: 'POST', body: '{}' });

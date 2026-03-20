@@ -129,7 +129,30 @@ public class GameEngine {
             .toList();
     }
 
+    /** Returns true when the scene has no explicit decisions AND has autoContinue set. */
+    public boolean sceneAutoContinues(String sceneId) {
+        Manifest.NodeData scene = nodeById(sceneId);
+        if (scene == null) return false;
+        boolean hasExplicitDecisions = scene.decisions != null && !scene.decisions.isEmpty();
+        return !hasExplicitDecisions && scene.autoContinue;
+    }
+
     public record DecisionInfo(String key, boolean isDefault) {}
+
+    /**
+     * Read-only traversal: returns the TraversalResult for a given decision without
+     * mutating the game state. Returns null if the traversal fails.
+     */
+    public TraversalResult peek(GameState state, String decisionKey) {
+        GameState copy = new GameState(state.currentSceneId);
+        copy.variables.putAll(state.variables);
+        copy.gameOver = state.gameOver;
+        try {
+            return decide(copy, decisionKey);
+        } catch (Exception e) {
+            return null;
+        }
+    }
 
     /**
      * Returns preload URLs (HLS paths) for all transition edges leaving the given scene.

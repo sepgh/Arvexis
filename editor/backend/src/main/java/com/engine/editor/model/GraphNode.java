@@ -13,6 +13,7 @@ public class GraphNode {
     private String type;
     private boolean isRoot;
     private boolean isEnd;
+    private boolean autoContinue;
     private String backgroundColor;
     private String decisionAppearanceConfig;
     private double posX;
@@ -37,6 +38,10 @@ public class GraphNode {
     @JsonProperty("isEnd")
     public boolean isEnd() { return isEnd; }
     public void setEnd(boolean end) { this.isEnd = end; }
+
+    @JsonProperty("autoContinue")
+    public boolean isAutoContinue() { return autoContinue; }
+    public void setAutoContinue(boolean autoContinue) { this.autoContinue = autoContinue; }
 
     public String getBackgroundColor() { return backgroundColor; }
     public void setBackgroundColor(String backgroundColor) { this.backgroundColor = backgroundColor; }

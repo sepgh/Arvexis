@@ -205,6 +205,10 @@ public class ManifestService {
         }
         n.put("decisions", decList);
 
+        // Scene-level auto-continue (only meaningful when there are no explicit decisions)
+        n.put("autoContinue", intFlag(jdbc.queryForObject(
+            "SELECT auto_continue FROM nodes WHERE id=?", Integer.class, nodeId)));
+
         // Computed duration
         double dur = computeSceneDuration(layerList, audioList);
         n.put("computedDuration", dur > 0 ? dur : null);

@@ -8,7 +8,6 @@ interface NewProjectWizardProps {
 
 const FPS_OPTIONS = [24, 30, 60]
 const RESOLUTION_OPTIONS = ['1280x720', '1920x1080', '2560x1440', '3840x2160']
-const SAMPLE_RATE_OPTIONS = [44100, 48000]
 
 export default function NewProjectWizard({ onClose }: NewProjectWizardProps) {
   const setProjectConfig = useEditorStore((s) => s.setProjectConfig)
@@ -125,16 +124,15 @@ export default function NewProjectWizard({ onClose }: NewProjectWizardProps) {
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Audio Sample Rate">
-              <select
+            <Field label="Audio Sample Rate (Hz)">
+              <input
+                type="number"
                 value={sampleRate}
                 onChange={(e) => setSampleRate(Number(e.target.value))}
+                min={1}
+                step={1}
                 className="input-base"
-              >
-                {SAMPLE_RATE_OPTIONS.map((r) => (
-                  <option key={r} value={r}>{r} Hz</option>
-                ))}
-              </select>
+              />
             </Field>
 
             <Field label="Decision Timeout (s)">

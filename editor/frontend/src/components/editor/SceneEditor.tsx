@@ -13,12 +13,13 @@ import PreviewModal from './PreviewModal'
 interface SceneEditorProps {
   nodeId: string
   isEnd: boolean
+  autoContinue: boolean
   backgroundColor: string | null
 }
 
 type Section = 'layers' | 'audio' | 'decisions' | 'props'
 
-export default function SceneEditor({ nodeId, isEnd: initialIsEnd, backgroundColor: initialBg }: SceneEditorProps) {
+export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue: initialAutoContinue, backgroundColor: initialBg }: SceneEditorProps) {
   const projectDefaultBackgroundColor = useEditorStore(
     (s) => s.projectConfig?.defaultBackgroundColor ?? '#000000'
   )
@@ -30,15 +31,17 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, backgroundCol
   const [section, setSection] = useState<Section>('layers')
 
   // Properties state
-  const [isEnd, setIsEnd]   = useState(initialIsEnd)
-  const [bgColor, setBgColor] = useState(initialBg ?? projectDefaultBackgroundColor)
+  const [isEnd, setIsEnd]         = useState(initialIsEnd)
+  const [autoContinue, setAutoContinue] = useState(initialAutoContinue)
+  const [bgColor, setBgColor]     = useState(initialBg ?? projectDefaultBackgroundColor)
   const [previewJob, setPreviewJob] = useState<PreviewJobStatus | null>(null)
   const [previewing, setPreviewing] = useState(false)
 
   useEffect(() => {
     setIsEnd(initialIsEnd)
+    setAutoContinue(initialAutoContinue)
     setBgColor(initialBg ?? projectDefaultBackgroundColor)
-  }, [initialIsEnd, initialBg, projectDefaultBackgroundColor, nodeId])
+  }, [initialIsEnd, initialAutoContinue, initialBg, projectDefaultBackgroundColor, nodeId])
 
   async function handlePreview() {
     setPreviewing(true)
@@ -172,7 +175,6 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, backgroundCol
   async function removeDecision(decId: number) {
     if (!data) return
     const filtered = data.decisions.filter(d => d.id !== decId)
-    // If we removed the default, make the first one default
     let decisions = filtered.map((d, i) => ({ decisionKey: d.decisionKey, isDefault: d.isDefault, decisionOrder: i }))
     if (decisions.length > 0 && !decisions.some(d => d.isDefault)) decisions[0].isDefault = true
     const result = await withSave(() => saveDecisions(nodeId, decisions))
@@ -189,8 +191,7 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, backgroundCol
   // ── Properties ────────────────────────────────────────────────────────────
 
   async function saveProperties() {
-    const result = await withSave(() => updateNode(nodeId, { isEnd, backgroundColor: bgColor }))
-    if (result) { /* node canvas auto-updates via React Flow */ }
+    await withSave(() => updateNode(nodeId, { isEnd, autoContinue, backgroundColor: bgColor }))
   }
 
   if (loading) return <div className="flex items-center justify-center h-20 text-xs text-muted-foreground">Loading…</div>
@@ -342,6 +343,20 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, backgroundCol
                 <p className="text-muted-foreground" style={{ fontSize: 13 }}>The game ends when this scene finishes.</p>
               </div>
             </label>
+            {!data?.decisions.length && (
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autoContinue}
+                  onChange={e => setAutoContinue(e.target.checked)}
+                  className="w-4 h-4 accent-primary"
+                />
+                <div>
+                  <span className="font-medium text-foreground" style={{ fontSize: 14 }}>Auto-continue</span>
+                  <p className="text-muted-foreground" style={{ fontSize: 13 }}>Next scene plays immediately when video ends, with no button shown.</p>
+                </div>
+              </label>
+            )}
             <div className="flex flex-col gap-1.5">
               <label className="text-muted-foreground" style={{ fontSize: 14 }}>Background color</label>
               <div className="flex items-center gap-2">

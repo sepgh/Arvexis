@@ -13,7 +13,7 @@
 
     <groupId>com.engine</groupId>
     <artifactId>editor-backend</artifactId>
-    <version>0.1.0-RELEASE</version>
+    <version>0.2.0-RELEASE</version>
     <name>editor-backend</name>
     <description>Arvexis - Editor Backend</description>
 

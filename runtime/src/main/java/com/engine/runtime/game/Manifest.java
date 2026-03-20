@@ -38,6 +38,7 @@ public class Manifest {
         @JsonProperty("assignments")              public List<AssignmentEntry> assignments;
         @JsonProperty("conditions")               public List<ConditionEntry>  conditions;
         @JsonProperty("decisionAppearanceConfig") public String decisionAppearanceConfig; // raw JSON string
+        @JsonProperty("autoContinue")             public boolean autoContinue;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
