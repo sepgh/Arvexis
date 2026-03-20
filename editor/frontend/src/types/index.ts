@@ -18,6 +18,7 @@ export interface GraphNode {
   autoContinue: boolean
   backgroundColor?: string
   decisionAppearanceConfig?: DecisionAppearanceConfig
+  musicAssetId?: string | null
   posX: number
   posY: number
   exits: NodeExit[]
@@ -93,6 +94,7 @@ export interface VideoLayerData {
   hasAlpha: boolean
   duration: number | null
   startAt: number
+  startAtFrames: number | null
   alphaError: boolean
   freezeLastFrame: boolean
 }
@@ -104,6 +106,7 @@ export interface AudioTrackData {
   assetFileName: string
   duration: number | null
   startAt: number
+  startAtFrames: number | null
 }
 
 export interface DecisionItemData {
@@ -166,6 +169,7 @@ export interface TransitionLayerData {
   hasAlpha: boolean
   duration: number | null
   startAt: number
+  startAtFrames: number | null
   alphaError: boolean
 }
 
@@ -176,6 +180,7 @@ export interface TransitionAudioData {
   assetFileName: string
   duration: number | null
   startAt: number
+  startAtFrames: number | null
 }
 
 export interface TransitionResponse {

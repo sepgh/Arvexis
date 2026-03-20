@@ -26,6 +26,7 @@ import ProjectSettingsPanel from '@/components/editor/ProjectSettingsPanel'
 import LabeledEdge from '@/components/canvas/LabeledEdge'
 import ResizableSidePanel from '@/components/layout/ResizableSidePanel'
 import LocalizationPanel from '@/components/editor/LocalizationPanel'
+import CustomCssPanel from '@/components/editor/CustomCssPanel'
 import type { NodeType } from '@/types'
 
 const NODE_TYPES: NodeTypes = {
@@ -48,6 +49,7 @@ function GraphCanvas() {
   const validationPanelOpen     = useEditorStore(s => s.validationPanelOpen)
   const localizationPanelOpen   = useEditorStore(s => s.localizationPanelOpen)
   const projectSettingsPanelOpen = useEditorStore(s => s.projectSettingsPanelOpen)
+  const customCssPanelOpen        = useEditorStore(s => s.customCssPanelOpen)
 
   const {
     nodes,
@@ -148,6 +150,7 @@ function GraphCanvas() {
           <NodeEditorPanel
             nodeData={selectedNodeData}
             onConditionsChanged={reloadGraph}
+            onNodeUpdated={reloadGraph}
           />
         </ResizableSidePanel>
       )}
@@ -163,6 +166,11 @@ function GraphCanvas() {
       {projectSettingsPanelOpen && (
         <ResizableSidePanel side="right" initialWidth={460} minWidth={360} maxWidth={720}>
           <ProjectSettingsPanel />
+        </ResizableSidePanel>
+      )}
+      {customCssPanelOpen && (
+        <ResizableSidePanel side="right" initialWidth={480} minWidth={360} maxWidth={720}>
+          <CustomCssPanel />
         </ResizableSidePanel>
       )}
     </div>

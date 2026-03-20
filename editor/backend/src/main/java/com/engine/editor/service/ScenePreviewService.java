@@ -78,7 +78,7 @@ public class ScenePreviewService {
             job.setProgress(5, "Loading layers…");
             // Load video layers
             List<Map<String, Object>> layerRows = jdbc.queryForList("""
-                SELECT nvl.layer_order, nvl.start_at, nvl.freeze_last_frame, a.file_path, a.duration, a.has_alpha
+                SELECT nvl.layer_order, nvl.start_at, nvl.start_at_frames, nvl.freeze_last_frame, a.file_path, a.duration, a.has_alpha
                 FROM node_video_layers nvl
                 JOIN assets a ON a.id = nvl.asset_id
                 WHERE nvl.node_id = ? ORDER BY nvl.layer_order
@@ -86,14 +86,18 @@ public class ScenePreviewService {
 
             // Load audio tracks
             List<Map<String, Object>> audioRows = jdbc.queryForList("""
-                SELECT nat.track_order, nat.start_at, a.file_path, a.duration
+                SELECT nat.track_order, nat.start_at, nat.start_at_frames, a.file_path, a.duration
                 FROM node_audio_tracks nat
                 JOIN assets a ON a.id = nat.asset_id
                 WHERE nat.node_id = ? ORDER BY nat.track_order
                 """, nodeId);
 
+            String resolution = config.getPreviewResolution() != null
+                ? config.getPreviewResolution() : "1280x720";
+            int fps = config.getFps() > 0 ? config.getFps() : 30;
+
             // Compute duration
-            double duration = computeDuration(layerRows, audioRows);
+            double duration = computeDuration(layerRows, audioRows, fps);
             if (duration <= 0) duration = 5.0; // default for empty scene
 
             job.setProgress(15, "Building composite spec…");
@@ -103,7 +107,7 @@ public class ScenePreviewService {
             List<VideoLayerSpec> videoLayers = new ArrayList<>();
             for (int i = 0; i < layerRows.size(); i++) {
                 Map<String, Object> row = layerRows.get(i);
-                double startAt = toDouble(row.get("start_at"));
+                double startAt = resolveStartAt(row.get("start_at"), row.get("start_at_frames"), fps);
                 boolean hasAlpha = row.get("has_alpha") instanceof Number n ? n.intValue() == 1 : Boolean.TRUE.equals(row.get("has_alpha"));
                 boolean freeze   = row.get("freeze_last_frame") instanceof Number n ? n.intValue() == 1 : Boolean.TRUE.equals(row.get("freeze_last_frame"));
                 videoLayers.add(new VideoLayerSpec(
@@ -113,7 +117,7 @@ public class ScenePreviewService {
             List<AudioTrackSpec> audioTracks = new ArrayList<>();
             for (int i = 0; i < audioRows.size(); i++) {
                 Map<String, Object> row = audioRows.get(i);
-                double startAt = toDouble(row.get("start_at"));
+                double startAt = resolveStartAt(row.get("start_at"), row.get("start_at_frames"), fps);
                 audioTracks.add(new AudioTrackSpec(
                     Path.of((String) row.get("file_path")), startAt, i));
             }
@@ -122,10 +126,6 @@ public class ScenePreviewService {
             Path previewDir = projectDir.resolve("preview");
             Files.createDirectories(previewDir);
             Path outFile = previewDir.resolve("scene_" + job.getId() + ".mp4");
-
-            String resolution = config.getPreviewResolution() != null
-                ? config.getPreviewResolution() : "1280x720";
-            int fps = config.getFps() > 0 ? config.getFps() : 30;
 
             CompositeSpec spec = CompositeSpec.builder()
                 .videoLayers(videoLayers)
@@ -151,21 +151,28 @@ public class ScenePreviewService {
         }
     }
 
-    private double computeDuration(List<Map<String, Object>> layers, List<Map<String, Object>> audio) {
+    private double computeDuration(List<Map<String, Object>> layers, List<Map<String, Object>> audio, int fps) {
         double max = 0;
         for (Map<String, Object> row : layers) {
             Object dur = row.get("duration");
             if (dur != null) {
-                max = Math.max(max, toDouble(dur) + toDouble(row.get("start_at")));
+                max = Math.max(max, toDouble(dur) + resolveStartAt(row.get("start_at"), row.get("start_at_frames"), fps));
             }
         }
         for (Map<String, Object> row : audio) {
             Object dur = row.get("duration");
             if (dur != null) {
-                max = Math.max(max, toDouble(dur) + toDouble(row.get("start_at")));
+                max = Math.max(max, toDouble(dur) + resolveStartAt(row.get("start_at"), row.get("start_at_frames"), fps));
             }
         }
         return max;
+    }
+
+    private double resolveStartAt(Object startAtSeconds, Object startAtFrames, int fps) {
+        if (startAtFrames instanceof Number n && n.intValue() >= 0) {
+            return n.intValue() / (double) fps;
+        }
+        return toDouble(startAtSeconds);
     }
 
     private double toDouble(Object val) {

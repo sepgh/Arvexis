@@ -145,17 +145,31 @@ public class ManifestService {
                 nodeId));
 
         // Decision appearance
-        String cfg = (String) jdbc.queryForMap("SELECT * FROM nodes WHERE id=?", nodeId)
-            .get("decision_appearance_config");
+        Map<String, Object> nodeFullRow = jdbc.queryForMap("SELECT * FROM nodes WHERE id=?", nodeId);
+        String cfg = (String) nodeFullRow.get("decision_appearance_config");
         n.put("decisionAppearanceConfig", cfg);
+
+        // Background music asset
+        String musicAssetId = (String) nodeFullRow.get("music_asset_id");
+        if (musicAssetId != null) {
+            List<Map<String, Object>> musicRows = jdbc.queryForList(
+                "SELECT file_path, file_name FROM assets WHERE id=?", musicAssetId);
+            if (!musicRows.isEmpty()) {
+                n.put("musicAssetId", musicAssetId);
+                n.put("musicAssetRelPath", relPath(config.getAssetsDirectory(),
+                    (String) musicRows.get(0).get("file_path")));
+                n.put("musicAssetFileName", musicRows.get(0).get("file_name"));
+            }
+        }
 
         // Video layers with relative asset path
         List<Map<String, Object>> layers = jdbc.queryForList("""
-            SELECT nvl.layer_order, nvl.start_at, nvl.freeze_last_frame,
+            SELECT nvl.layer_order, nvl.start_at, nvl.start_at_frames, nvl.freeze_last_frame,
                    a.id AS asset_id, a.file_path, a.file_name, a.has_alpha, a.duration
             FROM node_video_layers nvl JOIN assets a ON a.id=nvl.asset_id
             WHERE nvl.node_id=? ORDER BY nvl.layer_order
             """, nodeId);
+        int fps = config.getFps() > 0 ? config.getFps() : 30;
         List<Map<String, Object>> layerList = new ArrayList<>();
         for (Map<String, Object> r : layers) {
             Map<String, Object> l = new LinkedHashMap<>();
@@ -166,14 +180,15 @@ public class ManifestService {
             l.put("hasAlpha",        intFlag(r.get("has_alpha")));
             l.put("freezeLastFrame", intFlag(r.get("freeze_last_frame")));
             l.put("duration", r.get("duration"));
-            l.put("startAt",  r.get("start_at"));
+            l.put("startAtFrames", r.get("start_at_frames"));
+            l.put("startAt",  resolveStartAt(r.get("start_at"), r.get("start_at_frames"), fps));
             layerList.add(l);
         }
         n.put("videoLayers", layerList);
 
         // Audio tracks
         List<Map<String, Object>> audios = jdbc.queryForList("""
-            SELECT nat.track_order, nat.start_at, a.id AS asset_id, a.file_path, a.file_name, a.duration
+            SELECT nat.track_order, nat.start_at, nat.start_at_frames, a.id AS asset_id, a.file_path, a.file_name, a.duration
             FROM node_audio_tracks nat JOIN assets a ON a.id=nat.asset_id
             WHERE nat.node_id=? ORDER BY nat.track_order
             """, nodeId);
@@ -185,7 +200,8 @@ public class ManifestService {
             t.put("assetFileName", r.get("file_name"));
             t.put("assetRelPath", relPath(config.getAssetsDirectory(), (String) r.get("file_path")));
             t.put("duration", r.get("duration"));
-            t.put("startAt",  r.get("start_at"));
+            t.put("startAtFrames", r.get("start_at_frames"));
+            t.put("startAt",  resolveStartAt(r.get("start_at"), r.get("start_at_frames"), fps));
             audioList.add(t);
         }
         n.put("audioTracks", audioList);
@@ -291,8 +307,9 @@ public class ManifestService {
     private List<Map<String, Object>> buildTransVideoLayers(String edgeId,
                                                               ProjectConfigData config,
                                                               JdbcTemplate jdbc) {
+        int fps = config.getFps() > 0 ? config.getFps() : 30;
         return jdbc.queryForList("""
-            SELECT tvl.layer_order, tvl.start_at, tvl.freeze_last_frame,
+            SELECT tvl.layer_order, tvl.start_at, tvl.start_at_frames, tvl.freeze_last_frame,
                    a.id AS asset_id, a.file_path, a.file_name, a.has_alpha, a.duration
             FROM transition_video_layers tvl JOIN assets a ON a.id=tvl.asset_id
             WHERE tvl.edge_id=? ORDER BY tvl.layer_order
@@ -305,7 +322,8 @@ public class ManifestService {
                 l.put("hasAlpha",         intFlag(r.get("has_alpha")));
                 l.put("freezeLastFrame",  intFlag(r.get("freeze_last_frame")));
                 l.put("duration",         r.get("duration"));
-                l.put("startAt",          r.get("start_at"));
+                l.put("startAtFrames",    r.get("start_at_frames"));
+                l.put("startAt",          resolveStartAt(r.get("start_at"), r.get("start_at_frames"), fps));
                 return l;
             }).toList();
     }
@@ -313,8 +331,9 @@ public class ManifestService {
     private List<Map<String, Object>> buildTransAudioTracks(String edgeId,
                                                               ProjectConfigData config,
                                                               JdbcTemplate jdbc) {
+        int fps = config.getFps() > 0 ? config.getFps() : 30;
         return jdbc.queryForList("""
-            SELECT tat.track_order, tat.start_at, a.id AS asset_id, a.file_path, a.file_name, a.duration
+            SELECT tat.track_order, tat.start_at, tat.start_at_frames, a.id AS asset_id, a.file_path, a.file_name, a.duration
             FROM transition_audio_tracks tat JOIN assets a ON a.id=tat.asset_id
             WHERE tat.edge_id=? ORDER BY tat.track_order
             """, edgeId).stream().map(r -> {
@@ -323,8 +342,9 @@ public class ManifestService {
                 t.put("assetId",       r.get("asset_id"));
                 t.put("assetFileName", r.get("file_name"));
                 t.put("assetRelPath",  relPath(config.getAssetsDirectory(), (String) r.get("file_path")));
-                t.put("duration",  r.get("duration"));
-                t.put("startAt",   r.get("start_at"));
+                t.put("duration",      r.get("duration"));
+                t.put("startAtFrames", r.get("start_at_frames"));
+                t.put("startAt",       resolveStartAt(r.get("start_at"), r.get("start_at_frames"), fps));
                 return t;
             }).toList();
     }
@@ -415,6 +435,13 @@ public class ManifestService {
             if (dur != null) max = Math.max(max, toDouble(dur) + toDouble(start));
         }
         return max;
+    }
+
+    private double resolveStartAt(Object startAtSeconds, Object startAtFrames, int fps) {
+        if (startAtFrames instanceof Number n && n.intValue() >= 0) {
+            return n.intValue() / (double) fps;
+        }
+        return toDouble(startAtSeconds);
     }
 
     private double toDouble(Object val) {

@@ -8,12 +8,19 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FRONTEND="$ROOT/editor/frontend"
 BACKEND="$ROOT/editor/backend"
 
-echo "==> [1/2] Building frontend..."
+RUNTIME="$ROOT/runtime"
+
+echo "==> [1/3] Building runtime JAR..."
+cd "$RUNTIME"
+mvn clean package -DskipTests -q
+cp "$RUNTIME/target/runtime-1.0.0.jar" "$BACKEND/src/main/resources/bundled/runtime.jar"
+
+echo "==> [2/3] Building frontend..."
 cd "$FRONTEND"
 npm install --silent
 npm run build
 
-echo "==> [2/2] Building backend JAR (frontend bundled inside)..."
+echo "==> [3/3] Building backend JAR (frontend + runtime bundled inside)..."
 cd "$BACKEND"
 mvn clean package -DskipTests -q
 

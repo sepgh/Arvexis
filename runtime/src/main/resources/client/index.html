@@ -3,258 +3,169 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Interactive Video</title>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      background: #000;
-      color: #fff;
-      font-family: system-ui, -apple-system, sans-serif;
-      height: 100dvh;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-    }
-
-    /* ── Video container ── */
-    #stage {
-      position: relative;
-      width: 100%;
-      height: 100dvh;
-      background: #000;
-    }
-
-    #videoEl, #transitionEl {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      background: #000;
-    }
-
-    #transitionEl {
-      opacity: 0;
-      transition: opacity 0.05s;
-      z-index: 2;
-    }
-    #transitionEl.active { opacity: 1; }
-
-    /* Freeze frame canvas sits over the video */
-    #freezeCanvas {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      display: none;
-      z-index: 3;
-    }
-
-    /* ── Decision overlay ── */
-    #decisionOverlay {
-      position: absolute;
-      inset: 0;
-      z-index: 10;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-end;
-      padding-bottom: 7vh;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.4s;
-    }
-    #decisionOverlay.visible {
-      pointer-events: all;
-      opacity: 1;
-    }
-
-    #decisionButtons {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      width: 100%;
-      max-width: 480px;
-      padding: 0 20px;
-    }
-
-    .decision-btn {
-      padding: 14px 20px;
-      border-radius: 10px;
-      border: 2px solid rgba(255,255,255,0.25);
-      background: rgba(0,0,0,0.65);
-      backdrop-filter: blur(8px);
-      color: #fff;
-      font-size: 15px;
-      font-weight: 500;
-      cursor: pointer;
-      text-align: center;
-      transition: background 0.15s, border-color 0.15s, transform 0.1s;
-    }
-    .decision-btn:hover  { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.6); }
-    .decision-btn:active { transform: scale(0.97); }
-    .decision-btn.default { border-color: rgba(99,179,237,0.6); }
-
-    /* ── Countdown timer ── */
-    #countdown {
-      position: absolute;
-      top: 16px;
-      right: 16px;
-      z-index: 12;
-      font-size: 13px;
-      font-variant-numeric: tabular-nums;
-      color: rgba(255,255,255,0.6);
-      display: none;
-    }
-    #countdown.visible { display: block; }
-
-    #countdownArc {
-      display: inline-block;
-      vertical-align: middle;
-      margin-right: 5px;
-    }
-
-    /* ── Top bar ── */
-    #topBar {
-      position: absolute;
-      top: 0; right: 0;
-      z-index: 15;
-      padding: 12px 16px;
-    }
-
-    #restartBtn {
-      font-size: 11px;
-      font-weight: 500;
-      padding: 5px 11px;
-      border-radius: 6px;
-      border: 1px solid rgba(255,255,255,0.25);
-      background: rgba(0,0,0,0.4);
-      color: rgba(255,255,255,0.7);
-      cursor: pointer;
-      transition: background 0.15s;
-    }
-    #restartBtn:hover { background: rgba(255,255,255,0.15); color: #fff; }
-
-    /* ── Loading / error states ── */
-    #spinner {
-      position: absolute;
-      inset: 0;
-      z-index: 20;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 14px;
-      background: #000;
-      transition: opacity 0.3s;
-    }
-    #spinner.hidden { opacity: 0; pointer-events: none; }
-
-    .spinner-ring {
-      width: 40px; height: 40px;
-      border-radius: 50%;
-      border: 3px solid rgba(255,255,255,0.15);
-      border-top-color: rgba(255,255,255,0.8);
-      animation: spin 0.8s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    #spinnerText { font-size: 13px; color: rgba(255,255,255,0.5); }
-
-    #errorBox {
-      position: absolute;
-      inset: 0;
-      z-index: 25;
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      background: rgba(0,0,0,0.9);
-      padding: 24px;
-      text-align: center;
-    }
-    #errorBox.visible { display: flex; }
-    #errorMsg { font-size: 14px; color: rgba(255,80,80,0.9); max-width: 480px; }
-    #errorRetry {
-      padding: 8px 20px; border-radius: 8px;
-      border: 1px solid rgba(255,255,255,0.2);
-      background: transparent; color: #fff;
-      cursor: pointer; font-size: 13px;
-    }
-    #errorRetry:hover { background: rgba(255,255,255,0.1); }
-
-    /* ── End screen ── */
-    #endScreen {
-      position: absolute;
-      inset: 0;
-      z-index: 18;
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 20px;
-      background: rgba(0,0,0,0.75);
-    }
-    #endScreen.visible { display: flex; }
-    #endTitle { font-size: 28px; font-weight: 700; letter-spacing: 0.02em; }
-    #endRestart {
-      padding: 12px 32px; border-radius: 10px;
-      border: 2px solid rgba(255,255,255,0.35);
-      background: rgba(255,255,255,0.08);
-      color: #fff; font-size: 15px; font-weight: 500;
-      cursor: pointer; transition: background 0.15s;
-    }
-    #endRestart:hover { background: rgba(255,255,255,0.18); }
-  </style>
+  <title>Arvexis — Interactive Video</title>
+  <link rel="stylesheet" href="/default.css"/>
+  <link rel="stylesheet" href="/custom.css"/>
 </head>
 <body>
 
-<div id="stage">
-  <!-- Main scene video -->
-  <video id="videoEl" playsinline webkit-playsinline></video>
-  <!-- Transition video (layered on top) -->
-  <video id="transitionEl" playsinline webkit-playsinline muted></video>
-  <!-- Freeze frame canvas -->
-  <canvas id="freezeCanvas"></canvas>
+<div id="arvexis-root">
 
-  <!-- Top bar -->
-  <div id="topBar">
-    <button id="restartBtn">↺ Restart</button>
+  <!-- ══════════════════════════════════════════════════════════════════════
+       MAIN MENU — shown on launch; game-like entry point
+       ══════════════════════════════════════════════════════════════════════ -->
+  <div id="main-menu">
+    <h1 class="menu-title">Arvexis</h1>
+    <div class="menu-actions">
+      <button id="btn-continue" disabled>Continue</button>
+      <button id="btn-new-game">New Game</button>
+      <button id="btn-menu-settings">Settings</button>
+    </div>
   </div>
 
-  <!-- Countdown -->
-  <div id="countdown">
-    <canvas id="countdownArc" width="18" height="18"></canvas>
-    <span id="countdownNum"></span>
+  <!-- ══════════════════════════════════════════════════════════════════════
+       GAME SCREEN — active gameplay area (hidden while on menu)
+       ══════════════════════════════════════════════════════════════════════ -->
+  <div id="game-screen" class="hidden">
+    <div id="stage">
+      <!-- Main scene video -->
+      <video id="video-el" playsinline webkit-playsinline></video>
+      <!-- Transition video (layered on top) -->
+      <video id="transition-el" playsinline webkit-playsinline muted></video>
+      <!-- Freeze frame canvas -->
+      <canvas id="freeze-canvas"></canvas>
+
+      <!-- Pause button (top-left during gameplay) -->
+      <button id="pause-btn" title="Pause">⏸</button>
+
+      <!-- Countdown timer -->
+      <div id="countdown">
+        <canvas id="countdown-arc" width="18" height="18"></canvas>
+        <span id="countdown-num"></span>
+      </div>
+
+      <!-- Decision overlay -->
+      <div id="decision-overlay">
+        <div id="decision-buttons"></div>
+      </div>
+
+      <!-- Loading spinner -->
+      <div id="spinner">
+        <div class="spinner-ring"></div>
+        <span id="spinner-text">Loading…</span>
+      </div>
+
+      <!-- Error box -->
+      <div id="error-box">
+        <span id="error-msg"></span>
+        <button id="error-retry">Retry</button>
+      </div>
+
+      <!-- End screen -->
+      <div id="end-screen">
+        <span id="end-title">The End</span>
+        <button id="end-restart">Play Again</button>
+        <button id="end-menu">Main Menu</button>
+      </div>
+    </div>
+
+    <!-- Background music audio element (hidden) -->
+    <audio id="music-el" loop preload="auto"></audio>
   </div>
 
-  <!-- Decision overlay -->
-  <div id="decisionOverlay">
-    <div id="decisionButtons"></div>
+  <!-- ══════════════════════════════════════════════════════════════════════
+       PAUSE OVERLAY — shown when user pauses during gameplay
+       ══════════════════════════════════════════════════════════════════════ -->
+  <div id="pause-overlay">
+    <h2 class="pause-title">Paused</h2>
+    <div class="pause-actions">
+      <button id="btn-resume">Resume</button>
+      <button id="btn-pause-settings">Settings</button>
+      <button id="btn-quit-menu">Main Menu</button>
+    </div>
   </div>
 
-  <!-- Loading spinner -->
-  <div id="spinner">
-    <div class="spinner-ring"></div>
-    <span id="spinnerText">Loading…</span>
+  <!-- ══════════════════════════════════════════════════════════════════════
+       SETTINGS OVERLAY — accessible from main menu and pause menu
+       ══════════════════════════════════════════════════════════════════════ -->
+  <div id="settings-overlay">
+    <h2 class="settings-title">Settings</h2>
+    <div class="settings-body">
+
+      <!-- Music Volume -->
+      <div class="settings-group">
+        <span class="settings-label">Music Volume</span>
+        <div class="settings-control">
+          <input type="range" id="setting-music-vol" min="0" max="100" value="70"/>
+          <span class="volume-value" id="music-vol-display">70%</span>
+        </div>
+      </div>
+
+      <!-- Video Volume -->
+      <div class="settings-group">
+        <span class="settings-label">Video Volume</span>
+        <div class="settings-control">
+          <input type="range" id="setting-video-vol" min="0" max="100" value="100"/>
+          <span class="volume-value" id="video-vol-display">100%</span>
+        </div>
+      </div>
+
+      <!-- Music On/Off -->
+      <div class="settings-group">
+        <div class="settings-control">
+          <label>
+            <input type="checkbox" id="setting-music-enabled" checked/>
+            Enable background music
+          </label>
+        </div>
+      </div>
+
+      <!-- Button Background Color -->
+      <div class="settings-group">
+        <span class="settings-label">Button Background</span>
+        <div class="settings-control">
+          <input type="color" id="setting-btn-bg" value="#000000"/>
+          <span class="volume-value" id="btn-bg-display">#000000</span>
+        </div>
+      </div>
+
+      <!-- Button Text Color -->
+      <div class="settings-group">
+        <span class="settings-label">Button Text Color</span>
+        <div class="settings-control">
+          <input type="color" id="setting-btn-text" value="#ffffff"/>
+          <span class="volume-value" id="btn-text-display">#ffffff</span>
+        </div>
+      </div>
+
+      <!-- Button Position -->
+      <div class="settings-group">
+        <span class="settings-label">Button Position</span>
+        <div class="settings-control">
+          <select id="setting-btn-pos">
+            <option value="bottom">Bottom</option>
+            <option value="center">Center</option>
+            <option value="top">Top</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Resolution (set once) -->
+      <div class="settings-group" id="resolution-group">
+        <span class="settings-label">Resolution (applied on next scene)</span>
+        <div class="settings-control">
+          <select id="setting-resolution">
+            <option value="auto">Auto</option>
+          </select>
+        </div>
+      </div>
+
+    </div>
+    <div class="settings-footer">
+      <button id="btn-settings-close">Apply &amp; Close</button>
+    </div>
   </div>
 
-  <!-- Error box -->
-  <div id="errorBox">
-    <span id="errorMsg"></span>
-    <button id="errorRetry">Retry</button>
-  </div>
-
-  <!-- End screen -->
-  <div id="endScreen">
-    <span id="endTitle">The End</span>
-    <button id="endRestart">Play Again</button>
-  </div>
 </div>
 
 <script src="/hls.min.js"></script>

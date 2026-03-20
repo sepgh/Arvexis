@@ -14,7 +14,7 @@ import java.nio.file.attribute.PosixFilePermission;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.stream.Collectors;
+
 import java.util.zip.*;
 
 @Service
@@ -271,10 +271,17 @@ public class CompileService {
             buildReadme(projectName),
             StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
 
+        // custom.css (user-editable runtime styles)
+        Path customCss = projectDir.resolve("custom.css");
+        if (Files.exists(customCss)) {
+            Files.copy(customCss, distDir.resolve("custom.css"), StandardCopyOption.REPLACE_EXISTING);
+        }
+
         // Create dist.zip
         job.setProgress(97, "Packaging: creating ZIP archive…");
         Path zipFile = projectDir.resolve("dist.zip");
-        createZip(distDir, outputBase, zipFile);
+        Path assetsDir = projectDir.resolve("assets");
+        createZip(distDir, outputBase, assetsDir, zipFile);
 
         job.setProgress(100, "Package ready.");
         return zipFile;
@@ -306,12 +313,12 @@ public class CompileService {
                "Delete it to reset to the beginning.\n";
     }
 
-    private void createZip(Path distDir, Path outputBase, Path zipFile) throws IOException {
+    private void createZip(Path distDir, Path outputBase, Path assetsDir, Path zipFile) throws IOException {
         try (ZipOutputStream zos = new ZipOutputStream(
                 Files.newOutputStream(zipFile,
                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING))) {
 
-            // Add dist/ contents (manifest, runtime.jar, scripts, README)
+            // Add dist/ contents (manifest, runtime.jar, scripts, README, custom.css)
             try (var walk = Files.walk(distDir)) {
                 walk.filter(Files::isRegularFile).forEach(p -> {
                     String name = "game/" + distDir.relativize(p).toString();
@@ -334,6 +341,27 @@ public class CompileService {
                             zos.closeEntry();
                         } catch (IOException e) { throw new RuntimeException(e); }
                     });
+                }
+            }
+
+            // Add assets/ (audio files for background music) under game/assets/
+            if (Files.isDirectory(assetsDir)) {
+                try (var walk = Files.walk(assetsDir)) {
+                    walk.filter(Files::isRegularFile)
+                        .filter(p -> {
+                            String fn = p.getFileName().toString().toLowerCase();
+                            return fn.endsWith(".mp3") || fn.endsWith(".ogg") ||
+                                   fn.endsWith(".wav") || fn.endsWith(".aac") ||
+                                   fn.endsWith(".flac");
+                        })
+                        .forEach(p -> {
+                            String name = "game/assets/" + assetsDir.relativize(p).toString();
+                            try {
+                                zos.putNextEntry(new ZipEntry(name));
+                                Files.copy(p, zos);
+                                zos.closeEntry();
+                            } catch (IOException e) { throw new RuntimeException(e); }
+                        });
                 }
             }
         }

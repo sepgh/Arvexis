@@ -5,8 +5,8 @@ import type {
   AssignmentData, ConditionData, SpelValidateResponse,
 } from '@/types'
 
-export interface VideoLayerRequest { assetId: string; startAt: number; freezeLastFrame?: boolean }
-export interface AudioTrackRequest { assetId: string; startAt: number }
+export interface VideoLayerRequest { assetId: string; startAt: number; startAtFrames?: number | null; freezeLastFrame?: boolean }
+export interface AudioTrackRequest { assetId: string; startAt: number; startAtFrames?: number | null }
 export interface DecisionItemRequest { decisionKey: string; isDefault: boolean; decisionOrder: number }
 export interface AssignmentRequest { expression: string }
 export interface ConditionRequest { name: string | null; expression: string | null; isElse: boolean }

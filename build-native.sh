@@ -18,12 +18,19 @@ if ! java -version 2>&1 | grep -qi "graalvm\|native"; then
     exit 1
 fi
 
-echo "==> [1/2] Building frontend..."
+RUNTIME="$ROOT/runtime"
+
+echo "==> [1/3] Building runtime JAR..."
+cd "$RUNTIME"
+mvn clean package -DskipTests -q
+cp "$RUNTIME/target/runtime-1.0.0.jar" "$BACKEND/src/main/resources/bundled/runtime.jar"
+
+echo "==> [2/3] Building frontend..."
 cd "$FRONTEND"
 npm install --silent
 npm run build
 
-echo "==> [2/2] Compiling native binary (this takes several minutes)..."
+echo "==> [3/3] Compiling native binary (this takes several minutes)..."
 cd "$BACKEND"
 mvn -Pnative native:compile -DskipTests -q
 

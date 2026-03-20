@@ -1,47 +1,331 @@
 'use strict';
 
-// ── State ─────────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// Arvexis Runtime — Game Client
+// ═══════════════════════════════════════════════════════════════════════════════
 
 const API = '';  // same origin
+
+// ── Playback state ───────────────────────────────────────────────────────────
 
 let currentState   = null;  // last /api/game/state response
 let hlsInstance    = null;  // current scene Hls instance
 let transHls       = null;  // transition Hls instance
 let countdownTimer = null;
 let decisionMade   = false;
-let preloadedHls   = {};    // edgeId → Hls (preloaded, buffered)
+let preloadedHls   = {};    // url → Hls (preloaded transitions)
+let preloadedSceneHls = {}; // url → Hls (preloaded next-scene)
+let currentMusicUrl = null; // currently playing music URL
+let gamePaused      = false;
 
-// ── DOM ────────────────────────────────────────────────────────────────────────
+// ── App state machine ────────────────────────────────────────────────────────
+// Screens: 'menu' | 'game' | 'paused' | 'settings'
+let appScreen       = 'menu';
+let settingsReturnTo = 'menu'; // where to go back from settings
 
-const videoEl       = document.getElementById('videoEl');
-const transEl       = document.getElementById('transitionEl');
-const freezeCanvas  = document.getElementById('freezeCanvas');
-const decisionOverlay = document.getElementById('decisionOverlay');
-const decisionButtons = document.getElementById('decisionButtons');
-const countdownEl   = document.getElementById('countdown');
-const countdownNum  = document.getElementById('countdownNum');
-const countdownArc  = document.getElementById('countdownArc');
-const spinner       = document.getElementById('spinner');
-const spinnerText   = document.getElementById('spinnerText');
-const errorBox      = document.getElementById('errorBox');
-const errorMsg      = document.getElementById('errorMsg');
-const endScreen     = document.getElementById('endScreen');
+// ── DOM references ───────────────────────────────────────────────────────────
 
-document.getElementById('restartBtn').addEventListener('click', restartGame);
-document.getElementById('endRestart').addEventListener('click', restartGame);
-document.getElementById('errorRetry').addEventListener('click', () => location.reload());
+const $ = (id) => document.getElementById(id);
 
-// ── Boot ───────────────────────────────────────────────────────────────────────
+const mainMenu          = $('main-menu');
+const gameScreen        = $('game-screen');
+const pauseOverlay      = $('pause-overlay');
+const settingsOverlay   = $('settings-overlay');
 
-(async function boot() {
+const videoEl           = $('video-el');
+const transEl           = $('transition-el');
+const freezeCanvas      = $('freeze-canvas');
+const decisionOverlay   = $('decision-overlay');
+const decisionButtons   = $('decision-buttons');
+const countdownEl       = $('countdown');
+const countdownNum      = $('countdown-num');
+const countdownArc      = $('countdown-arc');
+const spinner           = $('spinner');
+const spinnerText       = $('spinner-text');
+const errorBox          = $('error-box');
+const errorMsg          = $('error-msg');
+const endScreen         = $('end-screen');
+const musicEl           = $('music-el');
+const pauseBtn          = $('pause-btn');
+
+// Settings controls
+const settingMusicVol       = $('setting-music-vol');
+const settingVideoVol       = $('setting-video-vol');
+const settingMusicEnabled   = $('setting-music-enabled');
+const settingBtnBg          = $('setting-btn-bg');
+const settingBtnText        = $('setting-btn-text');
+const settingBtnPos         = $('setting-btn-pos');
+const settingResolution     = $('setting-resolution');
+const musicVolDisplay       = $('music-vol-display');
+const videoVolDisplay       = $('video-vol-display');
+const btnBgDisplay          = $('btn-bg-display');
+const btnTextDisplay        = $('btn-text-display');
+
+// ── Settings persistence (localStorage) ──────────────────────────────────────
+
+const SETTINGS_KEY = 'arvexis_settings';
+
+const defaultSettings = {
+  musicVolume:   0.7,
+  videoVolume:   1.0,
+  musicEnabled:  true,
+  btnBg:         '#000000',
+  btnText:       '#ffffff',
+  btnPosition:   'bottom',
+  resolution:    'auto',
+};
+
+let settings = { ...defaultSettings };
+
+function loadSettings() {
+  try {
+    const saved = localStorage.getItem(SETTINGS_KEY);
+    if (saved) settings = { ...defaultSettings, ...JSON.parse(saved) };
+  } catch { /* ignore */ }
+}
+
+function saveSettings() {
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {}
+}
+
+function applySettings() {
+  // Music
+  musicEl.volume = settings.musicEnabled ? settings.musicVolume : 0;
+  if (!settings.musicEnabled && !musicEl.paused) musicEl.pause();
+  if (settings.musicEnabled && musicEl.src && musicEl.paused && appScreen === 'game') {
+    musicEl.play().catch(() => {});
+  }
+
+  // Video volume
+  videoEl.volume = settings.videoVolume;
+
+  // Decision button CSS custom properties
+  document.documentElement.style.setProperty('--arvexis-btn-bg',
+    hexToRgba(settings.btnBg, 0.65));
+  document.documentElement.style.setProperty('--arvexis-btn-text', settings.btnText);
+  document.documentElement.style.setProperty('--arvexis-btn-hover-bg',
+    hexToRgba(settings.btnText, 0.15));
+
+  // Button position
+  decisionOverlay.setAttribute('data-position', settings.btnPosition);
+
+  // Sync settings UI
+  settingMusicVol.value     = Math.round(settings.musicVolume * 100);
+  settingVideoVol.value     = Math.round(settings.videoVolume * 100);
+  settingMusicEnabled.checked = settings.musicEnabled;
+  settingBtnBg.value        = settings.btnBg;
+  settingBtnText.value      = settings.btnText;
+  settingBtnPos.value       = settings.btnPosition;
+  settingResolution.value   = settings.resolution;
+  musicVolDisplay.textContent = Math.round(settings.musicVolume * 100) + '%';
+  videoVolDisplay.textContent = Math.round(settings.videoVolume * 100) + '%';
+  btnBgDisplay.textContent  = settings.btnBg;
+  btnTextDisplay.textContent = settings.btnText;
+}
+
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+// ── Settings UI event listeners ──────────────────────────────────────────────
+
+settingMusicVol.addEventListener('input', () => {
+  settings.musicVolume = settingMusicVol.value / 100;
+  musicVolDisplay.textContent = settingMusicVol.value + '%';
+  musicEl.volume = settings.musicEnabled ? settings.musicVolume : 0;
+});
+
+settingVideoVol.addEventListener('input', () => {
+  settings.videoVolume = settingVideoVol.value / 100;
+  videoVolDisplay.textContent = settingVideoVol.value + '%';
+  videoEl.volume = settings.videoVolume;
+});
+
+settingMusicEnabled.addEventListener('change', () => {
+  settings.musicEnabled = settingMusicEnabled.checked;
+  applySettings();
+});
+
+settingBtnBg.addEventListener('input', () => {
+  settings.btnBg = settingBtnBg.value;
+  btnBgDisplay.textContent = settings.btnBg;
+  applySettings();
+});
+
+settingBtnText.addEventListener('input', () => {
+  settings.btnText = settingBtnText.value;
+  btnTextDisplay.textContent = settings.btnText;
+  applySettings();
+});
+
+settingBtnPos.addEventListener('change', () => {
+  settings.btnPosition = settingBtnPos.value;
+  applySettings();
+});
+
+settingResolution.addEventListener('change', () => {
+  settings.resolution = settingResolution.value;
+});
+
+// ── Screen management ────────────────────────────────────────────────────────
+
+function showScreen(screen) {
+  appScreen = screen;
+
+  mainMenu.classList.toggle('hidden', screen !== 'menu');
+  gameScreen.classList.toggle('hidden', screen !== 'game' && screen !== 'paused');
+  pauseOverlay.classList.toggle('visible', screen === 'paused');
+  settingsOverlay.classList.toggle('visible', screen === 'settings');
+
+  // Hide resolution setting during gameplay (fixed once game starts)
+  const resGroup = $('resolution-group');
+  if (resGroup) resGroup.style.display = (screen === 'settings' && settingsReturnTo === 'menu') ? '' : 'none';
+}
+
+// ── Menu button handlers ─────────────────────────────────────────────────────
+
+$('btn-continue').addEventListener('click', async () => {
+  showScreen('game');
   showSpinner('Loading…');
   try {
     const state = await apiFetch('/api/game/state');
     await loadScene(state);
   } catch (e) {
-    showError('Failed to start: ' + (e.message || e));
+    showError('Failed to load: ' + (e.message || e));
   }
+});
+
+$('btn-new-game').addEventListener('click', async () => {
+  showScreen('game');
+  await restartGame();
+});
+
+$('btn-menu-settings').addEventListener('click', () => {
+  settingsReturnTo = 'menu';
+  showScreen('settings');
+});
+
+// ── Pause / Resume ───────────────────────────────────────────────────────────
+
+pauseBtn.addEventListener('click', () => pauseGame());
+
+$('btn-resume').addEventListener('click', () => resumeGame());
+
+$('btn-pause-settings').addEventListener('click', () => {
+  settingsReturnTo = 'paused';
+  showScreen('settings');
+});
+
+$('btn-quit-menu').addEventListener('click', () => {
+  resumeGame();     // unpause video/music first
+  pauseVideo();     // then pause the video for real
+  showScreen('menu');
+  checkContinue();  // refresh Continue button state
+});
+
+$('btn-settings-close').addEventListener('click', () => {
+  saveSettings();
+  applySettings();
+  showScreen(settingsReturnTo);
+});
+
+// End screen buttons
+$('end-restart').addEventListener('click', async () => {
+  endScreen.classList.remove('visible');
+  await restartGame();
+});
+
+$('end-menu').addEventListener('click', () => {
+  endScreen.classList.remove('visible');
+  stopMusic();
+  showScreen('menu');
+  checkContinue();
+});
+
+$('error-retry').addEventListener('click', () => location.reload());
+
+// Keyboard: Escape to pause/resume
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    if (appScreen === 'game') pauseGame();
+    else if (appScreen === 'paused') resumeGame();
+    else if (appScreen === 'settings') {
+      saveSettings();
+      applySettings();
+      showScreen(settingsReturnTo);
+    }
+  }
+});
+
+function pauseGame() {
+  gamePaused = true;
+  videoEl.pause();
+  musicEl.pause();
+  clearCountdown();
+  showScreen('paused');
+}
+
+function resumeGame() {
+  gamePaused = false;
+  showScreen('game');
+  videoEl.play().catch(() => {});
+  if (settings.musicEnabled && musicEl.src) musicEl.play().catch(() => {});
+}
+
+function pauseVideo() {
+  videoEl.pause();
+}
+
+// ── Background Music ─────────────────────────────────────────────────────────
+
+function updateMusic(musicUrl) {
+  // null/undefined = keep current music playing; explicit new URL = switch
+  if (musicUrl === undefined || musicUrl === null) return;
+
+  if (musicUrl === currentMusicUrl) return; // same track, no change
+
+  currentMusicUrl = musicUrl;
+
+  if (!musicUrl) {
+    // No music for this scene: stop
+    stopMusic();
+    return;
+  }
+
+  musicEl.src = musicUrl;
+  musicEl.volume = settings.musicEnabled ? settings.musicVolume : 0;
+  if (settings.musicEnabled) {
+    musicEl.play().catch(() => {});
+  }
+}
+
+function stopMusic() {
+  musicEl.pause();
+  musicEl.removeAttribute('src');
+  musicEl.load();
+  currentMusicUrl = null;
+}
+
+// ── Boot ───────────────────────────────────────────────────────────────────────
+
+(async function boot() {
+  loadSettings();
+  applySettings();
+  showScreen('menu');
+  await checkContinue();
 })();
+
+async function checkContinue() {
+  try {
+    const { hasSave } = await apiFetch('/api/game/has-save');
+    $('btn-continue').disabled = !hasSave;
+  } catch {
+    $('btn-continue').disabled = true;
+  }
+}
 
 // ── Scene loading ─────────────────────────────────────────────────────────────
 
@@ -60,6 +344,9 @@ async function loadScene(state) {
 
   await loadHls(videoEl, state.sceneHlsUrl, (hls) => { hlsInstance = hls; });
 
+  // Apply video volume from settings
+  videoEl.volume = settings.videoVolume;
+
   // Start preloading transition HLS segments in background
   preloadTransitions(state.preloadUrls || []);
 
@@ -67,6 +354,9 @@ async function loadScene(state) {
   if (state.autoContinueNextSceneUrl) {
     preloadScene(state.autoContinueNextSceneUrl);
   }
+
+  // Update background music
+  updateMusic(state.musicUrl);
 
   hideSpinner();
 
@@ -89,8 +379,6 @@ async function loadScene(state) {
   }
 
   // ── Decision appearance timing ───────────────────────────────────────────
-  // decisionAppearanceConfig is a raw JSON string (or null) with shape:
-  // { "timing": "at_timestamp" | "after_video_ends", "timestamp": 4.5 }
   let appearAt = null; // null = after video ends
   try {
     if (state.decisionAppearanceConfig) {
@@ -103,7 +391,6 @@ async function loadScene(state) {
 
   if (decisions.length > 0) {
     if (appearAt !== null) {
-      // Show decisions at a fixed timestamp
       videoEl.addEventListener('timeupdate', function onTimeUpdate() {
         if (videoEl.currentTime >= appearAt) {
           videoEl.removeEventListener('timeupdate', onTimeUpdate);
@@ -111,7 +398,6 @@ async function loadScene(state) {
         }
       });
     }
-    // Always show on video end (covers after_video_ends + fallback)
     videoEl.addEventListener('ended', function onEnded() {
       videoEl.removeEventListener('ended', onEnded);
       captureFreeze();
@@ -121,7 +407,6 @@ async function loadScene(state) {
   } else if (isEnd) {
     videoEl.addEventListener('ended', () => { captureFreeze(); showEndScreen(); }, { once: true });
   } else {
-    // No decisions and not end → auto-continue when video ends
     videoEl.addEventListener('ended', async () => {
       captureFreeze();
       await makeDecision('CONTINUE');
@@ -140,7 +425,6 @@ function loadHls(videoElement, src, onReady) {
     }
 
     if (typeof Hls === 'undefined' || !Hls.isSupported()) {
-      // Safari native HLS
       attachNative();
     } else {
       const hls = new Hls({ enableWorker: false, lowLatencyMode: false });
@@ -161,7 +445,6 @@ function loadHls(videoElement, src, onReady) {
 // ── Preloading ────────────────────────────────────────────────────────────────
 
 function preloadTransitions(urls) {
-  // Destroy stale preloads not in new list
   for (const key of Object.keys(preloadedHls)) {
     if (!urls.includes(key)) {
       preloadedHls[key]?.destroy?.();
@@ -170,7 +453,7 @@ function preloadTransitions(urls) {
   }
 
   for (const url of urls) {
-    if (preloadedHls[url]) continue; // already preloading
+    if (preloadedHls[url]) continue;
     if (typeof Hls === 'undefined' || !Hls.isSupported()) continue;
 
     const hls = new Hls({ enableWorker: false });
@@ -182,10 +465,8 @@ function preloadTransitions(urls) {
   }
 }
 
-let preloadedSceneHls = {}; // url → Hls (preloaded scene HLS)
-
 function preloadScene(url) {
-  if (preloadedSceneHls[url]) return; // already preloading
+  if (preloadedSceneHls[url]) return;
   if (typeof Hls === 'undefined' || !Hls.isSupported()) return;
 
   const hls = new Hls({ enableWorker: false });
@@ -206,7 +487,7 @@ function showDecisions(decisions, timeoutSecs) {
   for (const d of decisions) {
     const btn = document.createElement('button');
     btn.className = 'decision-btn' + (d.isDefault ? ' default' : '');
-    btn.textContent = d.key; // label is the key in v1 (localization in T-025)
+    btn.textContent = d.key;
     btn.addEventListener('click', () => {
       if (decisionMade) return;
       decisionMade = true;
@@ -311,7 +592,6 @@ async function playTransition(trans) {
 
   const url = trans.transitionHlsUrl;
 
-  // Use preloaded Hls if available
   if (preloadedHls[url]) {
     transHls = preloadedHls[url];
     delete preloadedHls[url];
@@ -331,7 +611,6 @@ async function playTransition(trans) {
       resolve();
     }, { once: true });
 
-    // Safety timeout: if video never ends, resolve after duration + 1s
     setTimeout(() => {
       transEl.classList.remove('active');
       resolve();
@@ -355,6 +634,9 @@ async function restartGame() {
   preloadedHls = {};
   for (const h of Object.values(preloadedSceneHls)) h?.destroy?.();
   preloadedSceneHls = {};
+
+  // Stop music so it restarts from the first scene
+  stopMusic();
 
   try {
     const state = await apiFetch('/api/game/restart', { method: 'POST', body: '{}' });
