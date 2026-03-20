@@ -14,6 +14,8 @@ export interface UpdateNodePayload {
   autoContinue?: boolean
   backgroundColor?: string
   decisionAppearanceConfig?: string
+  musicAssetId?: string | null
+  clearMusicAsset?: boolean
   posX?: number
   posY?: number
 }

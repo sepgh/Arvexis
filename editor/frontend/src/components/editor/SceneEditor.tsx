@@ -15,11 +15,12 @@ interface SceneEditorProps {
   isEnd: boolean
   autoContinue: boolean
   backgroundColor: string | null
+  musicAssetId: string | null
 }
 
 type Section = 'layers' | 'audio' | 'decisions' | 'props'
 
-export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue: initialAutoContinue, backgroundColor: initialBg }: SceneEditorProps) {
+export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue: initialAutoContinue, backgroundColor: initialBg, musicAssetId: initialMusicAssetId }: SceneEditorProps) {
   const projectDefaultBackgroundColor = useEditorStore(
     (s) => s.projectConfig?.defaultBackgroundColor ?? '#000000'
   )
@@ -34,6 +35,7 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
   const [isEnd, setIsEnd]         = useState(initialIsEnd)
   const [autoContinue, setAutoContinue] = useState(initialAutoContinue)
   const [bgColor, setBgColor]     = useState(initialBg ?? projectDefaultBackgroundColor)
+  const [musicAssetId, setMusicAssetId] = useState<string | null>(initialMusicAssetId)
   const [previewJob, setPreviewJob] = useState<PreviewJobStatus | null>(null)
   const [previewing, setPreviewing] = useState(false)
 
@@ -41,7 +43,8 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
     setIsEnd(initialIsEnd)
     setAutoContinue(initialAutoContinue)
     setBgColor(initialBg ?? projectDefaultBackgroundColor)
-  }, [initialIsEnd, initialAutoContinue, initialBg, projectDefaultBackgroundColor, nodeId])
+    setMusicAssetId(initialMusicAssetId)
+  }, [initialIsEnd, initialAutoContinue, initialBg, projectDefaultBackgroundColor, initialMusicAssetId, nodeId])
 
   async function handlePreview() {
     setPreviewing(true)
@@ -191,7 +194,13 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
   // ── Properties ────────────────────────────────────────────────────────────
 
   async function saveProperties() {
-    await withSave(() => updateNode(nodeId, { isEnd, autoContinue, backgroundColor: bgColor }))
+    const payload: Record<string, unknown> = { isEnd, autoContinue, backgroundColor: bgColor }
+    if (musicAssetId) {
+      payload.musicAssetId = musicAssetId
+    } else {
+      payload.clearMusicAsset = true
+    }
+    await withSave(() => updateNode(nodeId, payload))
   }
 
   if (loading) return <div className="flex items-center justify-center h-20 text-xs text-muted-foreground">Loading…</div>
@@ -369,6 +378,28 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
                 <span className="text-sm text-muted-foreground font-mono">{bgColor}</span>
               </div>
             </div>
+            {/* Background Music */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-muted-foreground" style={{ fontSize: 14 }}>Background music</label>
+              {musicAssetId ? (
+                <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/40 border border-border/50">
+                  <span className="text-sm text-foreground truncate flex-1">
+                    {audioAssets.find(a => a.id === musicAssetId)?.fileName || musicAssetId}
+                  </span>
+                  <button
+                    onClick={() => setMusicAssetId(null)}
+                    className="text-muted-foreground hover:text-red-400 text-sm leading-none"
+                  >×</button>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">None — current music keeps playing.</p>
+              )}
+              <MusicPicker
+                assets={audioAssets}
+                onPick={(a) => setMusicAssetId(a.id)}
+              />
+            </div>
+
             <button
               onClick={saveProperties}
               disabled={saving}
@@ -451,6 +482,58 @@ function AudioTrackRow({ track, index, total, onRemove, onMoveUp, onMoveDown }: 
         <button onClick={onMoveDown} disabled={index === total - 1}  className="w-5 h-5 text-muted-foreground hover:text-foreground disabled:opacity-30 flex items-center justify-center text-xs">↓</button>
         <button onClick={onRemove} className="w-5 h-5 text-muted-foreground hover:text-red-400 flex items-center justify-center">×</button>
       </div>
+    </div>
+  )
+}
+
+function MusicPicker({ assets, onPick }: { assets: Asset[]; onPick: (a: Asset) => void }) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+
+  if (!assets.length) return <p className="text-sm text-muted-foreground text-center py-1">No audio assets scanned.</p>
+
+  const filtered = search
+    ? assets.filter(a => a.fileName.toLowerCase().includes(search.toLowerCase()))
+    : assets
+
+  return (
+    <div className="flex flex-col gap-1">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="text-sm text-primary hover:underline text-left font-medium"
+      >
+        {open ? '▲' : '▼'} Select music
+      </button>
+      {open && (
+        <div className="flex flex-col border border-border rounded-lg overflow-hidden bg-muted/20">
+          <div className="p-2 border-b border-border/50">
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search audio…"
+              className="input-base text-sm py-1.5 w-full"
+              autoFocus
+            />
+          </div>
+          <div className="flex flex-col max-h-48 overflow-y-auto">
+            {filtered.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-3">No matching audio</p>
+            ) : (
+              filtered.map(a => (
+                <button
+                  key={a.id}
+                  onClick={() => { onPick(a); setOpen(false); setSearch('') }}
+                  className="text-left px-4 py-2 text-sm text-foreground hover:bg-accent border-b border-border/30 last:border-0 flex items-center gap-3"
+                >
+                  <span className="flex-1 truncate">{a.fileName}</span>
+                  {a.duration != null && <span className="text-muted-foreground shrink-0">{a.duration.toFixed(1)}s</span>}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -18,6 +18,8 @@ export default function RootLayout({ children }: RootLayoutProps) {
   const toggleLocalizationPanel = useEditorStore((s) => s.toggleLocalizationPanel)
   const projectSettingsPanelOpen = useEditorStore((s) => s.projectSettingsPanelOpen)
   const toggleProjectSettingsPanel = useEditorStore((s) => s.toggleProjectSettingsPanel)
+  const customCssPanelOpen = useEditorStore((s) => s.customCssPanelOpen)
+  const toggleCustomCssPanel = useEditorStore((s) => s.toggleCustomCssPanel)
   const [manifestGenerating, setManifestGenerating] = useState(false)
   const [manifestReady, setManifestReady] = useState(false)
   const [manifestError, setManifestError] = useState<string | null>(null)
@@ -155,6 +157,23 @@ export default function RootLayout({ children }: RootLayoutProps) {
                 <path d="M5.4 1.5h3.2l.4 1.5 1.5.6 1.3-.9 2.2 2.2-.9 1.3.6 1.5 1.5.4v3.2l-1.5.4-.6 1.5.9 1.3-2.2 2.2-1.3-.9-1.5.6-.4 1.5H5.4l-.4-1.5-1.5-.6-1.3.9-2.2-2.2.9-1.3-.6-1.5L0 8.7V5.5l1.5-.4.6-1.5-.9-1.3 2.2-2.2 1.3.9 1.5-.6.4-1.5Zm1.6 3a2.6 2.6 0 100 5.2 2.6 2.6 0 000-5.2Z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round"/>
               </svg>
               Project Settings
+            </button>
+            <button
+              onClick={toggleCustomCssPanel}
+              title="Edit custom.css for runtime"
+              className={[
+                'flex items-center rounded-md font-medium transition-colors',
+                customCssPanelOpen
+                  ? 'bg-primary/15 text-primary border border-primary/30'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent border border-transparent',
+              ].join(' ')}
+              style={{ padding: '8px 14px', fontSize: 14, gap: 7 }}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M3 2h8a1 1 0 011 1v8a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.2"/>
+                <path d="M5 5.5l-1.5 2L5 9.5M9 5.5l1.5 2L9 9.5M7.5 4.5l-1 6" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              CSS
             </button>
             <button
               onClick={toggleValidationPanel}

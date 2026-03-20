@@ -1,0 +1,567 @@
+/*
+ * ============================================================================
+ * Arvexis Runtime — Default Stylesheet
+ * ============================================================================
+ *
+ * This file defines the default look and feel of the runtime player.
+ * To customize, create a `custom.css` file in your project directory.
+ * The custom.css is loaded AFTER this file, so your rules will override.
+ *
+ * ── DOCUMENT STRUCTURE ──────────────────────────────────────────────────────
+ *
+ *  body
+ *   └─ #arvexis-root                   — outer wrapper (fullscreen)
+ *       ├─ #main-menu                  — game main menu screen
+ *       │   ├─ .menu-title             — game title text
+ *       │   └─ .menu-actions           — button group
+ *       │       ├─ #btn-continue       — Continue saved game
+ *       │       ├─ #btn-new-game       — Start new game
+ *       │       └─ #btn-menu-settings  — Open settings
+ *       │
+ *       ├─ #game-screen                — active gameplay area (hidden in menu)
+ *       │   ├─ #stage                  — video + overlays container
+ *       │   │   ├─ #video-el           — main scene <video>
+ *       │   │   ├─ #transition-el      — transition overlay <video>
+ *       │   │   ├─ #freeze-canvas      — freeze-frame <canvas>
+ *       │   │   ├─ #pause-btn          — pause button (top-left)
+ *       │   │   ├─ #countdown          — decision countdown timer
+ *       │   │   │   ├─ #countdown-arc  — circular arc <canvas>
+ *       │   │   │   └─ #countdown-num  — remaining seconds text
+ *       │   │   ├─ #decision-overlay   — decision buttons container
+ *       │   │   │   └─ #decision-buttons — inner flex column
+ *       │   │   │       └─ .decision-btn — each decision button
+ *       │   │   │           └─ .decision-btn.default — the default choice
+ *       │   │   ├─ #spinner            — loading spinner overlay
+ *       │   │   │   ├─ .spinner-ring   — animated ring
+ *       │   │   │   └─ #spinner-text   — loading message
+ *       │   │   ├─ #error-box          — error display overlay
+ *       │   │   │   ├─ #error-msg      — error message text
+ *       │   │   │   └─ #error-retry    — retry button
+ *       │   │   └─ #end-screen         — game over screen
+ *       │   │       ├─ #end-title      — "The End" text
+ *       │   │       ├─ #end-restart    — "Play Again" button
+ *       │   │       └─ #end-menu       — "Main Menu" button
+ *       │   └─ <audio id="music-el">   — background music (hidden)
+ *       │
+ *       ├─ #pause-overlay              — pause menu (covers game screen)
+ *       │   ├─ .pause-title            — "Paused" heading
+ *       │   └─ .pause-actions          — button group
+ *       │       ├─ #btn-resume         — Resume game
+ *       │       ├─ #btn-pause-settings — Open settings
+ *       │       └─ #btn-quit-menu      — Quit to main menu
+ *       │
+ *       └─ #settings-overlay           — settings panel (covers everything)
+ *           ├─ .settings-title         — "Settings" heading
+ *           ├─ .settings-body          — scrollable settings area
+ *           │   ├─ .settings-group     — grouped setting section
+ *           │   │   ├─ .settings-label — label for a setting
+ *           │   │   └─ .settings-control — input/slider wrapper
+ *           │   ├─ #setting-music-vol  — music volume slider
+ *           │   ├─ #setting-video-vol  — video volume slider
+ *           │   ├─ #setting-music-enabled — music on/off checkbox
+ *           │   ├─ #setting-btn-bg     — button background color input
+ *           │   ├─ #setting-btn-text   — button text color input
+ *           │   ├─ #setting-btn-pos    — button position select
+ *           │   └─ #setting-resolution — resolution select
+ *           └─ .settings-footer
+ *               └─ #btn-settings-close — Close/Apply button
+ *
+ * ── CSS CUSTOM PROPERTIES (variables) ───────────────────────────────────────
+ *
+ *  --arvexis-bg             : page background color
+ *  --arvexis-text           : primary text color
+ *  --arvexis-accent         : accent/highlight color
+ *  --arvexis-menu-bg        : menu screen background
+ *  --arvexis-overlay-bg     : overlay/pause background
+ *  --arvexis-btn-bg         : decision button background (user-adjustable)
+ *  --arvexis-btn-text       : decision button text color (user-adjustable)
+ *  --arvexis-btn-border     : decision button border color
+ *  --arvexis-btn-hover-bg   : decision button hover background
+ *  --arvexis-spinner-color  : loading spinner color
+ *
+ * ============================================================================
+ */
+
+/* ── Reset & Variables ───────────────────────────────────────────────────── */
+
+:root {
+  --arvexis-bg:            #0a0a0f;
+  --arvexis-text:          #e8e8f0;
+  --arvexis-accent:        #6b8aff;
+  --arvexis-menu-bg:       radial-gradient(ellipse at center, #14142a 0%, #0a0a0f 100%);
+  --arvexis-overlay-bg:    rgba(0, 0, 0, 0.82);
+  --arvexis-btn-bg:        rgba(0, 0, 0, 0.65);
+  --arvexis-btn-text:      #ffffff;
+  --arvexis-btn-border:    rgba(255, 255, 255, 0.25);
+  --arvexis-btn-hover-bg:  rgba(255, 255, 255, 0.15);
+  --arvexis-spinner-color: rgba(255, 255, 255, 0.8);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--arvexis-bg);
+  color: var(--arvexis-text);
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* ── Root Container ──────────────────────────────────────────────────────── */
+
+#arvexis-root {
+  width: 100%;
+  height: 100dvh;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ── Main Menu ───────────────────────────────────────────────────────────── */
+
+#main-menu {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 40px;
+  background: var(--arvexis-menu-bg);
+  transition: opacity 0.4s;
+}
+#main-menu.hidden { display: none; }
+
+.menu-title {
+  font-size: 42px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--arvexis-text);
+  text-shadow: 0 0 30px rgba(107, 138, 255, 0.3);
+}
+
+.menu-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 280px;
+}
+
+.menu-actions button {
+  padding: 16px 32px;
+  border-radius: 10px;
+  border: 2px solid var(--arvexis-btn-border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--arvexis-text);
+  font-size: 17px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, transform 0.1s;
+  text-align: center;
+}
+.menu-actions button:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--arvexis-accent);
+}
+.menu-actions button:active { transform: scale(0.97); }
+.menu-actions button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* ── Game Screen ─────────────────────────────────────────────────────────── */
+
+#game-screen {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+#game-screen.hidden { display: none; }
+
+/* ── Stage (video area) ──────────────────────────────────────────────────── */
+
+#stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #000;
+}
+
+#video-el, #transition-el {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+#transition-el {
+  opacity: 0;
+  transition: opacity 0.05s;
+  z-index: 2;
+}
+#transition-el.active { opacity: 1; }
+
+#freeze-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: none;
+  z-index: 3;
+}
+
+/* ── Pause Button ────────────────────────────────────────────────────────── */
+
+#pause-btn {
+  position: absolute;
+  top: 12px;
+  left: 16px;
+  z-index: 15;
+  font-size: 20px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.4);
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.3s;
+  line-height: 1;
+}
+#pause-btn:hover { background: rgba(255, 255, 255, 0.15); color: #fff; }
+
+/* ── Decision Overlay ────────────────────────────────────────────────────── */
+
+#decision-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding-bottom: 7vh;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+#decision-overlay.visible {
+  pointer-events: all;
+  opacity: 1;
+}
+
+/* decision-buttons position variants (set via data-position attribute) */
+#decision-overlay[data-position="center"] { justify-content: center; padding-bottom: 0; }
+#decision-overlay[data-position="top"]    { justify-content: flex-start; padding-bottom: 0; padding-top: 7vh; }
+
+#decision-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 480px;
+  padding: 0 20px;
+}
+
+.decision-btn {
+  padding: 14px 20px;
+  border-radius: 10px;
+  border: 2px solid var(--arvexis-btn-border);
+  background: var(--arvexis-btn-bg);
+  backdrop-filter: blur(8px);
+  color: var(--arvexis-btn-text);
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+.decision-btn:hover {
+  background: var(--arvexis-btn-hover-bg);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+.decision-btn:active { transform: scale(0.97); }
+.decision-btn.default { border-color: rgba(107, 138, 255, 0.6); }
+
+/* ── Countdown Timer ─────────────────────────────────────────────────────── */
+
+#countdown {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 12;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.6);
+  display: none;
+}
+#countdown.visible { display: block; }
+
+#countdown-arc {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 5px;
+}
+
+/* ── Loading Spinner ─────────────────────────────────────────────────────── */
+
+#spinner {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: #000;
+  transition: opacity 0.3s;
+}
+#spinner.hidden { opacity: 0; pointer-events: none; }
+
+.spinner-ring {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.15);
+  border-top-color: var(--arvexis-spinner-color);
+  animation: arvexis-spin 0.8s linear infinite;
+}
+@keyframes arvexis-spin { to { transform: rotate(360deg); } }
+
+#spinner-text {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* ── Error Box ───────────────────────────────────────────────────────────── */
+
+#error-box {
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: rgba(0, 0, 0, 0.9);
+  padding: 24px;
+  text-align: center;
+}
+#error-box.visible { display: flex; }
+
+#error-msg {
+  font-size: 14px;
+  color: rgba(255, 80, 80, 0.9);
+  max-width: 480px;
+}
+#error-retry {
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+}
+#error-retry:hover { background: rgba(255, 255, 255, 0.1); }
+
+/* ── End Screen ──────────────────────────────────────────────────────────── */
+
+#end-screen {
+  position: absolute;
+  inset: 0;
+  z-index: 18;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  background: var(--arvexis-overlay-bg);
+}
+#end-screen.visible { display: flex; }
+
+#end-title {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+#end-screen button {
+  padding: 12px 32px;
+  border-radius: 10px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+#end-screen button:hover { background: rgba(255, 255, 255, 0.18); }
+
+/* ── Pause Overlay ───────────────────────────────────────────────────────── */
+
+#pause-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  background: var(--arvexis-overlay-bg);
+  backdrop-filter: blur(6px);
+}
+#pause-overlay.visible { display: flex; }
+
+.pause-title {
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.pause-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 260px;
+}
+
+.pause-actions button {
+  padding: 14px 28px;
+  border-radius: 10px;
+  border: 2px solid var(--arvexis-btn-border);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--arvexis-text);
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+  text-align: center;
+}
+.pause-actions button:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--arvexis-accent);
+}
+
+/* ── Settings Overlay ────────────────────────────────────────────────────── */
+
+#settings-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--arvexis-overlay-bg);
+  backdrop-filter: blur(8px);
+}
+#settings-overlay.visible { display: flex; }
+
+.settings-title {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 24px;
+}
+
+.settings-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
+  max-width: 420px;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 0 24px;
+}
+
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.settings-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-control input[type="range"] {
+  flex: 1;
+  accent-color: var(--arvexis-accent);
+  height: 6px;
+}
+
+.settings-control input[type="color"] {
+  width: 36px;
+  height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.settings-control select {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.4);
+  color: var(--arvexis-text);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.settings-control label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--arvexis-text);
+  cursor: pointer;
+}
+
+.settings-control .volume-value {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  min-width: 32px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-footer {
+  margin-top: 24px;
+}
+
+#btn-settings-close {
+  padding: 12px 40px;
+  border-radius: 10px;
+  border: 2px solid var(--arvexis-accent);
+  background: rgba(107, 138, 255, 0.15);
+  color: var(--arvexis-text);
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+#btn-settings-close:hover { background: rgba(107, 138, 255, 0.3); }

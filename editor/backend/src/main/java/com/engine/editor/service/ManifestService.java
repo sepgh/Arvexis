@@ -145,9 +145,22 @@ public class ManifestService {
                 nodeId));
 
         // Decision appearance
-        String cfg = (String) jdbc.queryForMap("SELECT * FROM nodes WHERE id=?", nodeId)
-            .get("decision_appearance_config");
+        Map<String, Object> nodeFullRow = jdbc.queryForMap("SELECT * FROM nodes WHERE id=?", nodeId);
+        String cfg = (String) nodeFullRow.get("decision_appearance_config");
         n.put("decisionAppearanceConfig", cfg);
+
+        // Background music asset
+        String musicAssetId = (String) nodeFullRow.get("music_asset_id");
+        if (musicAssetId != null) {
+            List<Map<String, Object>> musicRows = jdbc.queryForList(
+                "SELECT file_path, file_name FROM assets WHERE id=?", musicAssetId);
+            if (!musicRows.isEmpty()) {
+                n.put("musicAssetId", musicAssetId);
+                n.put("musicAssetRelPath", relPath(config.getAssetsDirectory(),
+                    (String) musicRows.get(0).get("file_path")));
+                n.put("musicAssetFileName", musicRows.get(0).get("file_name"));
+            }
+        }
 
         // Video layers with relative asset path
         List<Map<String, Object>> layers = jdbc.queryForList("""

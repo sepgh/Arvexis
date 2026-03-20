@@ -16,6 +16,7 @@ public class GraphNode {
     private boolean autoContinue;
     private String backgroundColor;
     private String decisionAppearanceConfig;
+    private String musicAssetId;
     private double posX;
     private double posY;
     private List<NodeExit> exits;
@@ -50,6 +51,9 @@ public class GraphNode {
     public void setDecisionAppearanceConfig(String decisionAppearanceConfig) {
         this.decisionAppearanceConfig = decisionAppearanceConfig;
     }
+
+    public String getMusicAssetId() { return musicAssetId; }
+    public void setMusicAssetId(String musicAssetId) { this.musicAssetId = musicAssetId; }
 
     public double getPosX() { return posX; }
     public void setPosX(double posX) { this.posX = posX; }

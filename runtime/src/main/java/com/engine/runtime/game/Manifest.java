@@ -39,6 +39,8 @@ public class Manifest {
         @JsonProperty("conditions")               public List<ConditionEntry>  conditions;
         @JsonProperty("decisionAppearanceConfig") public String decisionAppearanceConfig; // raw JSON string
         @JsonProperty("autoContinue")             public boolean autoContinue;
+        @JsonProperty("musicAssetId")             public String musicAssetId;
+        @JsonProperty("musicAssetRelPath")        public String musicAssetRelPath;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

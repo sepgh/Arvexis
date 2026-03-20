@@ -88,6 +88,8 @@ public class GraphService {
         String dac        = req.decisionAppearanceConfig() != null
                           ? req.decisionAppearanceConfig()
                           : existing.getDecisionAppearanceConfig();
+        String musicAsset = Boolean.TRUE.equals(req.clearMusicAsset()) ? null
+                          : (req.musicAssetId() != null ? req.musicAssetId() : existing.getMusicAssetId());
         double posX       = req.posX() != null ? req.posX() : existing.getPosX();
         double posY       = req.posY() != null ? req.posY() : existing.getPosY();
 
@@ -95,9 +97,9 @@ public class GraphService {
 
         jdbc.update("""
             UPDATE nodes SET name=?, is_end=?, auto_continue=?, background_color=?,
-                decision_appearance_config=?, pos_x=?, pos_y=?
+                decision_appearance_config=?, music_asset_id=?, pos_x=?, pos_y=?
             WHERE id=?
-            """, name, isEnd ? 1 : 0, autoCont ? 1 : 0, bgColor, dac, posX, posY, id);
+            """, name, isEnd ? 1 : 0, autoCont ? 1 : 0, bgColor, dac, musicAsset, posX, posY, id);
 
         return getNode(id);
     }
@@ -228,6 +230,7 @@ public class GraphService {
         n.setAutoContinue(rs.getInt("auto_continue") == 1);
         n.setBackgroundColor(rs.getString("background_color"));
         n.setDecisionAppearanceConfig(rs.getString("decision_appearance_config"));
+        n.setMusicAssetId(rs.getString("music_asset_id"));
         n.setPosX(rs.getDouble("pos_x"));
         n.setPosY(rs.getDouble("pos_y"));
         return n;

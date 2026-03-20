@@ -68,11 +68,13 @@ public class RuntimeServer {
         HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
         server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
 
-        server.createContext("/api/game/state",   this::handleState);
-        server.createContext("/api/game/decide",  this::handleDecide);
-        server.createContext("/api/game/restart", this::handleRestart);
-        server.createContext("/hls/",             this::handleHls);
-        server.createContext("/",                 this::handleStatic);
+        server.createContext("/api/game/state",    this::handleState);
+        server.createContext("/api/game/decide",   this::handleDecide);
+        server.createContext("/api/game/restart",  this::handleRestart);
+        server.createContext("/api/game/has-save", this::handleHasSave);
+        server.createContext("/hls/",              this::handleHls);
+        server.createContext("/assets/",           this::handleAssets);
+        server.createContext("/",                  this::handleStatic);
 
         server.start();
     }
@@ -145,6 +147,17 @@ public class RuntimeServer {
         }
     }
 
+    // ── GET /api/game/has-save ────────────────────────────────────────────────
+
+    private void handleHasSave(HttpExchange ex) throws IOException {
+        if ("OPTIONS".equals(ex.getRequestMethod())) { RequestHelper.handleOptions(ex); return; }
+        if (!"GET".equals(ex.getRequestMethod())) { RequestHelper.sendError(ex, 405, "Method not allowed"); return; }
+
+        GameState loaded = stateStore.load();
+        boolean hasSave = loaded != null && engine.nodeById(loaded.currentSceneId) != null;
+        RequestHelper.sendJson(ex, 200, Map.of("hasSave", hasSave));
+    }
+
     // ── GET /hls/{path} — serve HLS files from outputDir ─────────────────────
 
     private void handleHls(HttpExchange ex) throws IOException {
@@ -163,13 +176,45 @@ public class RuntimeServer {
         RequestHelper.sendBytes(ex, 200, mime, bytes);
     }
 
-    // ── Static client files (/, /game.js, etc.) ───────────────────────────────
+    // ── GET /assets/{path} — serve music/audio assets from assets dir ────────
+
+    private void handleAssets(HttpExchange ex) throws IOException {
+        if (!"GET".equals(ex.getRequestMethod())) { RequestHelper.sendError(ex, 405, "Method not allowed"); return; }
+
+        String uriPath  = ex.getRequestURI().getPath();
+        String filePart = uriPath.substring("/assets/".length());
+
+        Path assetsBase = projectDir.resolve("assets").normalize();
+        Path target = assetsBase.resolve(filePart).normalize();
+
+        if (!target.startsWith(assetsBase)) { RequestHelper.sendError(ex, 403, "Forbidden"); return; }
+        if (!Files.exists(target))           { RequestHelper.sendError(ex, 404, "Not found: " + filePart); return; }
+
+        String mime = mimeFor(target.getFileName().toString());
+        byte[] bytes = Files.readAllBytes(target);
+        RequestHelper.sendBytes(ex, 200, mime, bytes);
+    }
+
+    // ── Static client files (/, /game.js, /custom.css, etc.) ─────────────────
 
     private void handleStatic(HttpExchange ex) throws IOException {
         if (!"GET".equals(ex.getRequestMethod())) { RequestHelper.sendError(ex, 405, "Method not allowed"); return; }
 
         String path = ex.getRequestURI().getPath();
         if ("/".equals(path) || path.isBlank()) path = "/index.html";
+
+        // Serve custom.css from project dir (user-editable)
+        if ("/custom.css".equals(path)) {
+            Path customCss = projectDir.resolve("custom.css");
+            if (Files.exists(customCss)) {
+                byte[] bytes = Files.readAllBytes(customCss);
+                RequestHelper.sendBytes(ex, 200, "text/css; charset=UTF-8", bytes);
+            } else {
+                // Return empty CSS if no custom file exists
+                RequestHelper.sendBytes(ex, 200, "text/css; charset=UTF-8", new byte[0]);
+            }
+            return;
+        }
 
         String resource = "/client" + path;
         try (InputStream in = getClass().getResourceAsStream(resource)) {
@@ -211,6 +256,13 @@ public class RuntimeServer {
                 }
             } catch (Exception ignored) {}
         }
+        // Background music URL (if scene defines one)
+        if (scene != null && scene.musicAssetRelPath != null) {
+            resp.put("musicUrl", "/assets/" + scene.musicAssetRelPath);
+        } else {
+            resp.put("musicUrl", null);  // null = keep current music playing
+        }
+
         resp.put("variables",         Map.copyOf(s.variables));
         return resp;
     }
@@ -222,6 +274,11 @@ public class RuntimeServer {
         if (filename.endsWith(".html")) return "text/html; charset=UTF-8";
         if (filename.endsWith(".js"))   return "application/javascript; charset=UTF-8";
         if (filename.endsWith(".css"))  return "text/css; charset=UTF-8";
+        if (filename.endsWith(".mp3"))  return "audio/mpeg";
+        if (filename.endsWith(".ogg"))  return "audio/ogg";
+        if (filename.endsWith(".wav"))  return "audio/wav";
+        if (filename.endsWith(".aac"))  return "audio/aac";
+        if (filename.endsWith(".flac")) return "audio/flac";
         String guessed = URLConnection.guessContentTypeFromName(filename);
         return guessed != null ? guessed : "application/octet-stream";
     }

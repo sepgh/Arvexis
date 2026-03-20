@@ -18,6 +18,7 @@ export interface GraphNode {
   autoContinue: boolean
   backgroundColor?: string
   decisionAppearanceConfig?: DecisionAppearanceConfig
+  musicAssetId?: string | null
   posX: number
   posY: number
   exits: NodeExit[]

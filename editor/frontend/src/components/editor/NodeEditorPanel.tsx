@@ -59,6 +59,7 @@ export default function NodeEditorPanel({ nodeData, onConditionsChanged }: NodeE
             isEnd={nodeData.isEnd}
             autoContinue={nodeData.autoContinue}
             backgroundColor={nodeData.backgroundColor ?? null}
+            musicAssetId={nodeData.musicAssetId ?? null}
           />
         )}
         {nodeData.type === 'state' && (
