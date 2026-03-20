@@ -150,6 +150,7 @@ function GraphCanvas() {
           <NodeEditorPanel
             nodeData={selectedNodeData}
             onConditionsChanged={reloadGraph}
+            onNodeUpdated={reloadGraph}
           />
         </ResizableSidePanel>
       )}

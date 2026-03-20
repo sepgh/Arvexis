@@ -7,6 +7,7 @@ import ConditionEditor from './DecisionEditor'
 interface NodeEditorPanelProps {
   nodeData: FlowNodeData
   onConditionsChanged?: () => void
+  onNodeUpdated?: () => void
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -21,7 +22,7 @@ const TYPE_COLOR: Record<string, string> = {
   condition: 'text-violet-400 border-violet-500/30 bg-violet-500/5',
 }
 
-export default function NodeEditorPanel({ nodeData, onConditionsChanged }: NodeEditorPanelProps) {
+export default function NodeEditorPanel({ nodeData, onConditionsChanged, onNodeUpdated }: NodeEditorPanelProps) {
   const setSelectedNodeId = useEditorStore(s => s.setSelectedNodeId)
 
   return (
@@ -60,6 +61,7 @@ export default function NodeEditorPanel({ nodeData, onConditionsChanged }: NodeE
             autoContinue={nodeData.autoContinue}
             backgroundColor={nodeData.backgroundColor ?? null}
             musicAssetId={nodeData.musicAssetId ?? null}
+            onNodeUpdated={onNodeUpdated}
           />
         )}
         {nodeData.type === 'state' && (

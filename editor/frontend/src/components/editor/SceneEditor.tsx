@@ -16,11 +16,12 @@ interface SceneEditorProps {
   autoContinue: boolean
   backgroundColor: string | null
   musicAssetId: string | null
+  onNodeUpdated?: () => void
 }
 
 type Section = 'layers' | 'audio' | 'decisions' | 'props'
 
-export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue: initialAutoContinue, backgroundColor: initialBg, musicAssetId: initialMusicAssetId }: SceneEditorProps) {
+export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue: initialAutoContinue, backgroundColor: initialBg, musicAssetId: initialMusicAssetId, onNodeUpdated }: SceneEditorProps) {
   const projectDefaultBackgroundColor = useEditorStore(
     (s) => s.projectConfig?.defaultBackgroundColor ?? '#000000'
   )
@@ -200,7 +201,8 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
     } else {
       payload.clearMusicAsset = true
     }
-    await withSave(() => updateNode(nodeId, payload))
+    const result = await withSave(() => updateNode(nodeId, payload))
+    if (result && onNodeUpdated) onNodeUpdated()
   }
 
   if (loading) return <div className="flex items-center justify-center h-20 text-xs text-muted-foreground">Loading…</div>
