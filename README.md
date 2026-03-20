@@ -2,7 +2,7 @@
 
 <p>
   
-  <img width="10%" src="https://github.com/sepgh/Arvexis/blob/main/assets/logo.png" align="left" />
+  <img width="15%" src="https://github.com/sepgh/Arvexis/blob/main/assets/logo.png" align="left" />
   A node-based authoring tool for building interactive video experiences and artistic games. Authors compose a directed graph of scenes, conditions, and state mutations in a visual editor; the engine compiles it into a self-contained, offline-capable playable package.
 </p>
 
@@ -57,7 +57,11 @@ engine/
 
 ## Quick Start
 
-### Prerequisites
+### Compiled Binary
+
+Quickest way to run the editor and start a new project is to download available binaries in [releases](https://github.com/sepgh/Arvexis/releases). 
+
+### Prerequisites for building and running from source
 
 | Tool | Version | Notes |
 |------|---------|-------|
@@ -69,18 +73,30 @@ engine/
 ### Run the Editor
 
 ```bash
-# 1. Build and start the backend
-cd editor/backend
-mvn package -DskipTests
-java -jar target/editor-backend-0.0.1-SNAPSHOT.jar
-
-# 2. In a second terminal, start the frontend dev server
-cd editor/frontend
-npm install
-npm run dev
+# Easy way on linux
+./build.sh
 ```
 
-Open **http://localhost:5173** in a browser.
+Or make native binary
+
+```
+./build-native.sh
+```
+
+Or
+
+```bash
+# 1. Build the frontend
+cd editor/frontend
+npm install
+
+# 2. Build and start the backend. It will host frontend too.
+cd editor/backend
+mvn package -DskipTests
+java -jar target/editor-backend-{VERSION}.jar   # replace with valid version
+```
+
+Open **http://localhost:8080** in a browser.
 
 ### Play a Compiled Package
 
