@@ -47,6 +47,8 @@ const errorMsg          = $('error-msg');
 const endScreen         = $('end-screen');
 const musicEl           = $('music-el');
 const pauseBtn          = $('pause-btn');
+const subtitleContainer = $('subtitle-container');
+const subtitleText      = $('subtitle-text');
 
 // Settings controls
 const settingMusicVol       = $('setting-music-vol');
@@ -56,6 +58,8 @@ const settingBtnBg          = $('setting-btn-bg');
 const settingBtnText        = $('setting-btn-text');
 const settingBtnPos         = $('setting-btn-pos');
 const settingResolution     = $('setting-resolution');
+const settingSubtitlesEnabled = $('setting-subtitles-enabled');
+const settingLocale         = $('setting-locale');
 const musicVolDisplay       = $('music-vol-display');
 const videoVolDisplay       = $('video-vol-display');
 const btnBgDisplay          = $('btn-bg-display');
@@ -73,6 +77,8 @@ const defaultSettings = {
   btnText:       '#ffffff',
   btnPosition:   'bottom',
   resolution:    'auto',
+  subtitlesEnabled: true,
+  locale:        '',
 };
 
 let settings = { ...defaultSettings };
@@ -109,6 +115,11 @@ function applySettings() {
   // Button position
   decisionOverlay.setAttribute('data-position', settings.btnPosition);
 
+  // Subtitles visibility
+  if (subtitleContainer) {
+    subtitleContainer.classList.toggle('hidden', !settings.subtitlesEnabled);
+  }
+
   // Sync settings UI
   settingMusicVol.value     = Math.round(settings.musicVolume * 100);
   settingVideoVol.value     = Math.round(settings.videoVolume * 100);
@@ -117,6 +128,8 @@ function applySettings() {
   settingBtnText.value      = settings.btnText;
   settingBtnPos.value       = settings.btnPosition;
   settingResolution.value   = settings.resolution;
+  if (settingSubtitlesEnabled) settingSubtitlesEnabled.checked = settings.subtitlesEnabled;
+  if (settingLocale) settingLocale.value = settings.locale;
   musicVolDisplay.textContent = Math.round(settings.musicVolume * 100) + '%';
   videoVolDisplay.textContent = Math.round(settings.videoVolume * 100) + '%';
   btnBgDisplay.textContent  = settings.btnBg;
@@ -170,6 +183,19 @@ settingResolution.addEventListener('change', () => {
   settings.resolution = settingResolution.value;
 });
 
+if (settingSubtitlesEnabled) {
+  settingSubtitlesEnabled.addEventListener('change', () => {
+    settings.subtitlesEnabled = settingSubtitlesEnabled.checked;
+    applySettings();
+  });
+}
+
+if (settingLocale) {
+  settingLocale.addEventListener('change', () => {
+    settings.locale = settingLocale.value;
+  });
+}
+
 // ── Screen management ────────────────────────────────────────────────────────
 
 function showScreen(screen) {
@@ -191,7 +217,7 @@ $('btn-continue').addEventListener('click', async () => {
   showScreen('game');
   showSpinner('Loading…');
   try {
-    const state = await apiFetch('/api/game/state');
+    const state = await apiFetch('/api/game/state' + localeQueryString());
     await loadScene(state);
   } catch (e) {
     showError('Failed to load: ' + (e.message || e));
@@ -265,6 +291,7 @@ function pauseGame() {
   videoEl.pause();
   musicEl.pause();
   clearCountdown();
+  stopSubtitleSync();
   showScreen('paused');
 }
 
@@ -273,6 +300,7 @@ function resumeGame() {
   showScreen('game');
   videoEl.play().catch(() => {});
   if (settings.musicEnabled && musicEl.src) musicEl.play().catch(() => {});
+  startSubtitleSync();
 }
 
 function pauseVideo() {
@@ -309,13 +337,71 @@ function stopMusic() {
   currentMusicUrl = null;
 }
 
+// ── Subtitle engine ─────────────────────────────────────────────────────────
+
+let currentSubtitles = [];  // [{startTime, endTime, text}] for current scene
+let subtitleRafId    = null;
+
+function setSubtitles(subs) {
+  currentSubtitles = (subs || []).slice().sort((a, b) => a.startTime - b.startTime);
+  if (subtitleText) subtitleText.textContent = '';
+}
+
+function startSubtitleSync() {
+  stopSubtitleSync();
+  if (!currentSubtitles.length || !settings.subtitlesEnabled) return;
+
+  function tick() {
+    const t = videoEl.currentTime;
+    let found = '';
+    for (const s of currentSubtitles) {
+      if (t >= s.startTime && t < s.endTime) { found = s.text; break; }
+    }
+    if (subtitleText) subtitleText.textContent = found;
+    subtitleRafId = requestAnimationFrame(tick);
+  }
+  subtitleRafId = requestAnimationFrame(tick);
+}
+
+function stopSubtitleSync() {
+  if (subtitleRafId) { cancelAnimationFrame(subtitleRafId); subtitleRafId = null; }
+  if (subtitleText) subtitleText.textContent = '';
+}
+
+// ── Locale helpers ──────────────────────────────────────────────────────────
+
+function localeQueryString() {
+  return settings.locale ? '?locale=' + encodeURIComponent(settings.locale) : '';
+}
+
+async function loadLocales() {
+  try {
+    const data = await apiFetch('/api/game/locales');
+    const select = settingLocale;
+    if (!select) return;
+    // Preserve first "None" option, clear the rest
+    while (select.options.length > 1) select.remove(1);
+    (data.locales || []).forEach(l => {
+      const opt = document.createElement('option');
+      opt.value = l.code;
+      opt.textContent = l.name + ' (' + l.code + ')';
+      select.appendChild(opt);
+    });
+    // Auto-select default locale if user hasn't chosen one
+    if (!settings.locale && data.defaultLocaleCode) {
+      settings.locale = data.defaultLocaleCode;
+    }
+    select.value = settings.locale;
+  } catch { /* no locales available */ }
+}
+
 // ── Boot ───────────────────────────────────────────────────────────────────────
 
 (async function boot() {
   loadSettings();
   applySettings();
   showScreen('menu');
-  await checkContinue();
+  await Promise.all([checkContinue(), loadLocales()]);
 })();
 
 async function checkContinue() {
@@ -335,6 +421,7 @@ async function loadScene(state) {
 
   hideDecisions();
   hideCountdown();
+  stopSubtitleSync();
   endScreen.classList.remove('visible');
 
   showSpinner('Loading scene…');
@@ -358,9 +445,15 @@ async function loadScene(state) {
   // Update background music
   updateMusic(state.musicUrl);
 
+  // Load subtitles for this scene
+  setSubtitles(state.subtitles || []);
+
   hideSpinner();
 
   videoEl.play().catch(() => {});
+
+  // Start subtitle sync loop
+  startSubtitleSync();
 
   const decisions  = state.decisions || [];
   const timeout    = state.decisionTimeoutSecs || 5;
@@ -484,10 +577,13 @@ function showDecisions(decisions, timeoutSecs) {
 
   const defaultDecision = decisions.find(d => d.isDefault) || decisions[0];
 
+  // Decision translations from the current state response
+  const dtMap = (currentState && currentState.decisionTranslations) || {};
+
   for (const d of decisions) {
     const btn = document.createElement('button');
     btn.className = 'decision-btn' + (d.isDefault ? ' default' : '');
-    btn.textContent = d.key;
+    btn.textContent = dtMap[d.key] || d.key;
     btn.addEventListener('click', () => {
       if (decisionMade) return;
       decisionMade = true;
@@ -567,8 +663,9 @@ function hideFreeze() {
 
 async function makeDecision(decisionKey) {
   showSpinner('Deciding…');
+  stopSubtitleSync();
   try {
-    const result = await apiFetch('/api/game/decide', { method: 'POST',
+    const result = await apiFetch('/api/game/decide' + localeQueryString(), { method: 'POST',
       body: JSON.stringify({ decisionKey }) });
 
     if (result.transition) {
@@ -639,7 +736,7 @@ async function restartGame() {
   stopMusic();
 
   try {
-    const state = await apiFetch('/api/game/restart', { method: 'POST', body: '{}' });
+    const state = await apiFetch('/api/game/restart' + localeQueryString(), { method: 'POST', body: '{}' });
     await loadScene(state);
   } catch (e) {
     showError('Restart failed: ' + (e.message || e));

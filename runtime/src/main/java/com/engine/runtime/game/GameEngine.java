@@ -165,6 +165,34 @@ public class GameEngine {
             .toList();
     }
 
+    // ── Localization helpers ────────────────────────────────────────────────────
+
+    public String defaultLocaleCode() {
+        return manifest.project != null ? manifest.project.defaultLocaleCode : null;
+    }
+
+    public List<Manifest.LocaleEntry> availableLocales() {
+        if (manifest.localization == null || manifest.localization.locales == null) return List.of();
+        return manifest.localization.locales;
+    }
+
+    public List<Manifest.SubtitleEntry> getSubtitlesForScene(String sceneId, String localeCode) {
+        if (manifest.localization == null || manifest.localization.subtitles == null
+            || sceneId == null || localeCode == null) return List.of();
+        return manifest.localization.subtitles.stream()
+            .filter(s -> sceneId.equals(s.sceneId) && localeCode.equals(s.localeCode))
+            .sorted(Comparator.comparingDouble(s -> s.startTime))
+            .toList();
+    }
+
+    public List<Manifest.DecisionTranslationEntry> getDecisionTranslationsForScene(String sceneId, String localeCode) {
+        if (manifest.localization == null || manifest.localization.decisionTranslations == null
+            || sceneId == null || localeCode == null) return List.of();
+        return manifest.localization.decisionTranslations.stream()
+            .filter(dt -> sceneId.equals(dt.sceneId) && localeCode.equals(dt.localeCode))
+            .toList();
+    }
+
     // ── SpEL: state-node assignments ──────────────────────────────────────────
 
     private void executeAssignments(Manifest.NodeData stateNode, GameState gameState) {

@@ -35,6 +35,11 @@
       <!-- Freeze frame canvas -->
       <canvas id="freeze-canvas"></canvas>
 
+      <!-- Subtitle display -->
+      <div id="subtitle-container">
+        <span id="subtitle-text"></span>
+      </div>
+
       <!-- Pause button (top-left during gameplay) -->
       <button id="pause-btn" title="Pause">⏸</button>
 
@@ -146,6 +151,26 @@
             <option value="bottom">Bottom</option>
             <option value="center">Center</option>
             <option value="top">Top</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Subtitles On/Off -->
+      <div class="settings-group">
+        <div class="settings-control">
+          <label>
+            <input type="checkbox" id="setting-subtitles-enabled" checked/>
+            Enable subtitles
+          </label>
+        </div>
+      </div>
+
+      <!-- Locale -->
+      <div class="settings-group" id="locale-group">
+        <span class="settings-label">Language / Locale</span>
+        <div class="settings-control">
+          <select id="setting-locale">
+            <option value="">None</option>
           </select>
         </div>
       </div>

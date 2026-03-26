@@ -72,6 +72,7 @@ public class RuntimeServer {
         server.createContext("/api/game/decide",   this::handleDecide);
         server.createContext("/api/game/restart",  this::handleRestart);
         server.createContext("/api/game/has-save", this::handleHasSave);
+        server.createContext("/api/game/locales",  this::handleLocales);
         server.createContext("/hls/",              this::handleHls);
         server.createContext("/assets/",           this::handleAssets);
         server.createContext("/",                  this::handleStatic);
@@ -85,8 +86,9 @@ public class RuntimeServer {
         if ("OPTIONS".equals(ex.getRequestMethod())) { RequestHelper.handleOptions(ex); return; }
         if (!"GET".equals(ex.getRequestMethod())) { RequestHelper.sendError(ex, 405, "Method not allowed"); return; }
 
+        String locale = queryParam(ex, "locale");
         synchronized (stateLock) {
-            RequestHelper.sendJson(ex, 200, buildStateResponse(state));
+            RequestHelper.sendJson(ex, 200, buildStateResponse(state, locale));
         }
     }
 
@@ -104,6 +106,7 @@ public class RuntimeServer {
                 RequestHelper.sendError(ex, 400, "decisionKey is required"); return;
             }
 
+            String locale = queryParam(ex, "locale");
             synchronized (stateLock) {
                 if (state.gameOver) {
                     RequestHelper.sendError(ex, 409, "Game is over. Call /api/game/restart to play again."); return;
@@ -122,7 +125,7 @@ public class RuntimeServer {
                 } else {
                     resp.put("transition", null);
                 }
-                resp.put("nextState", buildStateResponse(state));
+                resp.put("nextState", buildStateResponse(state, locale));
                 RequestHelper.sendJson(ex, 200, resp);
             }
 
@@ -140,10 +143,11 @@ public class RuntimeServer {
         if ("OPTIONS".equals(ex.getRequestMethod())) { RequestHelper.handleOptions(ex); return; }
         if (!"POST".equals(ex.getRequestMethod())) { RequestHelper.sendError(ex, 405, "Method not allowed"); return; }
 
+        String locale = queryParam(ex, "locale");
         synchronized (stateLock) {
             state = new GameState(manifest.rootNodeId);
             stateStore.save(state);
-            RequestHelper.sendJson(ex, 200, buildStateResponse(state));
+            RequestHelper.sendJson(ex, 200, buildStateResponse(state, locale));
         }
     }
 
@@ -156,6 +160,23 @@ public class RuntimeServer {
         GameState loaded = stateStore.load();
         boolean hasSave = loaded != null && engine.nodeById(loaded.currentSceneId) != null;
         RequestHelper.sendJson(ex, 200, Map.of("hasSave", hasSave));
+    }
+
+    // ── GET /api/game/locales ─────────────────────────────────────────────────
+
+    private void handleLocales(HttpExchange ex) throws IOException {
+        if ("OPTIONS".equals(ex.getRequestMethod())) { RequestHelper.handleOptions(ex); return; }
+        if (!"GET".equals(ex.getRequestMethod())) { RequestHelper.sendError(ex, 405, "Method not allowed"); return; }
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("defaultLocaleCode", engine.defaultLocaleCode());
+        resp.put("locales", engine.availableLocales().stream().map(l -> {
+            Map<String, Object> lm = new LinkedHashMap<>();
+            lm.put("code", l.code);
+            lm.put("name", l.name);
+            return lm;
+        }).toList());
+        RequestHelper.sendJson(ex, 200, resp);
     }
 
     // ── GET /hls/{path} — serve HLS files from outputDir ─────────────────────
@@ -226,7 +247,7 @@ public class RuntimeServer {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private Map<String, Object> buildStateResponse(GameState s) {
+    private Map<String, Object> buildStateResponse(GameState s, String locale) {
         Manifest.NodeData scene = engine.nodeById(s.currentSceneId);
         List<GameEngine.DecisionInfo> decisions = engine.availableDecisions(s.currentSceneId);
 
@@ -264,7 +285,37 @@ public class RuntimeServer {
         }
 
         resp.put("variables",         Map.copyOf(s.variables));
+
+        // Localization: subtitles + decision translations for the current scene
+        if (locale != null && !locale.isBlank()) {
+            resp.put("subtitles", engine.getSubtitlesForScene(s.currentSceneId, locale).stream().map(sub -> {
+                Map<String, Object> sm = new LinkedHashMap<>();
+                sm.put("startTime", sub.startTime);
+                sm.put("endTime",   sub.endTime);
+                sm.put("text",      sub.text);
+                return sm;
+            }).toList());
+
+            Map<String, String> dtMap = new LinkedHashMap<>();
+            for (Manifest.DecisionTranslationEntry dt : engine.getDecisionTranslationsForScene(s.currentSceneId, locale)) {
+                dtMap.put(dt.decisionKey, dt.label);
+            }
+            resp.put("decisionTranslations", dtMap);
+        }
+
         return resp;
+    }
+
+    private String queryParam(HttpExchange ex, String name) {
+        String query = ex.getRequestURI().getQuery();
+        if (query == null) return null;
+        for (String pair : query.split("&")) {
+            String[] kv = pair.split("=", 2);
+            if (kv.length == 2 && name.equals(kv[0])) {
+                return java.net.URLDecoder.decode(kv[1], java.nio.charset.StandardCharsets.UTF_8);
+            }
+        }
+        return null;
     }
 
     private static String mimeFor(String filename) {

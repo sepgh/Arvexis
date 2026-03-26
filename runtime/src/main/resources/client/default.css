@@ -23,6 +23,8 @@
  *       │   │   ├─ #video-el           — main scene <video>
  *       │   │   ├─ #transition-el      — transition overlay <video>
  *       │   │   ├─ #freeze-canvas      — freeze-frame <canvas>
+ *       │   │   ├─ #subtitle-container — subtitle display area
+ *       │   │   │   └─ #subtitle-text  — the visible subtitle span
  *       │   │   ├─ #pause-btn          — pause button (top-left)
  *       │   │   ├─ #countdown          — decision countdown timer
  *       │   │   │   ├─ #countdown-arc  — circular arc <canvas>
@@ -218,7 +220,35 @@ body {
   z-index: 3;
 }
 
-/* ── Pause Button ────────────────────────────────────────────────────────── */
+/* ── Subtitle Display ────────────────────────────────────────────────── */
+
+#subtitle-container {
+  position: absolute;
+  bottom: 8%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 8;
+  pointer-events: none;
+  max-width: 80%;
+  text-align: center;
+  transition: opacity 0.2s;
+}
+#subtitle-container.hidden { opacity: 0; }
+
+#subtitle-text {
+  display: inline-block;
+  padding: 6px 16px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-size: 18px;
+  line-height: 1.4;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  white-space: pre-wrap;
+}
+#subtitle-text:empty { display: none; }
+
+/* ── Pause Button ────────────────────────────────────────────────────── */
 
 #pause-btn {
   position: absolute;

@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
-import java.util.Map;
 
 /** Deserializes manifest.json written by ManifestService. */
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -14,6 +13,7 @@ public class Manifest {
     @JsonProperty("project")      public ProjectConfig project;
     @JsonProperty("nodes")        public List<NodeData> nodes;
     @JsonProperty("edges")        public List<EdgeData> edges;
+    @JsonProperty("localization") public LocalizationData localization;
 
     // ── Project config ─────────────────────────────────────────────────────────
 
@@ -79,5 +79,39 @@ public class Manifest {
     public static class TransitionData {
         @JsonProperty("type")     public String type;
         @JsonProperty("duration") public double duration;
+    }
+
+    // ── Localization ──────────────────────────────────────────────────────────
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class LocalizationData {
+        @JsonProperty("locales")              public List<LocaleEntry>              locales;
+        @JsonProperty("subtitles")            public List<SubtitleEntry>            subtitles;
+        @JsonProperty("decisionTranslations") public List<DecisionTranslationEntry> decisionTranslations;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class LocaleEntry {
+        @JsonProperty("code") public String code;
+        @JsonProperty("name") public String name;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class SubtitleEntry {
+        @JsonProperty("id")         public String id;
+        @JsonProperty("sceneId")    public String sceneId;
+        @JsonProperty("localeCode") public String localeCode;
+        @JsonProperty("startTime")  public double startTime;
+        @JsonProperty("endTime")    public double endTime;
+        @JsonProperty("text")       public String text;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class DecisionTranslationEntry {
+        @JsonProperty("id")          public String id;
+        @JsonProperty("decisionKey") public String decisionKey;
+        @JsonProperty("sceneId")     public String sceneId;
+        @JsonProperty("localeCode")  public String localeCode;
+        @JsonProperty("label")       public String label;
     }
 }

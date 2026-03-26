@@ -161,7 +161,9 @@ function GraphCanvas() {
       )}
       {validationPanelOpen && !selectedNodeData && !selectedEdgeId && <ValidationPanel />}
       {localizationPanelOpen && !selectedNodeData && !selectedEdgeId && (
-        <LocalizationPanel />
+        <ResizableSidePanel side="right" initialWidth={460} minWidth={360} maxWidth={720}>
+          <LocalizationPanel />
+        </ResizableSidePanel>
       )}
       {projectSettingsPanelOpen && (
         <ResizableSidePanel side="right" initialWidth={460} minWidth={360} maxWidth={720}>
