@@ -271,10 +271,12 @@ public class CompileService {
             buildReadme(projectName),
             StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
 
-        // custom.css (user-editable runtime styles)
-        Path customCss = projectDir.resolve("custom.css");
-        if (Files.exists(customCss)) {
-            Files.copy(customCss, distDir.resolve("custom.css"), StandardCopyOption.REPLACE_EXISTING);
+        // User-editable runtime CSS files (buttons, subtitles, general)
+        for (String cssName : List.of("buttons.css", "subtitles.css", "custom.css")) {
+            Path cssFile = projectDir.resolve(cssName);
+            if (Files.exists(cssFile)) {
+                Files.copy(cssFile, distDir.resolve(cssName), StandardCopyOption.REPLACE_EXISTING);
+            }
         }
 
         // Create dist.zip
@@ -318,7 +320,7 @@ public class CompileService {
                 Files.newOutputStream(zipFile,
                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING))) {
 
-            // Add dist/ contents (manifest, runtime.jar, scripts, README, custom.css)
+            // Add dist/ contents (manifest, runtime.jar, scripts, README, CSS files)
             try (var walk = Files.walk(distDir)) {
                 walk.filter(Files::isRegularFile).forEach(p -> {
                     String name = "game/" + distDir.relativize(p).toString();

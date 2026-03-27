@@ -224,14 +224,14 @@ public class RuntimeServer {
         String path = ex.getRequestURI().getPath();
         if ("/".equals(path) || path.isBlank()) path = "/index.html";
 
-        // Serve custom.css from project dir (user-editable)
-        if ("/custom.css".equals(path)) {
-            Path customCss = projectDir.resolve("custom.css");
-            if (Files.exists(customCss)) {
-                byte[] bytes = Files.readAllBytes(customCss);
+        // Serve user-editable CSS files from project dir (custom.css, buttons.css, subtitles.css)
+        if ("/custom.css".equals(path) || "/buttons.css".equals(path) || "/subtitles.css".equals(path)) {
+            Path cssFile = projectDir.resolve(path.substring(1));
+            if (Files.exists(cssFile)) {
+                byte[] bytes = Files.readAllBytes(cssFile);
                 RequestHelper.sendBytes(ex, 200, "text/css; charset=UTF-8", bytes);
             } else {
-                // Return empty CSS if no custom file exists
+                // Return empty CSS if no file exists
                 RequestHelper.sendBytes(ex, 200, "text/css; charset=UTF-8", new byte[0]);
             }
             return;

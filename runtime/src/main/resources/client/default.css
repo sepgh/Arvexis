@@ -4,8 +4,12 @@
  * ============================================================================
  *
  * This file defines the default look and feel of the runtime player.
- * To customize, create a `custom.css` file in your project directory.
- * The custom.css is loaded AFTER this file, so your rules will override.
+ * To customize, use the editor's CSS panel which provides three separate files:
+ *   - buttons.css   — decision button overrides
+ *   - subtitles.css  — subtitle display overrides
+ *   - custom.css     — general / catch-all overrides
+ * Load order: default.css → buttons.css → subtitles.css → custom.css
+ * Later files override earlier ones.
  *
  * ── DOCUMENT STRUCTURE ──────────────────────────────────────────────────────
  *

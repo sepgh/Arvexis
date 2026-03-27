@@ -59,8 +59,8 @@ public class ManifestService {
         List<Map<String, Object>> edgeList = buildEdges(reachable, config, jdbc);
         manifest.put("edges", edgeList);
 
-        // Localization
-        manifest.put("localization", buildLocalization(jdbc));
+        // Localization (filtered to reachable scenes)
+        manifest.put("localization", buildLocalization(reachable, jdbc));
 
         // Write to file
         Path outFile = projectDir.resolve(MANIFEST_FILE);
@@ -351,7 +351,7 @@ public class ManifestService {
 
     // ── Localization ──────────────────────────────────────────────────────────
 
-    private Map<String, Object> buildLocalization(JdbcTemplate jdbc) {
+    private Map<String, Object> buildLocalization(Set<String> reachableSceneIds, JdbcTemplate jdbc) {
         Map<String, Object> loc = new LinkedHashMap<>();
 
         loc.put("locales", jdbc.queryForList("SELECT code, name FROM locales ORDER BY code")
@@ -359,7 +359,9 @@ public class ManifestService {
 
         loc.put("subtitles", jdbc.queryForList(
             "SELECT id, scene_id, locale_code, start_time, end_time, text FROM subtitle_entries ORDER BY scene_id, locale_code, start_time")
-            .stream().map(r -> {
+            .stream()
+            .filter(r -> reachableSceneIds.contains(r.get("scene_id")))
+            .map(r -> {
                 Map<String, Object> s = new LinkedHashMap<>();
                 s.put("id",         r.get("id"));
                 s.put("sceneId",    r.get("scene_id"));
@@ -372,7 +374,9 @@ public class ManifestService {
 
         loc.put("decisionTranslations", jdbc.queryForList(
             "SELECT id, decision_key, scene_id, locale_code, label FROM decision_translations ORDER BY scene_id, locale_code")
-            .stream().map(r -> {
+            .stream()
+            .filter(r -> reachableSceneIds.contains(r.get("scene_id")))
+            .map(r -> {
                 Map<String, Object> dt = new LinkedHashMap<>();
                 dt.put("id",          r.get("id"));
                 dt.put("decisionKey", r.get("decision_key"));
