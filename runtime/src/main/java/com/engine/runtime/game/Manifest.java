@@ -19,6 +19,7 @@ public class Manifest {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class ProjectConfig {
+        @JsonProperty("name")                 public String name;
         @JsonProperty("fps")                  public int    fps;
         @JsonProperty("decisionTimeoutSecs")  public double decisionTimeoutSecs = 5.0;
         @JsonProperty("defaultLocaleCode")    public String defaultLocaleCode;

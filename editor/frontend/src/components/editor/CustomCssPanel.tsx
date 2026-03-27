@@ -194,11 +194,13 @@ const CSS_REFERENCE: { section: string; items: { selector: string; desc: string 
     section: 'Main Menu',
     items: [
       { selector: '#main-menu', desc: 'Main menu screen' },
-      { selector: '.menu-title', desc: 'Game title text' },
+      { selector: '#menu-title', desc: 'Game title (project name)' },
       { selector: '.menu-actions', desc: 'Menu button group' },
       { selector: '#btn-continue', desc: 'Continue saved game' },
       { selector: '#btn-new-game', desc: 'New Game button' },
       { selector: '#btn-menu-settings', desc: 'Settings button' },
+      { selector: '.powered-by', desc: '"Powered by Arvexis" footer (menu & pause)' },
+      { selector: '.powered-by a', desc: 'Arvexis link in footer' },
     ],
   },
   {
@@ -208,6 +210,7 @@ const CSS_REFERENCE: { section: string; items: { selector: string; desc: string 
       { selector: '.pause-title', desc: '"Paused" heading' },
       { selector: '.pause-actions', desc: 'Pause button group' },
       { selector: '#pause-btn', desc: 'Pause icon (top-left during gameplay)' },
+      { selector: '.powered-by', desc: '"Powered by Arvexis" footer' },
     ],
   },
   {

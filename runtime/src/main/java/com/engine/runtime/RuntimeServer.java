@@ -68,6 +68,7 @@ public class RuntimeServer {
         HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
         server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
 
+        server.createContext("/api/game/info",     this::handleInfo);
         server.createContext("/api/game/state",    this::handleState);
         server.createContext("/api/game/decide",   this::handleDecide);
         server.createContext("/api/game/restart",  this::handleRestart);
@@ -78,6 +79,19 @@ public class RuntimeServer {
         server.createContext("/",                  this::handleStatic);
 
         server.start();
+    }
+
+    // ── GET /api/game/info ─────────────────────────────────────────────────────
+
+    private void handleInfo(HttpExchange ex) throws IOException {
+        if ("OPTIONS".equals(ex.getRequestMethod())) { RequestHelper.handleOptions(ex); return; }
+        if (!"GET".equals(ex.getRequestMethod())) { RequestHelper.sendError(ex, 405, "Method not allowed"); return; }
+
+        Map<String, Object> info = new LinkedHashMap<>();
+        String name = (manifest.project != null && manifest.project.name != null)
+            ? manifest.project.name : "Arvexis";
+        info.put("projectName", name);
+        RequestHelper.sendJson(ex, 200, info);
     }
 
     // ── GET /api/game/state ────────────────────────────────────────────────────

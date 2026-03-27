@@ -16,11 +16,12 @@
  *  body
  *   └─ #arvexis-root                   — outer wrapper (fullscreen)
  *       ├─ #main-menu                  — game main menu screen
- *       │   ├─ .menu-title             — game title text
- *       │   └─ .menu-actions           — button group
- *       │       ├─ #btn-continue       — Continue saved game
- *       │       ├─ #btn-new-game       — Start new game
- *       │       └─ #btn-menu-settings  — Open settings
+ *       │   ├─ .menu-title #menu-title — game title (project name)
+ *       │   ├─ .menu-actions           — button group
+ *       │   │   ├─ #btn-continue       — Continue saved game
+ *       │   │   ├─ #btn-new-game       — Start new game
+ *       │   │   └─ #btn-menu-settings  — Open settings
+ *       │   └─ .powered-by             — "Powered by Arvexis" footer
  *       │
  *       ├─ #game-screen                — active gameplay area (hidden in menu)
  *       │   ├─ #stage                  — video + overlays container
@@ -51,10 +52,11 @@
  *       │
  *       ├─ #pause-overlay              — pause menu (covers game screen)
  *       │   ├─ .pause-title            — "Paused" heading
- *       │   └─ .pause-actions          — button group
- *       │       ├─ #btn-resume         — Resume game
- *       │       ├─ #btn-pause-settings — Open settings
- *       │       └─ #btn-quit-menu      — Quit to main menu
+ *       │   ├─ .pause-actions          — button group
+ *       │   │   ├─ #btn-resume         — Resume game
+ *       │   │   ├─ #btn-pause-settings — Open settings
+ *       │   │   └─ #btn-quit-menu      — Quit to main menu
+ *       │   └─ .powered-by             — "Powered by Arvexis" footer
  *       │
  *       └─ #settings-overlay           — settings panel (covers everything)
  *           ├─ .settings-title         — "Settings" heading
@@ -178,6 +180,28 @@ body {
 .menu-actions button:disabled {
   opacity: 0.35;
   cursor: default;
+}
+
+/* ── "Powered By" footer (main menu & pause) ────────────────────────────── */
+
+.powered-by {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.35);
+  letter-spacing: 0.02em;
+  pointer-events: auto;
+}
+.powered-by a {
+  color: rgba(255, 255, 255, 0.5);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.powered-by a:hover {
+  color: var(--arvexis-accent);
+  text-decoration: underline;
 }
 
 /* ── Game Screen ─────────────────────────────────────────────────────────── */

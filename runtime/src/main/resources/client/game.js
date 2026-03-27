@@ -401,8 +401,19 @@ async function loadLocales() {
   loadSettings();
   applySettings();
   showScreen('menu');
-  await Promise.all([checkContinue(), loadLocales()]);
+  await Promise.all([checkContinue(), loadLocales(), loadProjectInfo()]);
 })();
+
+async function loadProjectInfo() {
+  try {
+    const { projectName } = await apiFetch('/api/game/info');
+    if (projectName) {
+      const titleEl = $('menu-title');
+      if (titleEl) titleEl.textContent = projectName;
+      document.title = projectName + ' — Interactive Video';
+    }
+  } catch { /* fallback to default title */ }
+}
 
 async function checkContinue() {
   try {
