@@ -165,3 +165,16 @@ Open **http://localhost:8090** in a browser.
 - **Video processing** — FFmpeg (CLI, abstraction layer)
 - **Compiled runtime** — Lightweight embedded Java HTTP server, hls.js (bundled, no CDN)
 - **Streaming** — HLS (`.m3u8` + `.ts` segments), multi-resolution
+
+---
+
+## Screenshots
+
+<img width="1864" height="1200" alt="image" src="https://github.com/user-attachments/assets/9c19f357-cbb9-4fba-8413-33641c14c23b" />
+<img width="1864" height="1200" alt="image" src="https://github.com/user-attachments/assets/9eae2ac9-7eed-4643-bb84-892c8155f1f6" />
+<img width="1866" height="1200" alt="image" src="https://github.com/user-attachments/assets/cc11aecd-a032-4375-84c8-771f14a1922d" />
+<img width="1866" height="1200" alt="image" src="https://github.com/user-attachments/assets/c1553278-f130-4a75-90d2-780a43f3fc08" />
+<img width="1866" height="1200" alt="image" src="https://github.com/user-attachments/assets/ee5f29b1-6da2-41d3-9b03-cb2cf832193d" />
+
+
+
