@@ -283,6 +283,8 @@ public class RuntimeServer {
         // Scene-level auto-continue: only active when there are no explicit decisions
         boolean autoContinues = engine.sceneAutoContinues(s.currentSceneId);
         resp.put("autoContinue", autoContinues);
+        // Loop video flag
+        resp.put("loopVideo", scene != null && scene.loopVideo);
         if (autoContinues) {
             try {
                 GameEngine.TraversalResult tr = engine.peek(s, "CONTINUE");

@@ -168,7 +168,7 @@ public class TransitionPreviewService {
                                         Path outFile, double fallbackDur,
                                         PreviewJob job) throws Exception {
         List<Map<String, Object>> layerRows = jdbc.queryForList("""
-            SELECT tvl.layer_order, tvl.start_at, tvl.start_at_frames, tvl.freeze_last_frame, a.file_path, a.duration, a.has_alpha
+            SELECT tvl.layer_order, tvl.start_at, tvl.start_at_frames, tvl.freeze_last_frame, a.file_path, a.duration, a.has_alpha, a.codec
             FROM transition_video_layers tvl
             JOIN assets a ON a.id = tvl.asset_id
             WHERE tvl.edge_id = ? ORDER BY tvl.layer_order
@@ -186,8 +186,9 @@ public class TransitionPreviewService {
             Map<String, Object> row = layerRows.get(i);
             boolean hasAlpha = row.get("has_alpha") instanceof Number n ? n.intValue() == 1 : Boolean.TRUE.equals(row.get("has_alpha"));
             boolean freeze   = row.get("freeze_last_frame") instanceof Number n ? n.intValue() == 1 : Boolean.TRUE.equals(row.get("freeze_last_frame"));
+            String codec = row.get("codec") instanceof String s ? s : null;
             videoLayers.add(new VideoLayerSpec(
-                Path.of((String) row.get("file_path")), resolveStartAt(row.get("start_at"), row.get("start_at_frames"), fps), i, hasAlpha, freeze));
+                Path.of((String) row.get("file_path")), resolveStartAt(row.get("start_at"), row.get("start_at_frames"), fps), i, hasAlpha, freeze, codec));
         }
 
         List<AudioTrackSpec> audioTracks = new ArrayList<>();

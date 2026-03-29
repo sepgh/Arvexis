@@ -391,7 +391,8 @@ public class CompileService {
             if (filePath == null) continue;
             boolean hasAlpha = r.get("hasAlpha") instanceof Boolean b ? b : Boolean.TRUE.equals(r.get("hasAlpha"));
             boolean freeze   = r.get("freezeLastFrame") instanceof Boolean b ? b : Boolean.TRUE.equals(r.get("freezeLastFrame"));
-            layers.add(new VideoLayerSpec(Path.of(filePath), toDouble(r.get("startAt")), i, hasAlpha, freeze));
+            String codec = r.get("codec") instanceof String s ? s : null;
+            layers.add(new VideoLayerSpec(Path.of(filePath), toDouble(r.get("startAt")), i, hasAlpha, freeze, codec));
         }
 
         List<AudioTrackSpec> tracks = new ArrayList<>();
@@ -493,7 +494,8 @@ public class CompileService {
             if (fp == null) continue;
             boolean hasAlpha = r.get("hasAlpha") instanceof Boolean b ? b : Boolean.TRUE.equals(r.get("hasAlpha"));
             boolean freeze   = r.get("freezeLastFrame") instanceof Boolean b ? b : Boolean.TRUE.equals(r.get("freezeLastFrame"));
-            layers.add(new VideoLayerSpec(Path.of(fp), toDouble(r.get("startAt")), i, hasAlpha, freeze));
+            String codec = r.get("codec") instanceof String s ? s : null;
+            layers.add(new VideoLayerSpec(Path.of(fp), toDouble(r.get("startAt")), i, hasAlpha, freeze, codec));
         }
         List<AudioTrackSpec> tracks = new ArrayList<>();
         for (int i = 0; i < audioData.size(); i++) {

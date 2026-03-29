@@ -84,6 +84,7 @@ public class GraphService {
         String name       = req.name()     != null ? req.name().trim() : existing.getName();
         boolean isEnd     = req.isEnd()    != null ? req.isEnd()       : existing.isEnd();
         boolean autoCont  = req.autoContinue() != null ? req.autoContinue() : existing.isAutoContinue();
+        boolean loopVid   = req.loopVideo() != null ? req.loopVideo() : existing.isLoopVideo();
         String bgColor    = req.backgroundColor() != null ? req.backgroundColor() : existing.getBackgroundColor();
         String dac        = req.decisionAppearanceConfig() != null
                           ? req.decisionAppearanceConfig()
@@ -96,10 +97,10 @@ public class GraphService {
         if (name.isBlank()) throw new ProjectException("Node name must not be blank");
 
         jdbc.update("""
-            UPDATE nodes SET name=?, is_end=?, auto_continue=?, background_color=?,
+            UPDATE nodes SET name=?, is_end=?, auto_continue=?, loop_video=?, background_color=?,
                 decision_appearance_config=?, music_asset_id=?, pos_x=?, pos_y=?
             WHERE id=?
-            """, name, isEnd ? 1 : 0, autoCont ? 1 : 0, bgColor, dac, musicAsset, posX, posY, id);
+            """, name, isEnd ? 1 : 0, autoCont ? 1 : 0, loopVid ? 1 : 0, bgColor, dac, musicAsset, posX, posY, id);
 
         return getNode(id);
     }
@@ -228,6 +229,7 @@ public class GraphService {
         n.setRoot(rs.getInt("is_root") == 1);
         n.setEnd(rs.getInt("is_end") == 1);
         n.setAutoContinue(rs.getInt("auto_continue") == 1);
+        n.setLoopVideo(rs.getInt("loop_video") == 1);
         n.setBackgroundColor(rs.getString("background_color"));
         n.setDecisionAppearanceConfig(rs.getString("decision_appearance_config"));
         n.setMusicAssetId(rs.getString("music_asset_id"));

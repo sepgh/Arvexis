@@ -59,6 +59,7 @@ export default function NodeEditorPanel({ nodeData, onConditionsChanged, onNodeU
             nodeId={nodeData.id}
             isEnd={nodeData.isEnd}
             autoContinue={nodeData.autoContinue}
+            loopVideo={nodeData.loopVideo}
             backgroundColor={nodeData.backgroundColor ?? null}
             musicAssetId={nodeData.musicAssetId ?? null}
             onNodeUpdated={onNodeUpdated}

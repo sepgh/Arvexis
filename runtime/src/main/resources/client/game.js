@@ -17,6 +17,7 @@ let preloadedHls   = {};    // url → Hls (preloaded transitions)
 let preloadedSceneHls = {}; // url → Hls (preloaded next-scene)
 let currentMusicUrl = null; // currently playing music URL
 let gamePaused      = false;
+let loopHandler     = null;  // persistent 'ended' handler for manual video looping
 
 // ── App state machine ────────────────────────────────────────────────────────
 // Screens: 'menu' | 'game' | 'paused' | 'settings'
@@ -430,6 +431,9 @@ async function loadScene(state) {
   currentState = state;
   decisionMade = false;
 
+  // Clean up any persistent loop handler from the previous scene
+  if (loopHandler) { videoEl.removeEventListener('ended', loopHandler); loopHandler = null; }
+
   hideDecisions();
   hideCountdown();
   stopSubtitleSync();
@@ -461,6 +465,9 @@ async function loadScene(state) {
 
   hideSpinner();
 
+  const loopVideo = !!state.loopVideo;
+  videoEl.loop = false; // always false; looping is handled manually so 'ended' always fires
+
   videoEl.play().catch(() => {});
 
   // Start subtitle sync loop
@@ -472,6 +479,7 @@ async function loadScene(state) {
 
   // Scene-level auto-continue: no explicit decisions, flag set → play immediately on end
   if (state.autoContinue && decisions.length === 0) {
+    videoEl.loop = false; // auto-continue must not loop
     videoEl.addEventListener('ended', async () => {
       captureFreeze();
       if (!decisionMade) {
@@ -502,15 +510,33 @@ async function loadScene(state) {
         }
       });
     }
-    videoEl.addEventListener('ended', function onEnded() {
-      videoEl.removeEventListener('ended', onEnded);
-      captureFreeze();
-      if (isEnd) { showEndScreen(); return; }
-      if (!decisionMade) showDecisions(decisions, timeout);
-    }, { once: true });
+
+    if (loopVideo) {
+      // Looping scene: manually replay video each cycle so 'ended' keeps firing.
+      // Show decisions after the first play-through (or via timestamp), then keep looping.
+      let decisionsShown = false;
+      loopHandler = function onLoop() {
+        if (decisionMade) { videoEl.removeEventListener('ended', loopHandler); loopHandler = null; return; }
+        if (isEnd) { videoEl.removeEventListener('ended', loopHandler); loopHandler = null; captureFreeze(); showEndScreen(); return; }
+        if (!decisionsShown && appearAt === null) { decisionsShown = true; showDecisions(decisions, timeout); }
+        videoEl.currentTime = 0;
+        videoEl.play().catch(() => {});
+      };
+      videoEl.addEventListener('ended', loopHandler);
+    } else {
+      // Non-looping: freeze on last frame and show decisions
+      videoEl.addEventListener('ended', function onEnded() {
+        videoEl.removeEventListener('ended', onEnded);
+        captureFreeze();
+        if (isEnd) { showEndScreen(); return; }
+        if (!decisionMade) showDecisions(decisions, timeout);
+      }, { once: true });
+    }
   } else if (isEnd) {
+    videoEl.loop = false; // end screen must not loop
     videoEl.addEventListener('ended', () => { captureFreeze(); showEndScreen(); }, { once: true });
   } else {
+    videoEl.loop = false; // implicit continue must not loop
     videoEl.addEventListener('ended', async () => {
       captureFreeze();
       await makeDecision('CONTINUE');
@@ -674,6 +700,8 @@ function hideFreeze() {
 
 async function makeDecision(decisionKey) {
   showSpinner('Deciding…');
+  videoEl.loop = false; // stop looping immediately on decision
+  videoEl.pause();
   stopSubtitleSync();
   try {
     const result = await apiFetch('/api/game/decide' + localeQueryString(), { method: 'POST',

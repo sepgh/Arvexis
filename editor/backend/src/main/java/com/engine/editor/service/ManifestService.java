@@ -144,10 +144,11 @@ public class ManifestService {
                 config.getDefaultBackgroundColor() != null ? config.getDefaultBackgroundColor() : "#000000",
                 nodeId));
 
-        // Decision appearance
+        // Decision appearance & loop flag
         Map<String, Object> nodeFullRow = jdbc.queryForMap("SELECT * FROM nodes WHERE id=?", nodeId);
         String cfg = (String) nodeFullRow.get("decision_appearance_config");
         n.put("decisionAppearanceConfig", cfg);
+        n.put("loopVideo", intFlag(nodeFullRow.get("loop_video")));
 
         // Background music asset
         String musicAssetId = (String) nodeFullRow.get("music_asset_id");
@@ -165,7 +166,7 @@ public class ManifestService {
         // Video layers with relative asset path
         List<Map<String, Object>> layers = jdbc.queryForList("""
             SELECT nvl.layer_order, nvl.start_at, nvl.start_at_frames, nvl.freeze_last_frame,
-                   a.id AS asset_id, a.file_path, a.file_name, a.has_alpha, a.duration
+                   a.id AS asset_id, a.file_path, a.file_name, a.has_alpha, a.codec, a.duration
             FROM node_video_layers nvl JOIN assets a ON a.id=nvl.asset_id
             WHERE nvl.node_id=? ORDER BY nvl.layer_order
             """, nodeId);
@@ -178,6 +179,7 @@ public class ManifestService {
             l.put("assetFileName", r.get("file_name"));
             l.put("assetRelPath", relPath(config.getAssetsDirectory(), (String) r.get("file_path")));
             l.put("hasAlpha",        intFlag(r.get("has_alpha")));
+            l.put("codec",           r.get("codec"));
             l.put("freezeLastFrame", intFlag(r.get("freeze_last_frame")));
             l.put("duration", r.get("duration"));
             l.put("startAtFrames", r.get("start_at_frames"));
@@ -310,7 +312,7 @@ public class ManifestService {
         int fps = config.getFps() > 0 ? config.getFps() : 30;
         return jdbc.queryForList("""
             SELECT tvl.layer_order, tvl.start_at, tvl.start_at_frames, tvl.freeze_last_frame,
-                   a.id AS asset_id, a.file_path, a.file_name, a.has_alpha, a.duration
+                   a.id AS asset_id, a.file_path, a.file_name, a.has_alpha, a.codec, a.duration
             FROM transition_video_layers tvl JOIN assets a ON a.id=tvl.asset_id
             WHERE tvl.edge_id=? ORDER BY tvl.layer_order
             """, edgeId).stream().map(r -> {
@@ -320,6 +322,7 @@ public class ManifestService {
                 l.put("assetFileName",    r.get("file_name"));
                 l.put("assetRelPath",     relPath(config.getAssetsDirectory(), (String) r.get("file_path")));
                 l.put("hasAlpha",         intFlag(r.get("has_alpha")));
+                l.put("codec",            r.get("codec"));
                 l.put("freezeLastFrame",  intFlag(r.get("freeze_last_frame")));
                 l.put("duration",         r.get("duration"));
                 l.put("startAtFrames",    r.get("start_at_frames"));

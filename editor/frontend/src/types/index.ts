@@ -16,6 +16,7 @@ export interface GraphNode {
   isRoot: boolean
   isEnd: boolean
   autoContinue: boolean
+  loopVideo: boolean
   backgroundColor?: string
   decisionAppearanceConfig?: DecisionAppearanceConfig
   musicAssetId?: string | null
