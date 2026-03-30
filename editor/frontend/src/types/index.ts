@@ -16,6 +16,7 @@ export interface GraphNode {
   isRoot: boolean
   isEnd: boolean
   autoContinue: boolean
+  loopVideo: boolean
   backgroundColor?: string
   decisionAppearanceConfig?: DecisionAppearanceConfig
   musicAssetId?: string | null
@@ -191,6 +192,7 @@ export interface TransitionResponse {
   transitionAllowed: boolean
   type: TransitionType | null
   duration: number | null
+  backgroundColor: string | null
   videoLayers: TransitionLayerData[]
   audioTracks: TransitionAudioData[]
 }

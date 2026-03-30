@@ -68,6 +68,7 @@ public class RuntimeServer {
         HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
         server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
 
+        server.createContext("/api/game/info",     this::handleInfo);
         server.createContext("/api/game/state",    this::handleState);
         server.createContext("/api/game/decide",   this::handleDecide);
         server.createContext("/api/game/restart",  this::handleRestart);
@@ -78,6 +79,19 @@ public class RuntimeServer {
         server.createContext("/",                  this::handleStatic);
 
         server.start();
+    }
+
+    // ── GET /api/game/info ─────────────────────────────────────────────────────
+
+    private void handleInfo(HttpExchange ex) throws IOException {
+        if ("OPTIONS".equals(ex.getRequestMethod())) { RequestHelper.handleOptions(ex); return; }
+        if (!"GET".equals(ex.getRequestMethod())) { RequestHelper.sendError(ex, 405, "Method not allowed"); return; }
+
+        Map<String, Object> info = new LinkedHashMap<>();
+        String name = (manifest.project != null && manifest.project.name != null)
+            ? manifest.project.name : "Arvexis";
+        info.put("projectName", name);
+        RequestHelper.sendJson(ex, 200, info);
     }
 
     // ── GET /api/game/state ────────────────────────────────────────────────────
@@ -120,6 +134,7 @@ public class RuntimeServer {
                     trans.put("edgeId",           result.transEdge().id);
                     trans.put("type",             result.transEdge().transition.type);
                     trans.put("duration",         result.transEdge().transition.duration);
+                    trans.put("backgroundColor",  result.transEdge().transition.backgroundColor);
                     trans.put("transitionHlsUrl", "/hls/trans_" + result.transEdge().id + "/master.m3u8");
                     resp.put("transition", trans);
                 } else {
@@ -224,14 +239,14 @@ public class RuntimeServer {
         String path = ex.getRequestURI().getPath();
         if ("/".equals(path) || path.isBlank()) path = "/index.html";
 
-        // Serve custom.css from project dir (user-editable)
-        if ("/custom.css".equals(path)) {
-            Path customCss = projectDir.resolve("custom.css");
-            if (Files.exists(customCss)) {
-                byte[] bytes = Files.readAllBytes(customCss);
+        // Serve user-editable CSS files from project dir (custom.css, buttons.css, subtitles.css)
+        if ("/custom.css".equals(path) || "/buttons.css".equals(path) || "/subtitles.css".equals(path)) {
+            Path cssFile = projectDir.resolve(path.substring(1));
+            if (Files.exists(cssFile)) {
+                byte[] bytes = Files.readAllBytes(cssFile);
                 RequestHelper.sendBytes(ex, 200, "text/css; charset=UTF-8", bytes);
             } else {
-                // Return empty CSS if no custom file exists
+                // Return empty CSS if no file exists
                 RequestHelper.sendBytes(ex, 200, "text/css; charset=UTF-8", new byte[0]);
             }
             return;
@@ -269,6 +284,8 @@ public class RuntimeServer {
         // Scene-level auto-continue: only active when there are no explicit decisions
         boolean autoContinues = engine.sceneAutoContinues(s.currentSceneId);
         resp.put("autoContinue", autoContinues);
+        // Loop video flag
+        resp.put("loopVideo", scene != null && scene.loopVideo);
         if (autoContinues) {
             try {
                 GameEngine.TraversalResult tr = engine.peek(s, "CONTINUE");

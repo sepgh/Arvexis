@@ -51,4 +51,12 @@ public class TransitionController {
     ) {
         return ResponseEntity.ok(transitionService.saveAudioTracks(id, tracks));
     }
+
+    @PutMapping("/background-color")
+    public ResponseEntity<TransitionResponse> setBackgroundColor(
+        @PathVariable String id,
+        @RequestBody Map<String, String> body
+    ) {
+        return ResponseEntity.ok(transitionService.setBackgroundColor(id, body.get("backgroundColor")));
+    }
 }

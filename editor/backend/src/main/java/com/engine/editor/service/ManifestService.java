@@ -59,8 +59,8 @@ public class ManifestService {
         List<Map<String, Object>> edgeList = buildEdges(reachable, config, jdbc);
         manifest.put("edges", edgeList);
 
-        // Localization
-        manifest.put("localization", buildLocalization(jdbc));
+        // Localization (filtered to reachable scenes)
+        manifest.put("localization", buildLocalization(reachable, jdbc));
 
         // Write to file
         Path outFile = projectDir.resolve(MANIFEST_FILE);
@@ -144,10 +144,11 @@ public class ManifestService {
                 config.getDefaultBackgroundColor() != null ? config.getDefaultBackgroundColor() : "#000000",
                 nodeId));
 
-        // Decision appearance
+        // Decision appearance & loop flag
         Map<String, Object> nodeFullRow = jdbc.queryForMap("SELECT * FROM nodes WHERE id=?", nodeId);
         String cfg = (String) nodeFullRow.get("decision_appearance_config");
         n.put("decisionAppearanceConfig", cfg);
+        n.put("loopVideo", intFlag(nodeFullRow.get("loop_video")));
 
         // Background music asset
         String musicAssetId = (String) nodeFullRow.get("music_asset_id");
@@ -165,7 +166,7 @@ public class ManifestService {
         // Video layers with relative asset path
         List<Map<String, Object>> layers = jdbc.queryForList("""
             SELECT nvl.layer_order, nvl.start_at, nvl.start_at_frames, nvl.freeze_last_frame,
-                   a.id AS asset_id, a.file_path, a.file_name, a.has_alpha, a.duration
+                   a.id AS asset_id, a.file_path, a.file_name, a.has_alpha, a.codec, a.duration
             FROM node_video_layers nvl JOIN assets a ON a.id=nvl.asset_id
             WHERE nvl.node_id=? ORDER BY nvl.layer_order
             """, nodeId);
@@ -178,6 +179,7 @@ public class ManifestService {
             l.put("assetFileName", r.get("file_name"));
             l.put("assetRelPath", relPath(config.getAssetsDirectory(), (String) r.get("file_path")));
             l.put("hasAlpha",        intFlag(r.get("has_alpha")));
+            l.put("codec",           r.get("codec"));
             l.put("freezeLastFrame", intFlag(r.get("freeze_last_frame")));
             l.put("duration", r.get("duration"));
             l.put("startAtFrames", r.get("start_at_frames"));
@@ -289,13 +291,14 @@ public class ManifestService {
     private Map<String, Object> buildTransition(String edgeId, ProjectConfigData config,
                                                   JdbcTemplate jdbc) {
         List<Map<String, Object>> rows = jdbc.queryForList(
-            "SELECT type, duration FROM edge_transitions WHERE edge_id=?", edgeId);
+            "SELECT type, duration, background_color FROM edge_transitions WHERE edge_id=?", edgeId);
         if (rows.isEmpty()) return null;
         Map<String, Object> row = rows.get(0);
 
         Map<String, Object> t = new LinkedHashMap<>();
-        t.put("type",     row.get("type"));
-        t.put("duration", row.get("duration"));
+        t.put("type",            row.get("type"));
+        t.put("duration",        row.get("duration"));
+        t.put("backgroundColor", row.get("background_color"));
 
         if ("video".equals(row.get("type"))) {
             t.put("videoLayers", buildTransVideoLayers(edgeId, config, jdbc));
@@ -310,7 +313,7 @@ public class ManifestService {
         int fps = config.getFps() > 0 ? config.getFps() : 30;
         return jdbc.queryForList("""
             SELECT tvl.layer_order, tvl.start_at, tvl.start_at_frames, tvl.freeze_last_frame,
-                   a.id AS asset_id, a.file_path, a.file_name, a.has_alpha, a.duration
+                   a.id AS asset_id, a.file_path, a.file_name, a.has_alpha, a.codec, a.duration
             FROM transition_video_layers tvl JOIN assets a ON a.id=tvl.asset_id
             WHERE tvl.edge_id=? ORDER BY tvl.layer_order
             """, edgeId).stream().map(r -> {
@@ -320,6 +323,7 @@ public class ManifestService {
                 l.put("assetFileName",    r.get("file_name"));
                 l.put("assetRelPath",     relPath(config.getAssetsDirectory(), (String) r.get("file_path")));
                 l.put("hasAlpha",         intFlag(r.get("has_alpha")));
+                l.put("codec",            r.get("codec"));
                 l.put("freezeLastFrame",  intFlag(r.get("freeze_last_frame")));
                 l.put("duration",         r.get("duration"));
                 l.put("startAtFrames",    r.get("start_at_frames"));
@@ -351,7 +355,7 @@ public class ManifestService {
 
     // ── Localization ──────────────────────────────────────────────────────────
 
-    private Map<String, Object> buildLocalization(JdbcTemplate jdbc) {
+    private Map<String, Object> buildLocalization(Set<String> reachableSceneIds, JdbcTemplate jdbc) {
         Map<String, Object> loc = new LinkedHashMap<>();
 
         loc.put("locales", jdbc.queryForList("SELECT code, name FROM locales ORDER BY code")
@@ -359,7 +363,9 @@ public class ManifestService {
 
         loc.put("subtitles", jdbc.queryForList(
             "SELECT id, scene_id, locale_code, start_time, end_time, text FROM subtitle_entries ORDER BY scene_id, locale_code, start_time")
-            .stream().map(r -> {
+            .stream()
+            .filter(r -> reachableSceneIds.contains(r.get("scene_id")))
+            .map(r -> {
                 Map<String, Object> s = new LinkedHashMap<>();
                 s.put("id",         r.get("id"));
                 s.put("sceneId",    r.get("scene_id"));
@@ -372,7 +378,9 @@ public class ManifestService {
 
         loc.put("decisionTranslations", jdbc.queryForList(
             "SELECT id, decision_key, scene_id, locale_code, label FROM decision_translations ORDER BY scene_id, locale_code")
-            .stream().map(r -> {
+            .stream()
+            .filter(r -> reachableSceneIds.contains(r.get("scene_id")))
+            .map(r -> {
                 Map<String, Object> dt = new LinkedHashMap<>();
                 dt.put("id",          r.get("id"));
                 dt.put("decisionKey", r.get("decision_key"));

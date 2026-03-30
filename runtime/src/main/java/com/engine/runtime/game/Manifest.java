@@ -19,6 +19,7 @@ public class Manifest {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class ProjectConfig {
+        @JsonProperty("name")                 public String name;
         @JsonProperty("fps")                  public int    fps;
         @JsonProperty("decisionTimeoutSecs")  public double decisionTimeoutSecs = 5.0;
         @JsonProperty("defaultLocaleCode")    public String defaultLocaleCode;
@@ -39,6 +40,7 @@ public class Manifest {
         @JsonProperty("conditions")               public List<ConditionEntry>  conditions;
         @JsonProperty("decisionAppearanceConfig") public String decisionAppearanceConfig; // raw JSON string
         @JsonProperty("autoContinue")             public boolean autoContinue;
+        @JsonProperty("loopVideo")                public boolean loopVideo;
         @JsonProperty("musicAssetId")             public String musicAssetId;
         @JsonProperty("musicAssetRelPath")        public String musicAssetRelPath;
     }
@@ -77,8 +79,9 @@ public class Manifest {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class TransitionData {
-        @JsonProperty("type")     public String type;
-        @JsonProperty("duration") public double duration;
+        @JsonProperty("type")            public String type;
+        @JsonProperty("duration")        public double duration;
+        @JsonProperty("backgroundColor") public String backgroundColor;
     }
 
     // ── Localization ──────────────────────────────────────────────────────────

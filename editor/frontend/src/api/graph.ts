@@ -12,6 +12,7 @@ export interface UpdateNodePayload {
   name?: string
   isEnd?: boolean
   autoContinue?: boolean
+  loopVideo?: boolean
   backgroundColor?: string
   decisionAppearanceConfig?: string
   musicAssetId?: string | null

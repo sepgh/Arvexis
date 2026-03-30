@@ -69,12 +69,13 @@ public class TransitionPreviewService {
 
             // Load transition info
             List<Map<String, Object>> transRows = jdbc.queryForList(
-                "SELECT type, duration FROM edge_transitions WHERE edge_id=?", edgeId);
+                "SELECT type, duration, background_color FROM edge_transitions WHERE edge_id=?", edgeId);
 
             String transType = transRows.isEmpty() ? "cut" : (String) transRows.get(0).get("type");
             Object durObj    = transRows.isEmpty() ? null  : transRows.get(0).get("duration");
             double transDur  = durObj instanceof Number n ? n.doubleValue() : 1.0;
             if (transDur <= 0) transDur = 1.0;
+            String transBg   = transRows.isEmpty() ? null  : (String) transRows.get(0).get("background_color");
 
             String resolution = config.getPreviewResolution() != null
                 ? config.getPreviewResolution() : "1280x720";
@@ -89,7 +90,7 @@ public class TransitionPreviewService {
 
             Integer threads = config.getFfmpegThreads();
             if ("video".equals(transType)) {
-                compileVideoTransition(edgeId, jdbc, config, resolution, fps, threads, outFile, transDur, job);
+                compileVideoTransition(edgeId, jdbc, config, transBg, resolution, fps, threads, outFile, transDur, job);
             } else if ("cut".equals(transType) || !XFADE_MAP.containsKey(transType)) {
                 compileCutTransition(resolution, fps, threads, outFile, job);
             } else {
@@ -163,12 +164,12 @@ public class TransitionPreviewService {
     // ── Video-based: composite layers same as scene preview ───────────────────
 
     private void compileVideoTransition(String edgeId, JdbcTemplate jdbc,
-                                        ProjectConfigData config,
+                                        ProjectConfigData config, String transitionBg,
                                         String resolution, int fps, Integer ffmpegThreads,
                                         Path outFile, double fallbackDur,
                                         PreviewJob job) throws Exception {
         List<Map<String, Object>> layerRows = jdbc.queryForList("""
-            SELECT tvl.layer_order, tvl.start_at, tvl.start_at_frames, tvl.freeze_last_frame, a.file_path, a.duration, a.has_alpha
+            SELECT tvl.layer_order, tvl.start_at, tvl.start_at_frames, tvl.freeze_last_frame, a.file_path, a.duration, a.has_alpha, a.codec
             FROM transition_video_layers tvl
             JOIN assets a ON a.id = tvl.asset_id
             WHERE tvl.edge_id = ? ORDER BY tvl.layer_order
@@ -186,8 +187,9 @@ public class TransitionPreviewService {
             Map<String, Object> row = layerRows.get(i);
             boolean hasAlpha = row.get("has_alpha") instanceof Number n ? n.intValue() == 1 : Boolean.TRUE.equals(row.get("has_alpha"));
             boolean freeze   = row.get("freeze_last_frame") instanceof Number n ? n.intValue() == 1 : Boolean.TRUE.equals(row.get("freeze_last_frame"));
+            String codec = row.get("codec") instanceof String s ? s : null;
             videoLayers.add(new VideoLayerSpec(
-                Path.of((String) row.get("file_path")), resolveStartAt(row.get("start_at"), row.get("start_at_frames"), fps), i, hasAlpha, freeze));
+                Path.of((String) row.get("file_path")), resolveStartAt(row.get("start_at"), row.get("start_at_frames"), fps), i, hasAlpha, freeze, codec));
         }
 
         List<AudioTrackSpec> audioTracks = new ArrayList<>();
@@ -200,7 +202,9 @@ public class TransitionPreviewService {
         double duration = computeDuration(layerRows, audioRows, fps);
         if (duration <= 0) duration = fallbackDur;
 
-        String bgHex = config.getDefaultBackgroundColor() != null ? config.getDefaultBackgroundColor() : "#000000";
+        String bgHex = transitionBg != null && !transitionBg.isBlank() ? transitionBg
+                     : config.getDefaultBackgroundColor() != null ? config.getDefaultBackgroundColor()
+                     : "#ffffff";
         String ffmpegBg = bgHex.replaceFirst("^#", "0x");
 
         CompositeSpec spec = CompositeSpec.builder()

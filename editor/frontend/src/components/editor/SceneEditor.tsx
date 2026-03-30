@@ -14,6 +14,7 @@ interface SceneEditorProps {
   nodeId: string
   isEnd: boolean
   autoContinue: boolean
+  loopVideo: boolean
   backgroundColor: string | null
   musicAssetId: string | null
   onNodeUpdated?: () => void
@@ -21,7 +22,7 @@ interface SceneEditorProps {
 
 type Section = 'layers' | 'audio' | 'decisions' | 'props'
 
-export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue: initialAutoContinue, backgroundColor: initialBg, musicAssetId: initialMusicAssetId, onNodeUpdated }: SceneEditorProps) {
+export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue: initialAutoContinue, loopVideo: initialLoopVideo, backgroundColor: initialBg, musicAssetId: initialMusicAssetId, onNodeUpdated }: SceneEditorProps) {
   const projectDefaultBackgroundColor = useEditorStore(
     (s) => s.projectConfig?.defaultBackgroundColor ?? '#000000'
   )
@@ -35,6 +36,7 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
   // Properties state
   const [isEnd, setIsEnd]         = useState(initialIsEnd)
   const [autoContinue, setAutoContinue] = useState(initialAutoContinue)
+  const [loopVideo, setLoopVideo] = useState(initialLoopVideo)
   const [bgColor, setBgColor]     = useState(initialBg ?? projectDefaultBackgroundColor)
   const [musicAssetId, setMusicAssetId] = useState<string | null>(initialMusicAssetId)
   const [previewJob, setPreviewJob] = useState<PreviewJobStatus | null>(null)
@@ -43,9 +45,10 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
   useEffect(() => {
     setIsEnd(initialIsEnd)
     setAutoContinue(initialAutoContinue)
+    setLoopVideo(initialLoopVideo)
     setBgColor(initialBg ?? projectDefaultBackgroundColor)
     setMusicAssetId(initialMusicAssetId)
-  }, [initialIsEnd, initialAutoContinue, initialBg, projectDefaultBackgroundColor, initialMusicAssetId, nodeId])
+  }, [initialIsEnd, initialAutoContinue, initialLoopVideo, initialBg, projectDefaultBackgroundColor, initialMusicAssetId, nodeId])
 
   async function handlePreview() {
     setPreviewing(true)
@@ -226,7 +229,7 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
   // ── Properties ────────────────────────────────────────────────────────────
 
   async function saveProperties() {
-    const payload: Record<string, unknown> = { isEnd, autoContinue, backgroundColor: bgColor }
+    const payload: Record<string, unknown> = { isEnd, autoContinue, loopVideo, backgroundColor: bgColor }
     if (musicAssetId) {
       payload.musicAssetId = musicAssetId
     } else {
@@ -402,6 +405,18 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
                 </div>
               </label>
             )}
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={loopVideo}
+                onChange={e => setLoopVideo(e.target.checked)}
+                className="w-4 h-4 accent-primary"
+              />
+              <div>
+                <span className="font-medium text-foreground" style={{ fontSize: 14 }}>Loop video</span>
+                <p className="text-muted-foreground" style={{ fontSize: 13 }}>Video replays continuously while waiting for a decision.</p>
+              </div>
+            </label>
             <div className="flex flex-col gap-1.5">
               <label className="text-muted-foreground" style={{ fontSize: 14 }}>Background color</label>
               <div className="flex items-center gap-2">

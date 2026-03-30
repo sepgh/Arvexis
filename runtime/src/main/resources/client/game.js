@@ -17,6 +17,7 @@ let preloadedHls   = {};    // url → Hls (preloaded transitions)
 let preloadedSceneHls = {}; // url → Hls (preloaded next-scene)
 let currentMusicUrl = null; // currently playing music URL
 let gamePaused      = false;
+let loopHandler     = null;  // persistent 'ended' handler for manual video looping
 
 // ── App state machine ────────────────────────────────────────────────────────
 // Screens: 'menu' | 'game' | 'paused' | 'settings'
@@ -401,8 +402,19 @@ async function loadLocales() {
   loadSettings();
   applySettings();
   showScreen('menu');
-  await Promise.all([checkContinue(), loadLocales()]);
+  await Promise.all([checkContinue(), loadLocales(), loadProjectInfo()]);
 })();
+
+async function loadProjectInfo() {
+  try {
+    const { projectName } = await apiFetch('/api/game/info');
+    if (projectName) {
+      const titleEl = $('menu-title');
+      if (titleEl) titleEl.textContent = projectName;
+      document.title = projectName + ' — Interactive Video';
+    }
+  } catch { /* fallback to default title */ }
+}
 
 async function checkContinue() {
   try {
@@ -419,17 +431,30 @@ async function loadScene(state) {
   currentState = state;
   decisionMade = false;
 
+  // Clean up any persistent loop handler from the previous scene
+  if (loopHandler) { videoEl.removeEventListener('ended', loopHandler); loopHandler = null; }
+
   hideDecisions();
   hideCountdown();
   stopSubtitleSync();
   endScreen.classList.remove('visible');
 
-  showSpinner('Loading scene…');
+  // Only show spinner when there is no freeze frame covering the screen (i.e. initial load)
+  if (freezeCanvas.style.display === 'none') showSpinner('Loading…');
 
   // Destroy previous HLS
   if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
 
-  await loadHls(videoEl, state.sceneHlsUrl, (hls) => { hlsInstance = hls; });
+  // Use preloaded scene HLS if available (fast path for auto-continue scenes)
+  const sceneUrl = state.sceneHlsUrl;
+  // Destroy any preloaded scene HLS — its HTTP fetches already warmed the
+  // browser cache, but the instance can't be reliably reattached to a new element.
+  if (preloadedSceneHls[sceneUrl]) {
+    preloadedSceneHls[sceneUrl].destroy();
+    delete preloadedSceneHls[sceneUrl];
+  }
+
+  await loadHls(videoEl, sceneUrl, (hls) => { hlsInstance = hls; });
 
   // Apply video volume from settings
   videoEl.volume = settings.videoVolume;
@@ -448,19 +473,17 @@ async function loadScene(state) {
   // Load subtitles for this scene
   setSubtitles(state.subtitles || []);
 
-  hideSpinner();
-
-  videoEl.play().catch(() => {});
-
-  // Start subtitle sync loop
-  startSubtitleSync();
+  const loopVideo = !!state.loopVideo;
+  videoEl.loop = false; // always false; looping is handled manually so 'ended' always fires
 
   const decisions  = state.decisions || [];
   const timeout    = state.decisionTimeoutSecs || 5;
   const isEnd      = state.isEnd;
 
-  // Scene-level auto-continue: no explicit decisions, flag set → play immediately on end
-  if (state.autoContinue && decisions.length === 0) {
+  // ── Register all event handlers BEFORE play() to avoid race conditions ──
+  // (short videos can fire 'ended' before listeners are attached otherwise)
+
+  if (state.autoContinue) {
     videoEl.addEventListener('ended', async () => {
       captureFreeze();
       if (!decisionMade) {
@@ -468,43 +491,73 @@ async function loadScene(state) {
         await makeDecision('CONTINUE');
       }
     }, { once: true });
-    return;
-  }
-
-  // ── Decision appearance timing ───────────────────────────────────────────
-  let appearAt = null; // null = after video ends
-  try {
-    if (state.decisionAppearanceConfig) {
-      const cfg = JSON.parse(state.decisionAppearanceConfig);
-      if (cfg.timing === 'at_timestamp' && typeof cfg.timestamp === 'number') {
-        appearAt = cfg.timestamp;
-      }
-    }
-  } catch {}
-
-  if (decisions.length > 0) {
-    if (appearAt !== null) {
-      videoEl.addEventListener('timeupdate', function onTimeUpdate() {
-        if (videoEl.currentTime >= appearAt) {
-          videoEl.removeEventListener('timeupdate', onTimeUpdate);
-          if (!decisionMade) showDecisions(decisions, timeout);
-        }
-      });
-    }
-    videoEl.addEventListener('ended', function onEnded() {
-      videoEl.removeEventListener('ended', onEnded);
-      captureFreeze();
-      if (isEnd) { showEndScreen(); return; }
-      if (!decisionMade) showDecisions(decisions, timeout);
-    }, { once: true });
-  } else if (isEnd) {
-    videoEl.addEventListener('ended', () => { captureFreeze(); showEndScreen(); }, { once: true });
   } else {
-    videoEl.addEventListener('ended', async () => {
-      captureFreeze();
-      await makeDecision('CONTINUE');
-    }, { once: true });
+    // ── Decision appearance timing ─────────────────────────────────────────
+    let appearAt = null; // null = after video ends
+    try {
+      if (state.decisionAppearanceConfig) {
+        const cfg = JSON.parse(state.decisionAppearanceConfig);
+        if (cfg.timing === 'at_timestamp' && typeof cfg.timestamp === 'number') {
+          appearAt = cfg.timestamp;
+        }
+      }
+    } catch {}
+
+    if (decisions.length > 0) {
+      if (appearAt !== null) {
+        videoEl.addEventListener('timeupdate', function onTimeUpdate() {
+          if (videoEl.currentTime >= appearAt) {
+            videoEl.removeEventListener('timeupdate', onTimeUpdate);
+            if (!decisionMade) showDecisions(decisions, timeout);
+          }
+        });
+      }
+
+      if (loopVideo) {
+        // Looping scene: manually replay video each cycle so 'ended' keeps firing.
+        // Show decisions after the first play-through (or via timestamp), then keep looping.
+        let decisionsShown = false;
+        loopHandler = function onLoop() {
+          if (decisionMade) { videoEl.removeEventListener('ended', loopHandler); loopHandler = null; return; }
+          if (isEnd) { videoEl.removeEventListener('ended', loopHandler); loopHandler = null; captureFreeze(); showEndScreen(); return; }
+          if (!decisionsShown && appearAt === null) { decisionsShown = true; showDecisions(decisions, timeout); }
+          if (hlsInstance) hlsInstance.startLoad(0);
+          videoEl.currentTime = 0;
+          videoEl.play().catch(() => {});
+        };
+        videoEl.addEventListener('ended', loopHandler);
+      } else {
+        // Non-looping: freeze on last frame and show decisions
+        videoEl.addEventListener('ended', function onEnded() {
+          videoEl.removeEventListener('ended', onEnded);
+          captureFreeze();
+          if (isEnd) { showEndScreen(); return; }
+          if (!decisionMade) showDecisions(decisions, timeout);
+        }, { once: true });
+      }
+    } else if (isEnd) {
+      videoEl.addEventListener('ended', () => { captureFreeze(); showEndScreen(); }, { once: true });
+    } else {
+      videoEl.addEventListener('ended', async () => {
+        captureFreeze();
+        await makeDecision('CONTINUE');
+      }, { once: true });
+    }
   }
+
+  // Start playback and wait for first frame to render before revealing
+  videoEl.play().catch(() => {});
+  await new Promise(resolve => {
+    if (videoEl.readyState >= 3) { resolve(); return; }
+    videoEl.addEventListener('playing', resolve, { once: true });
+    setTimeout(resolve, 1000);
+  });
+
+  hideSpinner();
+  hideFreeze();
+
+  // Start subtitle sync loop
+  startSubtitleSync();
 }
 
 // ── HLS loading helper ────────────────────────────────────────────────────────
@@ -521,16 +574,20 @@ function loadHls(videoElement, src, onReady) {
       attachNative();
     } else {
       const hls = new Hls({ enableWorker: false, lowLatencyMode: false });
+      let done = false;
+      const finish = () => { if (!done) { done = true; resolve(); } };
       hls.loadSource(src);
       hls.attachMedia(videoElement);
-      hls.on(Hls.Events.MANIFEST_PARSED, () => { onReady && onReady(hls); resolve(); });
+      hls.on(Hls.Events.MANIFEST_PARSED, () => { onReady && onReady(hls); });
+      hls.on(Hls.Events.FRAG_BUFFERED, finish);
+      videoElement.addEventListener('canplay', finish, { once: true });
       hls.on(Hls.Events.ERROR, (_, data) => {
         if (data.fatal) {
           hls.destroy();
-          reject(new Error('HLS fatal error: ' + data.type));
+          if (!done) { done = true; reject(new Error('HLS fatal error: ' + data.type)); }
         }
       });
-      onReady && onReady(hls);
+      setTimeout(finish, 10000);
     }
   });
 }
@@ -662,7 +719,9 @@ function hideFreeze() {
 // ── Decision handling ─────────────────────────────────────────────────────────
 
 async function makeDecision(decisionKey) {
-  showSpinner('Deciding…');
+  captureFreeze();
+  videoEl.loop = false; // stop looping immediately on decision
+  videoEl.pause();
   stopSubtitleSync();
   try {
     const result = await apiFetch('/api/game/decide' + localeQueryString(), { method: 'POST',
@@ -672,7 +731,6 @@ async function makeDecision(decisionKey) {
       await playTransition(result.transition);
     }
 
-    hideFreeze();
     await loadScene(result.nextState);
 
   } catch (e) {
@@ -683,35 +741,40 @@ async function makeDecision(decisionKey) {
 // ── Transition playback ───────────────────────────────────────────────────────
 
 async function playTransition(trans) {
-  showSpinner('Transition…');
-
   if (transHls) { transHls.destroy(); transHls = null; }
 
   const url = trans.transitionHlsUrl;
 
+  // Destroy any preloaded HLS for this URL — its HTTP fetches already warmed the
+  // browser cache, but the HLS instance can't be reliably reattached to a new element.
   if (preloadedHls[url]) {
-    transHls = preloadedHls[url];
+    preloadedHls[url].destroy();
     delete preloadedHls[url];
-    transHls.attachMedia(transEl);
   }
 
+  // Load fresh (fast due to browser-cached segments)
   await loadHls(transEl, url, (hls) => { transHls = hls; });
 
+  hideSpinner();
+  // Apply background colour behind the transition video (for alpha-channel / transparent transitions)
+  transEl.style.backgroundColor = trans.backgroundColor || '';
+  // transition-el.active has z-index 4 (above freeze-canvas z-index 3) so no need to hide freeze first
   transEl.classList.add('active');
   transEl.play().catch(() => {});
 
   return new Promise(resolve => {
-    transEl.addEventListener('ended', () => {
+    let cleaned = false;
+    function cleanup() {
+      if (cleaned) return;
+      cleaned = true;
       transEl.classList.remove('active');
-      transEl.src = '';
+      transEl.style.backgroundColor = '';
       if (transHls) { transHls.destroy(); transHls = null; }
       resolve();
-    }, { once: true });
-
-    setTimeout(() => {
-      transEl.classList.remove('active');
-      resolve();
-    }, ((trans.duration || 2) + 1) * 1000);
+    }
+    transEl.addEventListener('ended', cleanup, { once: true });
+    // Fallback: if 'ended' never fires, clean up after duration + buffer
+    setTimeout(cleanup, ((trans.duration || 2) + 1) * 1000);
   });
 }
 

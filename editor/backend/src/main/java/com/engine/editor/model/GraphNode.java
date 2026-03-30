@@ -14,6 +14,7 @@ public class GraphNode {
     private boolean isRoot;
     private boolean isEnd;
     private boolean autoContinue;
+    private boolean loopVideo;
     private String backgroundColor;
     private String decisionAppearanceConfig;
     private String musicAssetId;
@@ -43,6 +44,10 @@ public class GraphNode {
     @JsonProperty("autoContinue")
     public boolean isAutoContinue() { return autoContinue; }
     public void setAutoContinue(boolean autoContinue) { this.autoContinue = autoContinue; }
+
+    @JsonProperty("loopVideo")
+    public boolean isLoopVideo() { return loopVideo; }
+    public void setLoopVideo(boolean loopVideo) { this.loopVideo = loopVideo; }
 
     public String getBackgroundColor() { return backgroundColor; }
     public void setBackgroundColor(String backgroundColor) { this.backgroundColor = backgroundColor; }

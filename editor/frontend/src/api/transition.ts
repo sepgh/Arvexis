@@ -13,3 +13,6 @@ export const saveTransitionLayers = (edgeId: string, layers: VideoLayerRequest[]
 
 export const saveTransitionAudio = (edgeId: string, tracks: AudioTrackRequest[]) =>
   apiClient.put<TransitionResponse>(`/edges/${edgeId}/transition/audio`, tracks)
+
+export const setTransitionBackgroundColor = (edgeId: string, backgroundColor: string | null) =>
+  apiClient.put<TransitionResponse>(`/edges/${edgeId}/transition/background-color`, { backgroundColor })

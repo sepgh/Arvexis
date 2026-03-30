@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { TransitionResponse, TransitionType, Asset, TransitionLayerData, TransitionAudioData } from '@/types'
-import { getTransition, setTransitionType, saveTransitionLayers, saveTransitionAudio } from '@/api/transition'
+import { getTransition, setTransitionType, saveTransitionLayers, saveTransitionAudio, setTransitionBackgroundColor } from '@/api/transition'
 import type { VideoLayerRequest, AudioTrackRequest } from '@/api/nodeEditor'
 import { listAssets } from '@/api/assets'
 import { startTransitionPreview, type PreviewJobStatus } from '@/api/preview'
@@ -32,6 +32,7 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
   const [videoAssets, setVideoAssets] = useState<Asset[]>([])
   const [audioAssets, setAudioAssets] = useState<Asset[]>([])
   const [durationInput, setDurationInput] = useState('')
+  const [bgColorInput, setBgColorInput]   = useState('#ffffff')
   const [previewJob, setPreviewJob]   = useState<PreviewJobStatus | null>(null)
   const [previewing, setPreviewing]   = useState(false)
 
@@ -57,6 +58,7 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
       .then(([d, v, a]) => {
         setData(d)
         setDurationInput(d.duration != null ? String(d.duration) : '')
+        setBgColorInput(d.backgroundColor ?? '#ffffff')
         setVideoAssets(v)
         setAudioAssets(a)
       })
@@ -288,9 +290,40 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
             )}
 
             {isVideo && (
-              <p className="text-xs text-muted-foreground bg-muted/30 rounded-lg p-2.5">
-                Video transition uses custom video layers and audio tracks — configure in the Layers and Audio tabs.
-              </p>
+              <>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm text-muted-foreground">Background colour</label>
+                  <p className="text-xs text-muted-foreground">
+                    Composited behind video layers with alpha channel.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={bgColorInput}
+                      onChange={e => setBgColorInput(e.target.value)}
+                      onBlur={async () => {
+                        const result = await withSave(() => setTransitionBackgroundColor(edgeId, bgColorInput))
+                        if (result) setData(result)
+                      }}
+                      className="w-10 h-8 rounded cursor-pointer border border-border bg-transparent"
+                    />
+                    <input
+                      type="text"
+                      value={bgColorInput}
+                      onChange={e => setBgColorInput(e.target.value)}
+                      onBlur={async () => {
+                        const result = await withSave(() => setTransitionBackgroundColor(edgeId, bgColorInput))
+                        if (result) setData(result)
+                      }}
+                      className="input-base text-xs py-1 w-28 font-mono"
+                      placeholder="#ffffff"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground bg-muted/30 rounded-lg p-2.5">
+                  Video transition uses custom video layers and audio tracks — configure in the Layers and Audio tabs.
+                </p>
+              </>
             )}
           </>
         )}

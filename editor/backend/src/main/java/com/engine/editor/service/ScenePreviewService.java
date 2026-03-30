@@ -78,7 +78,7 @@ public class ScenePreviewService {
             job.setProgress(5, "Loading layers…");
             // Load video layers
             List<Map<String, Object>> layerRows = jdbc.queryForList("""
-                SELECT nvl.layer_order, nvl.start_at, nvl.start_at_frames, nvl.freeze_last_frame, a.file_path, a.duration, a.has_alpha
+                SELECT nvl.layer_order, nvl.start_at, nvl.start_at_frames, nvl.freeze_last_frame, a.file_path, a.duration, a.has_alpha, a.codec
                 FROM node_video_layers nvl
                 JOIN assets a ON a.id = nvl.asset_id
                 WHERE nvl.node_id = ? ORDER BY nvl.layer_order
@@ -110,8 +110,9 @@ public class ScenePreviewService {
                 double startAt = resolveStartAt(row.get("start_at"), row.get("start_at_frames"), fps);
                 boolean hasAlpha = row.get("has_alpha") instanceof Number n ? n.intValue() == 1 : Boolean.TRUE.equals(row.get("has_alpha"));
                 boolean freeze   = row.get("freeze_last_frame") instanceof Number n ? n.intValue() == 1 : Boolean.TRUE.equals(row.get("freeze_last_frame"));
+                String codec = row.get("codec") instanceof String s ? s : null;
                 videoLayers.add(new VideoLayerSpec(
-                    Path.of((String) row.get("file_path")), startAt, i, hasAlpha, freeze));
+                    Path.of((String) row.get("file_path")), startAt, i, hasAlpha, freeze, codec));
             }
 
             List<AudioTrackSpec> audioTracks = new ArrayList<>();

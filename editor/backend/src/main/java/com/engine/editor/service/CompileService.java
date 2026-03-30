@@ -271,10 +271,12 @@ public class CompileService {
             buildReadme(projectName),
             StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
 
-        // custom.css (user-editable runtime styles)
-        Path customCss = projectDir.resolve("custom.css");
-        if (Files.exists(customCss)) {
-            Files.copy(customCss, distDir.resolve("custom.css"), StandardCopyOption.REPLACE_EXISTING);
+        // User-editable runtime CSS files (buttons, subtitles, general)
+        for (String cssName : List.of("buttons.css", "subtitles.css", "custom.css")) {
+            Path cssFile = projectDir.resolve(cssName);
+            if (Files.exists(cssFile)) {
+                Files.copy(cssFile, distDir.resolve(cssName), StandardCopyOption.REPLACE_EXISTING);
+            }
         }
 
         // Create dist.zip
@@ -318,7 +320,7 @@ public class CompileService {
                 Files.newOutputStream(zipFile,
                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING))) {
 
-            // Add dist/ contents (manifest, runtime.jar, scripts, README, custom.css)
+            // Add dist/ contents (manifest, runtime.jar, scripts, README, CSS files)
             try (var walk = Files.walk(distDir)) {
                 walk.filter(Files::isRegularFile).forEach(p -> {
                     String name = "game/" + distDir.relativize(p).toString();
@@ -389,7 +391,8 @@ public class CompileService {
             if (filePath == null) continue;
             boolean hasAlpha = r.get("hasAlpha") instanceof Boolean b ? b : Boolean.TRUE.equals(r.get("hasAlpha"));
             boolean freeze   = r.get("freezeLastFrame") instanceof Boolean b ? b : Boolean.TRUE.equals(r.get("freezeLastFrame"));
-            layers.add(new VideoLayerSpec(Path.of(filePath), toDouble(r.get("startAt")), i, hasAlpha, freeze));
+            String codec = r.get("codec") instanceof String s ? s : null;
+            layers.add(new VideoLayerSpec(Path.of(filePath), toDouble(r.get("startAt")), i, hasAlpha, freeze, codec));
         }
 
         List<AudioTrackSpec> tracks = new ArrayList<>();
@@ -491,7 +494,8 @@ public class CompileService {
             if (fp == null) continue;
             boolean hasAlpha = r.get("hasAlpha") instanceof Boolean b ? b : Boolean.TRUE.equals(r.get("hasAlpha"));
             boolean freeze   = r.get("freezeLastFrame") instanceof Boolean b ? b : Boolean.TRUE.equals(r.get("freezeLastFrame"));
-            layers.add(new VideoLayerSpec(Path.of(fp), toDouble(r.get("startAt")), i, hasAlpha, freeze));
+            String codec = r.get("codec") instanceof String s ? s : null;
+            layers.add(new VideoLayerSpec(Path.of(fp), toDouble(r.get("startAt")), i, hasAlpha, freeze, codec));
         }
         List<AudioTrackSpec> tracks = new ArrayList<>();
         for (int i = 0; i < audioData.size(); i++) {
@@ -503,7 +507,10 @@ public class CompileService {
         double duration = toDouble(trans.get("duration"));
         if (duration <= 0) duration = 2.0;
 
-        String bgHex = config.getDefaultBackgroundColor() != null ? config.getDefaultBackgroundColor() : "#000000";
+        // Prefer per-transition backgroundColor; fall back to project default, then white
+        String bgHex = trans.get("backgroundColor") instanceof String s && !s.isBlank() ? s
+                     : config.getDefaultBackgroundColor() != null ? config.getDefaultBackgroundColor()
+                     : "#ffffff";
         String ffmpegBg = bgHex.replaceFirst("^#", "0x");
 
         CompositeSpec spec = CompositeSpec.builder()
