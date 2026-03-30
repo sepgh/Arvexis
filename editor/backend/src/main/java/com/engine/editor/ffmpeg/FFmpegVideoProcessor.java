@@ -140,6 +140,33 @@ public class FFmpegVideoProcessor implements VideoProcessor {
         if (!result.isSuccess()) {
             throw new IOException("FFmpeg HLS generation failed: " + result.getStderr());
         }
+        // FFmpeg writes TARGETDURATION as floor(max_segment_duration), which gives 0 for
+        // clips shorter than 1 second. Fix it to ceil(max_extinf) per HLS spec (RFC 8216 §4.3.3.1).
+        fixTargetDuration(outputDir.resolve(options.getPlaylistName()));
+    }
+
+    private static void fixTargetDuration(Path playlist) {
+        if (!Files.exists(playlist)) return;
+        try {
+            String content = Files.readString(playlist);
+            // Find the maximum EXTINF duration value
+            double maxExtinf = 0;
+            for (String line : content.split("\n")) {
+                line = line.trim();
+                if (line.startsWith("#EXTINF:")) {
+                    try {
+                        double d = Double.parseDouble(line.substring(8).replace(",", "").trim());
+                        if (d > maxExtinf) maxExtinf = d;
+                    } catch (NumberFormatException ignored) {}
+                }
+            }
+            int correct = (int) Math.ceil(maxExtinf);
+            if (correct < 1) correct = 1;
+            String fixed = content.replaceFirst(
+                "#EXT-X-TARGETDURATION:\\d+",
+                "#EXT-X-TARGETDURATION:" + correct);
+            if (!fixed.equals(content)) Files.writeString(playlist, fixed);
+        } catch (IOException ignored) {}
     }
 
     @Override

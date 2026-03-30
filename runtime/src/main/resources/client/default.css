@@ -236,7 +236,7 @@ body {
   transition: opacity 0.05s;
   z-index: 2;
 }
-#transition-el.active { opacity: 1; }
+#transition-el.active { opacity: 1; z-index: 4; }
 
 #freeze-canvas {
   position: absolute;

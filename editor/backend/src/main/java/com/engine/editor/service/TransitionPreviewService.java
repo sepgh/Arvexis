@@ -69,12 +69,13 @@ public class TransitionPreviewService {
 
             // Load transition info
             List<Map<String, Object>> transRows = jdbc.queryForList(
-                "SELECT type, duration FROM edge_transitions WHERE edge_id=?", edgeId);
+                "SELECT type, duration, background_color FROM edge_transitions WHERE edge_id=?", edgeId);
 
             String transType = transRows.isEmpty() ? "cut" : (String) transRows.get(0).get("type");
             Object durObj    = transRows.isEmpty() ? null  : transRows.get(0).get("duration");
             double transDur  = durObj instanceof Number n ? n.doubleValue() : 1.0;
             if (transDur <= 0) transDur = 1.0;
+            String transBg   = transRows.isEmpty() ? null  : (String) transRows.get(0).get("background_color");
 
             String resolution = config.getPreviewResolution() != null
                 ? config.getPreviewResolution() : "1280x720";
@@ -89,7 +90,7 @@ public class TransitionPreviewService {
 
             Integer threads = config.getFfmpegThreads();
             if ("video".equals(transType)) {
-                compileVideoTransition(edgeId, jdbc, config, resolution, fps, threads, outFile, transDur, job);
+                compileVideoTransition(edgeId, jdbc, config, transBg, resolution, fps, threads, outFile, transDur, job);
             } else if ("cut".equals(transType) || !XFADE_MAP.containsKey(transType)) {
                 compileCutTransition(resolution, fps, threads, outFile, job);
             } else {
@@ -163,7 +164,7 @@ public class TransitionPreviewService {
     // ── Video-based: composite layers same as scene preview ───────────────────
 
     private void compileVideoTransition(String edgeId, JdbcTemplate jdbc,
-                                        ProjectConfigData config,
+                                        ProjectConfigData config, String transitionBg,
                                         String resolution, int fps, Integer ffmpegThreads,
                                         Path outFile, double fallbackDur,
                                         PreviewJob job) throws Exception {
@@ -201,7 +202,9 @@ public class TransitionPreviewService {
         double duration = computeDuration(layerRows, audioRows, fps);
         if (duration <= 0) duration = fallbackDur;
 
-        String bgHex = config.getDefaultBackgroundColor() != null ? config.getDefaultBackgroundColor() : "#000000";
+        String bgHex = transitionBg != null && !transitionBg.isBlank() ? transitionBg
+                     : config.getDefaultBackgroundColor() != null ? config.getDefaultBackgroundColor()
+                     : "#ffffff";
         String ffmpegBg = bgHex.replaceFirst("^#", "0x");
 
         CompositeSpec spec = CompositeSpec.builder()

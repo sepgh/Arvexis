@@ -79,8 +79,9 @@ public class Manifest {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class TransitionData {
-        @JsonProperty("type")     public String type;
-        @JsonProperty("duration") public double duration;
+        @JsonProperty("type")            public String type;
+        @JsonProperty("duration")        public double duration;
+        @JsonProperty("backgroundColor") public String backgroundColor;
     }
 
     // ── Localization ──────────────────────────────────────────────────────────

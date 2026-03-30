@@ -47,6 +47,7 @@ public class TransitionService {
         boolean transitionAllowed,
         String type,
         Double duration,
+        String backgroundColor,
         List<TransitionLayerData> videoLayers,
         List<TransitionAudioData> audioTracks
     ) {}
@@ -60,7 +61,7 @@ public class TransitionService {
         // Get edge + target node type in one query
         List<Object[]> row = jdbc.query("""
             SELECT e.source_node_id, e.target_node_id, n.type AS target_type,
-                   t.type AS trans_type, t.duration
+                   t.type AS trans_type, t.duration, t.background_color
             FROM edges e
             JOIN nodes n ON n.id = e.target_node_id
             LEFT JOIN edge_transitions t ON t.edge_id = e.id
@@ -70,7 +71,8 @@ public class TransitionService {
                 rs.getString("target_node_id"),
                 rs.getString("target_type"),
                 rs.getString("trans_type"),
-                rs.getObject("duration") != null ? rs.getDouble("duration") : null
+                rs.getObject("duration") != null ? rs.getDouble("duration") : null,
+                rs.getString("background_color")
             }, edgeId);
 
         if (row.isEmpty()) throw new ProjectException("Edge not found: " + edgeId);
@@ -81,13 +83,14 @@ public class TransitionService {
         String targetType    = (String) r[2];
         String transType     = (String) r[3];
         Double duration      = (Double) r[4];
+        String bgColor       = (String) r[5];
         boolean allowed      = "scene".equals(targetType);
 
         List<TransitionLayerData> layers = allowed ? loadVideoLayers(jdbc, edgeId) : List.of();
         List<TransitionAudioData> audio  = allowed ? loadAudioTracks(jdbc, edgeId) : List.of();
 
         return new TransitionResponse(edgeId, sourceNodeId, targetNodeId, targetType,
-            allowed, transType, duration, layers, audio);
+            allowed, transType, duration, bgColor, layers, audio);
     }
 
     // ── Update type/duration ──────────────────────────────────────────────────
@@ -102,15 +105,32 @@ public class TransitionService {
         if (duration != null && duration > MAX_SECS)
             throw new ProjectException("Transition duration cannot exceed " + MAX_SECS + " seconds");
 
+        // Preserve existing backgroundColor when only changing type/duration
+        String existingBg = null;
+        try {
+            existingBg = jdbc.queryForObject(
+                "SELECT background_color FROM edge_transitions WHERE edge_id=?", String.class, edgeId);
+        } catch (Exception ignored) {}
         jdbc.update("DELETE FROM edge_transitions WHERE edge_id = ?", edgeId);
         if (!"none".equals(type)) {
-            jdbc.update("INSERT INTO edge_transitions (edge_id, type, duration) VALUES (?, ?, ?)",
-                edgeId, type, duration);
+            jdbc.update("INSERT INTO edge_transitions (edge_id, type, duration, background_color) VALUES (?, ?, ?, ?)",
+                edgeId, type, duration, existingBg);
         }
         if (!"video".equals(type)) {
             jdbc.update("DELETE FROM transition_video_layers WHERE edge_id = ?", edgeId);
             jdbc.update("DELETE FROM transition_audio_tracks WHERE edge_id = ?", edgeId);
         }
+        return getTransition(edgeId);
+    }
+
+    // ── Background color ──────────────────────────────────────────────────────
+
+    public TransitionResponse setBackgroundColor(String edgeId, String backgroundColor) {
+        JdbcTemplate jdbc = projectService.requireJdbc();
+        requireEdge(jdbc, edgeId);
+        requireTargetIsScene(jdbc, edgeId);
+        jdbc.update("UPDATE edge_transitions SET background_color = ? WHERE edge_id = ?",
+            backgroundColor, edgeId);
         return getTransition(edgeId);
     }
 

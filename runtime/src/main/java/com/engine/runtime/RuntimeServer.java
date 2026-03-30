@@ -134,6 +134,7 @@ public class RuntimeServer {
                     trans.put("edgeId",           result.transEdge().id);
                     trans.put("type",             result.transEdge().transition.type);
                     trans.put("duration",         result.transEdge().transition.duration);
+                    trans.put("backgroundColor",  result.transEdge().transition.backgroundColor);
                     trans.put("transitionHlsUrl", "/hls/trans_" + result.transEdge().id + "/master.m3u8");
                     resp.put("transition", trans);
                 } else {

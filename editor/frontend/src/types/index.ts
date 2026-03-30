@@ -192,6 +192,7 @@ export interface TransitionResponse {
   transitionAllowed: boolean
   type: TransitionType | null
   duration: number | null
+  backgroundColor: string | null
   videoLayers: TransitionLayerData[]
   audioTracks: TransitionAudioData[]
 }

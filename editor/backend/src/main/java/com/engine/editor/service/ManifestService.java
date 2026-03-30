@@ -291,13 +291,14 @@ public class ManifestService {
     private Map<String, Object> buildTransition(String edgeId, ProjectConfigData config,
                                                   JdbcTemplate jdbc) {
         List<Map<String, Object>> rows = jdbc.queryForList(
-            "SELECT type, duration FROM edge_transitions WHERE edge_id=?", edgeId);
+            "SELECT type, duration, background_color FROM edge_transitions WHERE edge_id=?", edgeId);
         if (rows.isEmpty()) return null;
         Map<String, Object> row = rows.get(0);
 
         Map<String, Object> t = new LinkedHashMap<>();
-        t.put("type",     row.get("type"));
-        t.put("duration", row.get("duration"));
+        t.put("type",            row.get("type"));
+        t.put("duration",        row.get("duration"));
+        t.put("backgroundColor", row.get("background_color"));
 
         if ("video".equals(row.get("type"))) {
             t.put("videoLayers", buildTransVideoLayers(edgeId, config, jdbc));

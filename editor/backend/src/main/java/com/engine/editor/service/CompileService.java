@@ -507,7 +507,10 @@ public class CompileService {
         double duration = toDouble(trans.get("duration"));
         if (duration <= 0) duration = 2.0;
 
-        String bgHex = config.getDefaultBackgroundColor() != null ? config.getDefaultBackgroundColor() : "#000000";
+        // Prefer per-transition backgroundColor; fall back to project default, then white
+        String bgHex = trans.get("backgroundColor") instanceof String s && !s.isBlank() ? s
+                     : config.getDefaultBackgroundColor() != null ? config.getDefaultBackgroundColor()
+                     : "#ffffff";
         String ffmpegBg = bgHex.replaceFirst("^#", "0x");
 
         CompositeSpec spec = CompositeSpec.builder()
