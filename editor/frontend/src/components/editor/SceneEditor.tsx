@@ -80,14 +80,20 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
   // ── Video layers ─────────────────────────────────────────────────────────
 
   function toLayerReq(vl: VideoLayerData): VideoLayerRequest {
-    return { assetId: vl.assetId, startAt: vl.startAt, startAtFrames: vl.startAtFrames, freezeLastFrame: vl.freezeLastFrame }
+    return {
+      assetId: vl.assetId,
+      startAt: vl.startAt,
+      startAtFrames: vl.startAtFrames,
+      freezeLastFrame: vl.freezeLastFrame,
+      loopLayer: vl.loopLayer,
+    }
   }
 
   async function addVideoLayer(asset: Asset) {
     if (!data) return
     const newLayers: VideoLayerRequest[] = [
       ...data.videoLayers.map(toLayerReq),
-      { assetId: asset.id, startAt: 0, freezeLastFrame: false },
+      { assetId: asset.id, startAt: 0, startAtFrames: null, freezeLastFrame: false, loopLayer: false },
     ]
     const result = await withSave(() => saveVideoLayers(nodeId, newLayers))
     if (result) setData(result)
@@ -132,6 +138,15 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
     if (!data) return
     const newLayers = data.videoLayers.map(vl =>
       ({ ...toLayerReq(vl), ...(vl.id === layerId ? { freezeLastFrame } : {}) })
+    )
+    const result = await withSave(() => saveVideoLayers(nodeId, newLayers))
+    if (result) setData(result)
+  }
+
+  async function updateLayerLoop(layerId: number, loopLayer: boolean) {
+    if (!data) return
+    const newLayers = data.videoLayers.map(vl =>
+      ({ ...toLayerReq(vl), ...(vl.id === layerId ? { loopLayer } : {}) })
     )
     const result = await withSave(() => saveVideoLayers(nodeId, newLayers))
     if (result) setData(result)
@@ -307,6 +322,7 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
                 onStartAtChange={v => updateLayerStartAt(vl.id, v)}
                 onStartAtFramesChange={v => updateLayerStartAtFrames(vl.id, v)}
                 onFreezeChange={v => updateLayerFreeze(vl.id, v)}
+                onLoopChange={v => updateLayerLoop(vl.id, v)}
               />
             ))}
             {!data?.videoLayers.length && (
@@ -468,12 +484,13 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function VideoLayerRow({ layer, index, total, onRemove, onMoveUp, onMoveDown, onStartAtChange, onStartAtFramesChange, onFreezeChange }: {
+function VideoLayerRow({ layer, index, total, onRemove, onMoveUp, onMoveDown, onStartAtChange, onStartAtFramesChange, onFreezeChange, onLoopChange }: {
   layer: VideoLayerData; index: number; total: number
   onRemove: () => void; onMoveUp: () => void; onMoveDown: () => void
   onStartAtChange: (v: number) => void
   onStartAtFramesChange: (v: number | null) => void
   onFreezeChange: (v: boolean) => void
+  onLoopChange: (v: boolean) => void
 }) {
   const [localMs, setLocalMs] = useState(String(Math.round(layer.startAt * 1000)))
   const [localFrames, setLocalFrames] = useState(layer.startAtFrames != null ? String(layer.startAtFrames) : '')
@@ -534,6 +551,15 @@ function VideoLayerRow({ layer, index, total, onRemove, onMoveUp, onMoveDown, on
           className="w-3.5 h-3.5 accent-primary"
         />
         <span className="text-[11px] text-muted-foreground">Hold last frame</span>
+      </label>
+      <label className="flex items-center gap-2 cursor-pointer select-none">
+        <input
+          type="checkbox"
+          checked={layer.loopLayer}
+          onChange={e => onLoopChange(e.target.checked)}
+          className="w-3.5 h-3.5 accent-primary"
+        />
+        <span className="text-[11px] text-muted-foreground">Loop layer until scene end</span>
       </label>
     </div>
   )

@@ -389,10 +389,11 @@ public class CompileService {
             Map<String, Object> r = layerData.get(i);
             String filePath = absPath((String) r.get("assetRelPath"), r);
             if (filePath == null) continue;
-            boolean hasAlpha = r.get("hasAlpha") instanceof Boolean b ? b : Boolean.TRUE.equals(r.get("hasAlpha"));
-            boolean freeze   = r.get("freezeLastFrame") instanceof Boolean b ? b : Boolean.TRUE.equals(r.get("freezeLastFrame"));
+            boolean hasAlpha  = r.get("hasAlpha") instanceof Boolean b ? b : Boolean.TRUE.equals(r.get("hasAlpha"));
+            boolean freeze    = r.get("freezeLastFrame") instanceof Boolean b ? b : Boolean.TRUE.equals(r.get("freezeLastFrame"));
+            boolean loopLayer = r.get("loopLayer") instanceof Boolean b ? b : Boolean.TRUE.equals(r.get("loopLayer"));
             String codec = r.get("codec") instanceof String s ? s : null;
-            layers.add(new VideoLayerSpec(Path.of(filePath), toDouble(r.get("startAt")), i, hasAlpha, freeze, codec));
+            layers.add(new VideoLayerSpec(Path.of(filePath), toDouble(r.get("startAt")), i, hasAlpha, freeze, codec, loopLayer));
         }
 
         List<AudioTrackSpec> tracks = new ArrayList<>();

@@ -91,7 +91,7 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
 
   // Video layers
   function toLayerReq(l: TransitionLayerData): VideoLayerRequest {
-    return { assetId: l.assetId, startAt: l.startAt, startAtFrames: l.startAtFrames, freezeLastFrame: l.freezeLastFrame }
+    return { assetId: l.assetId, startAt: l.startAt, startAtFrames: l.startAtFrames, freezeLastFrame: l.freezeLastFrame, loopLayer: false }
   }
 
   async function updateLayerStartAt(layerId: number, startAt: number) {
@@ -116,7 +116,7 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
     if (!data) return
     const layers: VideoLayerRequest[] = [
       ...data.videoLayers.map(toLayerReq),
-      { assetId: asset.id, startAt: 0, startAtFrames: null, freezeLastFrame: false },
+      { assetId: asset.id, startAt: 0, startAtFrames: null, freezeLastFrame: false, loopLayer: false },
     ]
     const result = await withSave(() => saveTransitionLayers(edgeId, layers))
     if (result) setData(result)

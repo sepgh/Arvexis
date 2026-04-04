@@ -18,6 +18,7 @@ let preloadedSceneHls = {}; // url → Hls (preloaded next-scene)
 let currentMusicUrl = null; // currently playing music URL
 let gamePaused      = false;
 let loopHandler     = null;  // persistent 'ended' handler for manual video looping
+let sceneVideoListeners = []; // per-scene listeners attached to videoEl
 
 // ── App state machine ────────────────────────────────────────────────────────
 // Screens: 'menu' | 'game' | 'paused' | 'settings'
@@ -425,14 +426,28 @@ async function checkContinue() {
   }
 }
 
+function addSceneVideoListener(type, handler, options) {
+  videoEl.addEventListener(type, handler, options);
+  const capture = typeof options === 'boolean' ? options : !!(options && options.capture);
+  sceneVideoListeners.push({ type, handler, capture });
+}
+
+function clearSceneVideoListeners() {
+  for (const l of sceneVideoListeners) {
+    videoEl.removeEventListener(l.type, l.handler, l.capture);
+  }
+  sceneVideoListeners = [];
+}
+
 // ── Scene loading ─────────────────────────────────────────────────────────────
 
 async function loadScene(state) {
   currentState = state;
   decisionMade = false;
 
-  // Clean up any persistent loop handler from the previous scene
-  if (loopHandler) { videoEl.removeEventListener('ended', loopHandler); loopHandler = null; }
+  // Clean up scene listeners from previous scene to avoid stale handlers
+  clearSceneVideoListeners();
+  loopHandler = null;
 
   hideDecisions();
   hideCountdown();
@@ -484,7 +499,7 @@ async function loadScene(state) {
   // (short videos can fire 'ended' before listeners are attached otherwise)
 
   if (state.autoContinue) {
-    videoEl.addEventListener('ended', async () => {
+    addSceneVideoListener('ended', async () => {
       captureFreeze();
       if (!decisionMade) {
         decisionMade = true;
@@ -505,7 +520,7 @@ async function loadScene(state) {
 
     if (decisions.length > 0) {
       if (appearAt !== null) {
-        videoEl.addEventListener('timeupdate', function onTimeUpdate() {
+        addSceneVideoListener('timeupdate', function onTimeUpdate() {
           if (videoEl.currentTime >= appearAt) {
             videoEl.removeEventListener('timeupdate', onTimeUpdate);
             if (!decisionMade) showDecisions(decisions, timeout);
@@ -525,10 +540,10 @@ async function loadScene(state) {
           videoEl.currentTime = 0;
           videoEl.play().catch(() => {});
         };
-        videoEl.addEventListener('ended', loopHandler);
+        addSceneVideoListener('ended', loopHandler);
       } else {
         // Non-looping: freeze on last frame and show decisions
-        videoEl.addEventListener('ended', function onEnded() {
+        addSceneVideoListener('ended', function onEnded() {
           videoEl.removeEventListener('ended', onEnded);
           captureFreeze();
           if (isEnd) { showEndScreen(); return; }
@@ -536,9 +551,9 @@ async function loadScene(state) {
         }, { once: true });
       }
     } else if (isEnd) {
-      videoEl.addEventListener('ended', () => { captureFreeze(); showEndScreen(); }, { once: true });
+      addSceneVideoListener('ended', () => { captureFreeze(); showEndScreen(); }, { once: true });
     } else {
-      videoEl.addEventListener('ended', async () => {
+      addSceneVideoListener('ended', async () => {
         captureFreeze();
         await makeDecision('CONTINUE');
       }, { once: true });

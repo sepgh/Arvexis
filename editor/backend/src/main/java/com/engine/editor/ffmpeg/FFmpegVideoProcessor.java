@@ -200,6 +200,10 @@ public class FFmpegVideoProcessor implements VideoProcessor {
         List<VideoLayerSpec> layers = spec.getVideoLayers();
         for (VideoLayerSpec layer : layers) {
             List<String> preOpts = new ArrayList<>();
+            if (layer.isLoopLayer()) {
+                preOpts.add("-stream_loop");
+                preOpts.add("-1");
+            }
             if (layer.isHasAlpha() && "vp9".equalsIgnoreCase(layer.getCodec())) {
                 preOpts.add("-vcodec");
                 preOpts.add("libvpx-vp9");

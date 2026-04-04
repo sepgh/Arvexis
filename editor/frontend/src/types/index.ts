@@ -98,6 +98,7 @@ export interface VideoLayerData {
   startAtFrames: number | null
   alphaError: boolean
   freezeLastFrame: boolean
+  loopLayer: boolean
 }
 
 export interface AudioTrackData {

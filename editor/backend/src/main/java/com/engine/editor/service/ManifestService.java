@@ -165,7 +165,7 @@ public class ManifestService {
 
         // Video layers with relative asset path
         List<Map<String, Object>> layers = jdbc.queryForList("""
-            SELECT nvl.layer_order, nvl.start_at, nvl.start_at_frames, nvl.freeze_last_frame,
+            SELECT nvl.layer_order, nvl.start_at, nvl.start_at_frames, nvl.freeze_last_frame, nvl.loop_layer,
                    a.id AS asset_id, a.file_path, a.file_name, a.has_alpha, a.codec, a.duration
             FROM node_video_layers nvl JOIN assets a ON a.id=nvl.asset_id
             WHERE nvl.node_id=? ORDER BY nvl.layer_order
@@ -181,6 +181,7 @@ public class ManifestService {
             l.put("hasAlpha",        intFlag(r.get("has_alpha")));
             l.put("codec",           r.get("codec"));
             l.put("freezeLastFrame", intFlag(r.get("freeze_last_frame")));
+            l.put("loopLayer",       intFlag(r.get("loop_layer")));
             l.put("duration", r.get("duration"));
             l.put("startAtFrames", r.get("start_at_frames"));
             l.put("startAt",  resolveStartAt(r.get("start_at"), r.get("start_at_frames"), fps));
@@ -431,8 +432,9 @@ public class ManifestService {
 
     private double computeSceneDuration(List<Map<String, Object>> layers,
                                          List<Map<String, Object>> audios) {
-        double max = 0;
+        double max = -1;
         for (Map<String, Object> l : layers) {
+            if (Boolean.TRUE.equals(l.get("loopLayer"))) continue; // looped layers fill the scene, not determine its duration
             Object dur = l.get("duration");
             Object start = l.get("startAt");
             if (dur != null) max = Math.max(max, toDouble(dur) + toDouble(start));
@@ -442,6 +444,14 @@ public class ManifestService {
             Object start = t.get("startAt");
             if (dur != null) max = Math.max(max, toDouble(dur) + toDouble(start));
         }
+        if (max < 0) {
+            for (Map<String, Object> l : layers) {
+                Object dur = l.get("duration");
+                Object start = l.get("startAt");
+                if (dur != null) max = Math.max(max, toDouble(dur) + toDouble(start));
+            }
+        }
+        if (max < 0) return 0;
         return max;
     }
 
