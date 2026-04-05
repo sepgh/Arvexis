@@ -15,6 +15,8 @@ public class ProjectConfigData {
     private double decisionTimeoutSecs;
     private String defaultLocaleCode;
     private String defaultBackgroundColor;
+    private boolean hideDecisionButtons;
+    private boolean showDecisionInputIndicator;
     private Integer ffmpegThreads;   // null = Auto (let FFmpeg decide)
 
     public ProjectConfigData() {}
@@ -51,6 +53,12 @@ public class ProjectConfigData {
 
     public String getDefaultBackgroundColor() { return defaultBackgroundColor; }
     public void setDefaultBackgroundColor(String defaultBackgroundColor) { this.defaultBackgroundColor = defaultBackgroundColor; }
+
+    public boolean isHideDecisionButtons() { return hideDecisionButtons; }
+    public void setHideDecisionButtons(boolean hideDecisionButtons) { this.hideDecisionButtons = hideDecisionButtons; }
+
+    public boolean isShowDecisionInputIndicator() { return showDecisionInputIndicator; }
+    public void setShowDecisionInputIndicator(boolean showDecisionInputIndicator) { this.showDecisionInputIndicator = showDecisionInputIndicator; }
 
     public Integer getFfmpegThreads() { return ffmpegThreads; }
     public void setFfmpegThreads(Integer ffmpegThreads) { this.ffmpegThreads = ffmpegThreads; }

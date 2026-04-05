@@ -2,6 +2,8 @@ package com.engine.editor.ffmpeg;
 
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Method;
+import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -151,5 +153,31 @@ class FFmpegCommandBuilderTest {
             .build();
 
         assertThrows(UnsupportedOperationException.class, () -> cmd.add("extra"));
+    }
+
+    @Test
+    void compositeCommandScalesAndCentersLayersForSmallerOutputResolution() throws Exception {
+        FFmpegVideoProcessor processor = new FFmpegVideoProcessor(new FFprobeMediaAnalyzer());
+        CompositeSpec spec = CompositeSpec.builder()
+            .videoLayers(List.of(new VideoLayerSpec(Path.of("/tmp/source.mp4"), 0, 0, false, false)))
+            .backgroundColor("0x000000")
+            .outputResolution("1280x720")
+            .fps(30)
+            .duration(5.0)
+            .outputPath(Path.of("/tmp/out.mp4"))
+            .build();
+
+        Method buildCompositeCommand = FFmpegVideoProcessor.class.getDeclaredMethod("buildCompositeCommand", CompositeSpec.class);
+        buildCompositeCommand.setAccessible(true);
+
+        @SuppressWarnings("unchecked")
+        List<String> cmd = (List<String>) buildCompositeCommand.invoke(processor, spec);
+
+        int filterIdx = cmd.indexOf("-filter_complex");
+        assertNotEquals(-1, filterIdx);
+
+        String filter = cmd.get(filterIdx + 1);
+        assertTrue(filter.contains("scale=w=1280:h=720:force_original_aspect_ratio=decrease,setsar=1[vs0]"));
+        assertTrue(filter.contains("[0:v][vs0]overlay=(W-w)/2:(H-h)/2:format=auto:eof_action=pass[vout]"));
     }
 }

@@ -5,9 +5,9 @@ import type {
   AssignmentData, ConditionData, SpelValidateResponse,
 } from '@/types'
 
-export interface VideoLayerRequest { assetId: string; startAt: number; startAtFrames?: number | null; freezeLastFrame?: boolean }
+export interface VideoLayerRequest { assetId: string; startAt: number; startAtFrames?: number | null; freezeLastFrame?: boolean; loopLayer?: boolean }
 export interface AudioTrackRequest { assetId: string; startAt: number; startAtFrames?: number | null }
-export interface DecisionItemRequest { decisionKey: string; isDefault: boolean; decisionOrder: number }
+export interface DecisionItemRequest { decisionKey: string; isDefault: boolean; decisionOrder: number; keyboardKey?: string | null; conditionExpression?: string | null }
 export interface AssignmentRequest { expression: string }
 export interface ConditionRequest { name: string | null; expression: string | null; isElse: boolean }
 

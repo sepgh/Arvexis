@@ -18,6 +18,7 @@ public class GameEngine {
 
     private static final int MAX_TRAVERSAL_STEPS = 100;
     private static final Pattern ASSIGNMENT_RE = Pattern.compile("^\\s*#(\\w+)\\s*=(.+)$", Pattern.DOTALL);
+    private static final Pattern STATE_MAP_ACCESS_RE = Pattern.compile("#state\\[(?:'([^']+)'|\"([^\"]+)\")\\]");
 
     private final Manifest manifest;
     private final Map<String, Manifest.NodeData>   nodeById         = new HashMap<>();
@@ -48,6 +49,14 @@ public class GameEngine {
         return manifest.project != null ? manifest.project.decisionTimeoutSecs : 5.0;
     }
 
+    public boolean hideDecisionButtons() {
+        return manifest.project != null && manifest.project.hideDecisionButtons;
+    }
+
+    public boolean showDecisionInputIndicator() {
+        return manifest.project != null && manifest.project.showDecisionInputIndicator;
+    }
+
     /**
      * Result of a decision traversal.
      *
@@ -70,6 +79,10 @@ public class GameEngine {
         Manifest.NodeData currentScene = nodeById(state.currentSceneId);
         if (currentScene == null)
             throw new IllegalArgumentException("Unknown current scene: " + state.currentSceneId);
+        if (!isDecisionAvailable(state, state.currentSceneId, decisionKey)) {
+            throw new IllegalArgumentException(
+                "Decision '" + decisionKey + "' is not currently available from scene " + state.currentSceneId);
+        }
 
         // Find the outgoing edge matching the decisionKey from the current scene
         Manifest.EdgeData startEdge = findDecisionEdge(state.currentSceneId, decisionKey);
@@ -118,26 +131,32 @@ public class GameEngine {
      * Returns the decisions available from the given scene, with their keys.
      * If the scene has no explicit decisions, returns a synthetic CONTINUE.
      */
-    public List<DecisionInfo> availableDecisions(String sceneId) {
+    public List<DecisionInfo> availableDecisions(GameState state, String sceneId) {
         Manifest.NodeData scene = nodeById(sceneId);
         if (scene == null || scene.decisions == null || scene.decisions.isEmpty()) {
-            return List.of(new DecisionInfo("CONTINUE", true));
+            return List.of(new DecisionInfo("CONTINUE", true, null));
         }
         return scene.decisions.stream()
             .sorted(Comparator.comparingInt(d -> d.decisionOrder))
-            .map(d -> new DecisionInfo(d.decisionKey, d.isDefault))
+            .filter(d -> isDecisionAvailable(d, state))
+            .map(d -> new DecisionInfo(d.decisionKey, d.isDefault, d.keyboardKey))
             .toList();
+    }
+
+    public boolean sceneHasExplicitDecisions(String sceneId) {
+        Manifest.NodeData scene = nodeById(sceneId);
+        return scene != null && scene.decisions != null && !scene.decisions.isEmpty();
     }
 
     /** Returns true when the scene has no explicit decisions AND has autoContinue set. */
     public boolean sceneAutoContinues(String sceneId) {
         Manifest.NodeData scene = nodeById(sceneId);
         if (scene == null) return false;
-        boolean hasExplicitDecisions = scene.decisions != null && !scene.decisions.isEmpty();
+        boolean hasExplicitDecisions = sceneHasExplicitDecisions(sceneId);
         return !hasExplicitDecisions && scene.autoContinue;
     }
 
-    public record DecisionInfo(String key, boolean isDefault) {}
+    public record DecisionInfo(String key, boolean isDefault, String keyboardKey) {}
 
     /**
      * Read-only traversal: returns the TraversalResult for a given decision without
@@ -292,6 +311,7 @@ public class GameEngine {
     private EvaluationContext buildContext(GameState state) {
         SimpleEvaluationContext ctx = SimpleEvaluationContext.forReadWriteDataBinding().build();
         state.variables.forEach(ctx::setVariable);
+        ctx.setVariable("state", stateView(state));
         return ctx;
     }
 
@@ -299,7 +319,52 @@ public class GameEngine {
     private void seedMissingVars(String expression, GameState state) {
         java.util.regex.Matcher m = java.util.regex.Pattern.compile("#(\\w+)").matcher(expression);
         while (m.find()) {
-            state.variables.putIfAbsent(m.group(1), 0);
+            String varName = m.group(1);
+            if ("state".equals(varName)) continue;
+            state.variables.putIfAbsent(varName, 0);
         }
+        Matcher stateAccess = STATE_MAP_ACCESS_RE.matcher(expression);
+        while (stateAccess.find()) {
+            String key = stateAccess.group(1) != null ? stateAccess.group(1) : stateAccess.group(2);
+            if (key != null && !key.isBlank()) {
+                state.variables.putIfAbsent(key, 0);
+            }
+        }
+    }
+
+    private boolean isDecisionAvailable(GameState state, String sceneId, String decisionKey) {
+        Manifest.NodeData scene = nodeById(sceneId);
+        if (scene == null || scene.decisions == null || scene.decisions.isEmpty()) {
+            return "CONTINUE".equals(decisionKey);
+        }
+        return scene.decisions.stream()
+            .filter(d -> decisionKey.equals(d.decisionKey))
+            .findFirst()
+            .map(d -> isDecisionAvailable(d, state))
+            .orElse(false);
+    }
+
+    private boolean isDecisionAvailable(Manifest.DecisionEntry decision, GameState gameState) {
+        if (decision == null || decision.conditionExpression == null || decision.conditionExpression.isBlank()) {
+            return true;
+        }
+        seedMissingVars(decision.conditionExpression, gameState);
+        EvaluationContext ctx = buildContext(gameState);
+        try {
+            Boolean result = parser.parseExpression(decision.conditionExpression).getValue(ctx, Boolean.class);
+            return Boolean.TRUE.equals(result);
+        } catch (Exception e) {
+            System.err.println("[GameEngine] Decision condition error '" + decision.conditionExpression + "': " + e.getMessage());
+            return false;
+        }
+    }
+
+    private Map<String, Object> stateView(GameState state) {
+        return new HashMap<>(state.variables) {
+            @Override
+            public Object get(Object key) {
+                return containsKey(key) ? super.get(key) : 0;
+            }
+        };
     }
 }

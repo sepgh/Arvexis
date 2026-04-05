@@ -18,6 +18,8 @@ let preloadedSceneHls = {}; // url → Hls (preloaded next-scene)
 let currentMusicUrl = null; // currently playing music URL
 let gamePaused      = false;
 let loopHandler     = null;  // persistent 'ended' handler for manual video looping
+let sceneVideoListeners = []; // per-scene listeners attached to videoEl
+let activeDecisionHotkeys = new Map();
 
 // ── App state machine ────────────────────────────────────────────────────────
 // Screens: 'menu' | 'game' | 'paused' | 'settings'
@@ -38,6 +40,7 @@ const transEl           = $('transition-el');
 const freezeCanvas      = $('freeze-canvas');
 const decisionOverlay   = $('decision-overlay');
 const decisionButtons   = $('decision-buttons');
+const decisionInputIndicator = $('decision-input-indicator');
 const countdownEl       = $('countdown');
 const countdownNum      = $('countdown-num');
 const countdownArc      = $('countdown-arc');
@@ -93,6 +96,49 @@ function loadSettings() {
 
 function saveSettings() {
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {}
+}
+
+function normalizeDecisionHotkey(key) {
+  if (!key || key === 'Unidentified') return null;
+  if (key === ' ' || key === 'Spacebar') return 'space';
+  return String(key).toLowerCase();
+}
+
+function formatDecisionHotkey(key) {
+  if (!key) return '';
+  if (key === ' ') return 'Space';
+  return key;
+}
+
+function setActiveDecisionHotkeys(decisions) {
+  activeDecisionHotkeys = new Map();
+  for (const d of decisions || []) {
+    const normalized = normalizeDecisionHotkey(d.keyboardKey);
+    if (normalized) activeDecisionHotkeys.set(normalized, d);
+  }
+}
+
+function clearActiveDecisionHotkeys() {
+  activeDecisionHotkeys = new Map();
+}
+
+function showDecisionInputIndicator(decisions) {
+  if (!decisionInputIndicator) return;
+  const shouldShow = !!(currentState && currentState.hideDecisionButtons && currentState.showDecisionInputIndicator);
+  const hotkeys = (decisions || [])
+    .map((decision) => formatDecisionHotkey(decision.keyboardKey))
+    .filter(Boolean);
+  const text = shouldShow && hotkeys.length > 0
+    ? `Input ready — press ${hotkeys.join(' / ')}`
+    : '';
+  decisionInputIndicator.textContent = text;
+  decisionInputIndicator.classList.toggle('visible', text !== '');
+}
+
+function hideDecisionInputIndicator() {
+  if (!decisionInputIndicator) return;
+  decisionInputIndicator.textContent = '';
+  decisionInputIndicator.classList.remove('visible');
 }
 
 function applySettings() {
@@ -284,7 +330,24 @@ document.addEventListener('keydown', (e) => {
       applySettings();
       showScreen(settingsReturnTo);
     }
+    return;
   }
+
+  if (appScreen !== 'game' || gamePaused || decisionMade) {
+    return;
+  }
+
+  const decision = activeDecisionHotkeys.get(normalizeDecisionHotkey(e.key));
+  if (!decision) {
+    return;
+  }
+
+  e.preventDefault();
+  e.stopPropagation();
+  decisionMade = true;
+  clearCountdown();
+  hideDecisions();
+  makeDecision(decision.key);
 });
 
 function pauseGame() {
@@ -425,14 +488,29 @@ async function checkContinue() {
   }
 }
 
+function addSceneVideoListener(type, handler, options) {
+  videoEl.addEventListener(type, handler, options);
+  const capture = typeof options === 'boolean' ? options : !!(options && options.capture);
+  sceneVideoListeners.push({ type, handler, capture });
+}
+
+function clearSceneVideoListeners() {
+  for (const l of sceneVideoListeners) {
+    videoEl.removeEventListener(l.type, l.handler, l.capture);
+  }
+  sceneVideoListeners = [];
+}
+
 // ── Scene loading ─────────────────────────────────────────────────────────────
 
 async function loadScene(state) {
   currentState = state;
   decisionMade = false;
+  clearActiveDecisionHotkeys();
 
-  // Clean up any persistent loop handler from the previous scene
-  if (loopHandler) { videoEl.removeEventListener('ended', loopHandler); loopHandler = null; }
+  // Clean up scene listeners from previous scene to avoid stale handlers
+  clearSceneVideoListeners();
+  loopHandler = null;
 
   hideDecisions();
   hideCountdown();
@@ -477,6 +555,7 @@ async function loadScene(state) {
   videoEl.loop = false; // always false; looping is handled manually so 'ended' always fires
 
   const decisions  = state.decisions || [];
+  const hasExplicitDecisions = !!state.hasExplicitDecisions;
   const timeout    = state.decisionTimeoutSecs || 5;
   const isEnd      = state.isEnd;
 
@@ -484,7 +563,7 @@ async function loadScene(state) {
   // (short videos can fire 'ended' before listeners are attached otherwise)
 
   if (state.autoContinue) {
-    videoEl.addEventListener('ended', async () => {
+    addSceneVideoListener('ended', async () => {
       captureFreeze();
       if (!decisionMade) {
         decisionMade = true;
@@ -505,7 +584,7 @@ async function loadScene(state) {
 
     if (decisions.length > 0) {
       if (appearAt !== null) {
-        videoEl.addEventListener('timeupdate', function onTimeUpdate() {
+        addSceneVideoListener('timeupdate', function onTimeUpdate() {
           if (videoEl.currentTime >= appearAt) {
             videoEl.removeEventListener('timeupdate', onTimeUpdate);
             if (!decisionMade) showDecisions(decisions, timeout);
@@ -525,20 +604,51 @@ async function loadScene(state) {
           videoEl.currentTime = 0;
           videoEl.play().catch(() => {});
         };
-        videoEl.addEventListener('ended', loopHandler);
+        addSceneVideoListener('ended', loopHandler);
       } else {
         // Non-looping: freeze on last frame and show decisions
-        videoEl.addEventListener('ended', function onEnded() {
+        addSceneVideoListener('ended', function onEnded() {
           videoEl.removeEventListener('ended', onEnded);
           captureFreeze();
           if (isEnd) { showEndScreen(); return; }
           if (!decisionMade) showDecisions(decisions, timeout);
         }, { once: true });
       }
+    } else if (hasExplicitDecisions) {
+      if (appearAt !== null) {
+        addSceneVideoListener('timeupdate', function onTimeUpdate() {
+          if (videoEl.currentTime >= appearAt) {
+            videoEl.removeEventListener('timeupdate', onTimeUpdate);
+            showUnavailableDecisionsError();
+          }
+        });
+      }
+
+      if (loopVideo) {
+        let unavailableShown = false;
+        loopHandler = function onLoop() {
+          if (decisionMade) { videoEl.removeEventListener('ended', loopHandler); loopHandler = null; return; }
+          if (isEnd) { videoEl.removeEventListener('ended', loopHandler); loopHandler = null; captureFreeze(); showEndScreen(); return; }
+          if (!unavailableShown && appearAt === null) {
+            unavailableShown = true;
+            showUnavailableDecisionsError();
+            return;
+          }
+          if (hlsInstance) hlsInstance.startLoad(0);
+          videoEl.currentTime = 0;
+          videoEl.play().catch(() => {});
+        };
+        addSceneVideoListener('ended', loopHandler);
+      } else {
+        addSceneVideoListener('ended', function onEnded() {
+          videoEl.removeEventListener('ended', onEnded);
+          if (!decisionMade) showUnavailableDecisionsError();
+        }, { once: true });
+      }
     } else if (isEnd) {
-      videoEl.addEventListener('ended', () => { captureFreeze(); showEndScreen(); }, { once: true });
+      addSceneVideoListener('ended', () => { captureFreeze(); showEndScreen(); }, { once: true });
     } else {
-      videoEl.addEventListener('ended', async () => {
+      addSceneVideoListener('ended', async () => {
         captureFreeze();
         await makeDecision('CONTINUE');
       }, { once: true });
@@ -629,29 +739,50 @@ function preloadScene(url) {
 
 // ── Decisions ─────────────────────────────────────────────────────────────────
 
+function showUnavailableDecisionsError() {
+  if (decisionMade) return;
+  decisionMade = true;
+  clearCountdown();
+  hideDecisions();
+  captureFreeze();
+  videoEl.pause();
+  stopSubtitleSync();
+  showError('No decisions are currently available for this scene.');
+}
+
 function showDecisions(decisions, timeoutSecs) {
+  if (!decisions || decisions.length === 0) {
+    showUnavailableDecisionsError();
+    return;
+  }
   decisionButtons.innerHTML = '';
+  setActiveDecisionHotkeys(decisions);
 
   const defaultDecision = decisions.find(d => d.isDefault) || decisions[0];
+  const hideDecisionButtons = !!(currentState && currentState.hideDecisionButtons);
 
   // Decision translations from the current state response
   const dtMap = (currentState && currentState.decisionTranslations) || {};
 
-  for (const d of decisions) {
-    const btn = document.createElement('button');
-    btn.className = 'decision-btn' + (d.isDefault ? ' default' : '');
-    btn.textContent = dtMap[d.key] || d.key;
-    btn.addEventListener('click', () => {
-      if (decisionMade) return;
-      decisionMade = true;
-      clearCountdown();
-      hideDecisions();
-      makeDecision(d.key);
-    });
-    decisionButtons.appendChild(btn);
+  if (!hideDecisionButtons) {
+    for (const d of decisions) {
+      const btn = document.createElement('button');
+      btn.className = 'decision-btn' + (d.isDefault ? ' default' : '');
+      const label = dtMap[d.key] || d.key;
+      btn.textContent = d.keyboardKey ? `${label} [${formatDecisionHotkey(d.keyboardKey)}]` : label;
+      btn.addEventListener('click', () => {
+        if (decisionMade) return;
+        decisionMade = true;
+        clearCountdown();
+        hideDecisions();
+        makeDecision(d.key);
+      });
+      decisionButtons.appendChild(btn);
+    }
   }
 
-  decisionOverlay.classList.add('visible');
+  decisionOverlay.classList.toggle('visible', !hideDecisionButtons);
+  showDecisionInputIndicator(decisions);
   startCountdown(timeoutSecs, () => {
     if (!decisionMade) {
       decisionMade = true;
@@ -662,7 +793,10 @@ function showDecisions(decisions, timeoutSecs) {
 }
 
 function hideDecisions() {
+  clearActiveDecisionHotkeys();
   decisionOverlay.classList.remove('visible');
+  decisionButtons.innerHTML = '';
+  hideDecisionInputIndicator();
 }
 
 // ── Countdown ─────────────────────────────────────────────────────────────────
@@ -702,14 +836,18 @@ function drawArc(fraction) {
 
 // ── Freeze frame ──────────────────────────────────────────────────────────────
 
-function captureFreeze() {
+function captureFreezeFrom(videoElement) {
   try {
-    freezeCanvas.width  = videoEl.videoWidth  || 1280;
-    freezeCanvas.height = videoEl.videoHeight || 720;
+    freezeCanvas.width  = videoElement.videoWidth  || 1280;
+    freezeCanvas.height = videoElement.videoHeight || 720;
     const ctx = freezeCanvas.getContext('2d');
-    ctx.drawImage(videoEl, 0, 0, freezeCanvas.width, freezeCanvas.height);
+    ctx.drawImage(videoElement, 0, 0, freezeCanvas.width, freezeCanvas.height);
     freezeCanvas.style.display = 'block';
   } catch { /* cross-origin or no frame */ }
+}
+
+function captureFreeze() {
+  captureFreezeFrom(videoEl);
 }
 
 function hideFreeze() {
@@ -767,6 +905,8 @@ async function playTransition(trans) {
     function cleanup() {
       if (cleaned) return;
       cleaned = true;
+      captureFreezeFrom(transEl);
+      transEl.pause();
       transEl.classList.remove('active');
       transEl.style.backgroundColor = '';
       if (transHls) { transHls.destroy(); transHls = null; }

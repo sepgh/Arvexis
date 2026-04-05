@@ -23,6 +23,8 @@ public class Manifest {
         @JsonProperty("fps")                  public int    fps;
         @JsonProperty("decisionTimeoutSecs")  public double decisionTimeoutSecs = 5.0;
         @JsonProperty("defaultLocaleCode")    public String defaultLocaleCode;
+        @JsonProperty("hideDecisionButtons")  public boolean hideDecisionButtons;
+        @JsonProperty("showDecisionInputIndicator") public boolean showDecisionInputIndicator;
     }
 
     // ── Node ──────────────────────────────────────────────────────────────────
@@ -50,6 +52,8 @@ public class Manifest {
         @JsonProperty("decisionKey")   public String  decisionKey;
         @JsonProperty("isDefault")     public boolean isDefault;
         @JsonProperty("decisionOrder") public int     decisionOrder;
+        @JsonProperty("keyboardKey")   public String  keyboardKey;
+        @JsonProperty("conditionExpression") public String conditionExpression;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

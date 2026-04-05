@@ -14,6 +14,8 @@ public record UpdateProjectConfigRequest(
     Double decisionTimeoutSecs,
     String defaultLocaleCode,
     String defaultBackgroundColor,
+    Boolean hideDecisionButtons,
+    Boolean showDecisionInputIndicator,
     Boolean ffmpegThreadsAuto,
     Integer ffmpegThreads
 ) {}

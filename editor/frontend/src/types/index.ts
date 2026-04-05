@@ -98,6 +98,7 @@ export interface VideoLayerData {
   startAtFrames: number | null
   alphaError: boolean
   freezeLastFrame: boolean
+  loopLayer: boolean
 }
 
 export interface AudioTrackData {
@@ -115,6 +116,8 @@ export interface DecisionItemData {
   decisionKey: string
   isDefault: boolean
   decisionOrder: number
+  keyboardKey?: string | null
+  conditionExpression?: string | null
 }
 
 export interface SceneDataResponse {
@@ -226,6 +229,8 @@ export interface ProjectConfig {
   decisionTimeoutSecs: number
   defaultLocaleCode?: string
   defaultBackgroundColor?: string
+  hideDecisionButtons?: boolean
+  showDecisionInputIndicator?: boolean
   ffmpegThreads?: number | null    // null = Auto (let FFmpeg decide)
 }
 

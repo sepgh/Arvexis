@@ -15,9 +15,11 @@ import java.util.*;
 public class SceneNodeService {
 
     private final ProjectService projectService;
+    private final SpelValidationService spelValidationService;
 
-    public SceneNodeService(ProjectService projectService) {
+    public SceneNodeService(ProjectService projectService, SpelValidationService spelValidationService) {
         this.projectService = projectService;
+        this.spelValidationService = spelValidationService;
     }
 
     // ── Response DTOs ─────────────────────────────────────────────────────────
@@ -25,7 +27,7 @@ public class SceneNodeService {
     public record VideoLayerData(
         long id, int layerOrder, String assetId, String assetFileName,
         boolean hasAlpha, Double duration, double startAt, Integer startAtFrames,
-        boolean alphaError, boolean freezeLastFrame
+        boolean alphaError, boolean freezeLastFrame, boolean loopLayer
     ) {}
 
     public record AudioTrackData(
@@ -34,7 +36,7 @@ public class SceneNodeService {
     ) {}
 
     public record DecisionItemData(
-        long id, String decisionKey, boolean isDefault, int decisionOrder
+        long id, String decisionKey, boolean isDefault, int decisionOrder, String keyboardKey, String conditionExpression
     ) {}
 
     public record SceneDataResponse(
@@ -71,10 +73,11 @@ public class SceneNodeService {
             if (r.assetId() == null) throw new ProjectException("assetId is required for each layer");
             requireAssetExists(jdbc, r.assetId());
             int freeze = Boolean.TRUE.equals(r.freezeLastFrame()) ? 1 : 0;
+            int loop  = Boolean.TRUE.equals(r.loopLayer()) ? 1 : 0;
             jdbc.update("""
-                INSERT INTO node_video_layers (node_id, asset_id, layer_order, start_at, start_at_frames, freeze_last_frame)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """, nodeId, r.assetId(), i, r.startAt() != null ? r.startAt() : 0.0, r.startAtFrames(), freeze);
+                INSERT INTO node_video_layers (node_id, asset_id, layer_order, start_at, start_at_frames, freeze_last_frame, loop_layer)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, nodeId, r.assetId(), i, r.startAt() != null ? r.startAt() : 0.0, r.startAtFrames(), freeze, loop);
         }
         return getSceneData(nodeId);
     }
@@ -109,21 +112,40 @@ public class SceneNodeService {
             throw new ProjectException("Exactly one decision must be marked as default");
 
         Set<String> keys = new HashSet<>();
+        Set<String> keyboardKeys = new HashSet<>();
         for (DecisionItemRequest r : reqs) {
-            if (r.decisionKey() == null || r.decisionKey().isBlank())
+            String decisionKey = r.decisionKey() != null ? r.decisionKey().trim() : null;
+            if (decisionKey == null || decisionKey.isBlank())
                 throw new ProjectException("decisionKey must not be blank");
-            if (!keys.add(r.decisionKey()))
-                throw new ProjectException("Duplicate decisionKey: " + r.decisionKey());
+            if (!keys.add(decisionKey))
+                throw new ProjectException("Duplicate decisionKey: " + decisionKey);
+            String keyboardKey = normalizeKeyboardKey(r.keyboardKey());
+            String conditionExpression = normalizeConditionExpression(r.conditionExpression());
+            if (keyboardKey != null) {
+                if ("escape".equalsIgnoreCase(keyboardKey))
+                    throw new ProjectException("keyboardKey Escape is reserved");
+                String normalizedKeyboardKey = keyboardKey.toLowerCase(Locale.ROOT);
+                if (!keyboardKeys.add(normalizedKeyboardKey))
+                    throw new ProjectException("Duplicate keyboardKey: " + keyboardKey);
+            }
+            if (conditionExpression != null) {
+                SpelValidationService.ValidationResult validation = spelValidationService.validate(conditionExpression, "boolean");
+                if (!validation.valid()) {
+                    throw new ProjectException("Invalid condition for decision '" + decisionKey + "': " + validation.error());
+                }
+            }
         }
 
         jdbc.update("DELETE FROM scene_decisions WHERE node_id = ?", nodeId);
         for (int i = 0; i < reqs.size(); i++) {
             DecisionItemRequest r = reqs.get(i);
             int order = r.decisionOrder() != null ? r.decisionOrder() : i;
+            String keyboardKey = normalizeKeyboardKey(r.keyboardKey());
+            String conditionExpression = normalizeConditionExpression(r.conditionExpression());
             jdbc.update("""
-                INSERT INTO scene_decisions (node_id, decision_key, is_default, decision_order)
-                VALUES (?, ?, ?, ?)
-                """, nodeId, r.decisionKey().trim(), Boolean.TRUE.equals(r.isDefault()) ? 1 : 0, order);
+                INSERT INTO scene_decisions (node_id, decision_key, is_default, decision_order, keyboard_key, condition_expression)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """, nodeId, r.decisionKey().trim(), Boolean.TRUE.equals(r.isDefault()) ? 1 : 0, order, keyboardKey, conditionExpression);
         }
         return getSceneData(nodeId);
     }
@@ -133,7 +155,7 @@ public class SceneNodeService {
     private List<VideoLayerData> loadVideoLayers(JdbcTemplate jdbc, String nodeId) {
         List<VideoLayerData> rows = jdbc.query("""
             SELECT nvl.id, nvl.layer_order, nvl.asset_id, nvl.start_at, nvl.start_at_frames,
-                   nvl.freeze_last_frame, a.file_name, a.has_alpha, a.duration
+                   nvl.freeze_last_frame, nvl.loop_layer, a.file_name, a.has_alpha, a.duration
             FROM node_video_layers nvl
             JOIN assets a ON a.id = nvl.asset_id
             WHERE nvl.node_id = ?
@@ -146,7 +168,7 @@ public class SceneNodeService {
             boolean alphaError = i > 0 && !vl.hasAlpha();
             if (alphaError) {
                 rows.set(i, new VideoLayerData(vl.id(), vl.layerOrder(), vl.assetId(),
-                    vl.assetFileName(), vl.hasAlpha(), vl.duration(), vl.startAt(), vl.startAtFrames(), true, vl.freezeLastFrame()));
+                    vl.assetFileName(), vl.hasAlpha(), vl.duration(), vl.startAt(), vl.startAtFrames(), true, vl.freezeLastFrame(), vl.loopLayer()));
             }
         }
         return rows;
@@ -163,7 +185,8 @@ public class SceneNodeService {
             rs.getDouble("start_at"),
             rs.getObject("start_at_frames") != null ? rs.getInt("start_at_frames") : null,
             false,
-            rs.getInt("freeze_last_frame") == 1
+            rs.getInt("freeze_last_frame") == 1,
+            rs.getInt("loop_layer") == 1
         );
     }
 
@@ -188,23 +211,31 @@ public class SceneNodeService {
 
     private List<DecisionItemData> loadDecisions(JdbcTemplate jdbc, String nodeId) {
         return jdbc.query("""
-            SELECT id, decision_key, is_default, decision_order
+            SELECT id, decision_key, is_default, decision_order, keyboard_key, condition_expression
             FROM scene_decisions WHERE node_id = ? ORDER BY decision_order
             """, (rs, rowNum) -> new DecisionItemData(
                 rs.getLong("id"),
                 rs.getString("decision_key"),
                 rs.getInt("is_default") == 1,
-                rs.getInt("decision_order")
+                rs.getInt("decision_order"),
+                rs.getString("keyboard_key"),
+                rs.getString("condition_expression")
             ), nodeId);
     }
 
     private Double computeDuration(List<VideoLayerData> layers, List<AudioTrackData> tracks) {
         double max = -1;
         for (VideoLayerData vl : layers) {
+            if (vl.loopLayer()) continue; // looped layers fill the scene, not determine its duration
             if (vl.duration() != null) max = Math.max(max, vl.startAt() + vl.duration());
         }
         for (AudioTrackData at : tracks) {
             if (at.duration() != null) max = Math.max(max, at.startAt() + at.duration());
+        }
+        if (max < 0) {
+            for (VideoLayerData vl : layers) {
+                if (vl.duration() != null) max = Math.max(max, vl.startAt() + vl.duration());
+            }
         }
         return max < 0 ? null : max;
     }
@@ -222,5 +253,17 @@ public class SceneNodeService {
             "SELECT COUNT(*) FROM assets WHERE id=?", Integer.class, assetId);
         if (count == null || count == 0)
             throw new ProjectException("Asset not found: " + assetId);
+    }
+
+    private String normalizeKeyboardKey(String keyboardKey) {
+        if (keyboardKey == null) return null;
+        String trimmed = keyboardKey.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String normalizeConditionExpression(String conditionExpression) {
+        if (conditionExpression == null) return null;
+        String trimmed = conditionExpression.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

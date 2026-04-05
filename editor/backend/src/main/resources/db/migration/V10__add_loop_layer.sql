@@ -1,0 +1,1 @@
+ALTER TABLE node_video_layers ADD COLUMN loop_layer INTEGER NOT NULL DEFAULT 0;

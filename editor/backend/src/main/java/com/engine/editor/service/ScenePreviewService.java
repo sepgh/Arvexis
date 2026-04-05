@@ -78,7 +78,7 @@ public class ScenePreviewService {
             job.setProgress(5, "Loading layers…");
             // Load video layers
             List<Map<String, Object>> layerRows = jdbc.queryForList("""
-                SELECT nvl.layer_order, nvl.start_at, nvl.start_at_frames, nvl.freeze_last_frame, a.file_path, a.duration, a.has_alpha, a.codec
+                SELECT nvl.layer_order, nvl.start_at, nvl.start_at_frames, nvl.freeze_last_frame, nvl.loop_layer, a.file_path, a.duration, a.has_alpha, a.codec
                 FROM node_video_layers nvl
                 JOIN assets a ON a.id = nvl.asset_id
                 WHERE nvl.node_id = ? ORDER BY nvl.layer_order
@@ -110,9 +110,10 @@ public class ScenePreviewService {
                 double startAt = resolveStartAt(row.get("start_at"), row.get("start_at_frames"), fps);
                 boolean hasAlpha = row.get("has_alpha") instanceof Number n ? n.intValue() == 1 : Boolean.TRUE.equals(row.get("has_alpha"));
                 boolean freeze   = row.get("freeze_last_frame") instanceof Number n ? n.intValue() == 1 : Boolean.TRUE.equals(row.get("freeze_last_frame"));
+                boolean loopLayer = row.get("loop_layer") instanceof Number n ? n.intValue() == 1 : Boolean.TRUE.equals(row.get("loop_layer"));
                 String codec = row.get("codec") instanceof String s ? s : null;
                 videoLayers.add(new VideoLayerSpec(
-                    Path.of((String) row.get("file_path")), startAt, i, hasAlpha, freeze, codec));
+                    Path.of((String) row.get("file_path")), startAt, i, hasAlpha, freeze, codec, loopLayer));
             }
 
             List<AudioTrackSpec> audioTracks = new ArrayList<>();
@@ -153,8 +154,10 @@ public class ScenePreviewService {
     }
 
     private double computeDuration(List<Map<String, Object>> layers, List<Map<String, Object>> audio, int fps) {
-        double max = 0;
+        double max = -1;
         for (Map<String, Object> row : layers) {
+            boolean loopLayer = row.get("loop_layer") instanceof Number n ? n.intValue() == 1 : Boolean.TRUE.equals(row.get("loop_layer"));
+            if (loopLayer) continue;
             Object dur = row.get("duration");
             if (dur != null) {
                 max = Math.max(max, toDouble(dur) + resolveStartAt(row.get("start_at"), row.get("start_at_frames"), fps));
@@ -166,7 +169,15 @@ public class ScenePreviewService {
                 max = Math.max(max, toDouble(dur) + resolveStartAt(row.get("start_at"), row.get("start_at_frames"), fps));
             }
         }
-        return max;
+        if (max < 0) {
+            for (Map<String, Object> row : layers) {
+                Object dur = row.get("duration");
+                if (dur != null) {
+                    max = Math.max(max, toDouble(dur) + resolveStartAt(row.get("start_at"), row.get("start_at_frames"), fps));
+                }
+            }
+        }
+        return Math.max(max, 0);
     }
 
     private double resolveStartAt(Object startAtSeconds, Object startAtFrames, int fps) {
