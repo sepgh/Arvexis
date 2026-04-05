@@ -3,7 +3,7 @@
 <p>
   
   <img width="15%" src="https://github.com/sepgh/Arvexis/blob/main/assets/logo.png" align="left" />
-  A node-based authoring tool for building interactive video experiences and artistic games. Authors compose a directed graph of scenes, conditions, and state mutations in a visual editor; the engine compiles it into a self-contained, offline-capable playable package with a branded runtime, menu flow, save/resume support, and configurable presentation.
+  A node-based authoring tool for building interactive video experiences and artistic games. Authors compose a directed graph of scenes, decisions, conditions, and state mutations in a visual editor; the engine compiles it into a self-contained, offline-capable playable package with localization support, customizable runtime styling, menu and pause flows, save/resume support, and configurable presentation.
 </p>
 
 
@@ -13,14 +13,15 @@
 ## What It Does
 
 1. **Author interactive graphs** — Open the editor in a browser and build a node graph:
-   - **Scene nodes** — layered video compositing, audio tracks, optional background music, decision buttons, and an end flag.
+   - **Scene nodes** — layered video compositing, audio tracks, optional background music, per-layer looping, scene looping, auto-continue, conditional decisions, keyboard-mapped decisions, and an end flag.
    - **State nodes** — SpEL expressions that mutate global variables such as `#VISIT_COUNT = #VISIT_COUNT + 1`.
-   - **Condition nodes** — ordered boolean conditions that route the player along different edges.
-2. **Manage assets and presentation** — Upload video/audio assets, organize folders, tag media, and assign scene-level properties such as background color, decision timeout behavior, and default decisions.
+   - **Condition nodes** — ordered boolean conditions with else/fallback routing.
+2. **Manage assets, localization, and presentation** — Upload video/audio assets, organize folders, tag media, define locales, edit subtitles and translated decision labels, and assign scene-level properties such as background color, decision timeout behavior, and default decisions.
 3. **Preview quickly** — Compile individual scenes or transitions at preview resolution and watch the result in-browser without leaving the editor.
-4. **Customize the runtime** — Edit project CSS, tune project settings, and control runtime options such as menu flow, button styling, music behavior, and display preferences.
-5. **Compile and export** — Run the full pipeline: FFmpeg compositing → HLS conversion → packaging. The editor produces a `dist.zip` containing a self-contained runtime.
-6. **Play offline** — Extract `dist.zip` and run `./start.sh` (Linux/macOS) or `start.bat` (Windows). Open `http://localhost:8090` in any browser — no internet connection required.
+4. **Validate graphs before export** — Catch missing root nodes, missing default decisions, decisions without matching outgoing edges, invalid transition targets, missing else branches, and unreachable nodes.
+5. **Customize the runtime** — Edit runtime CSS in dedicated tabs, tune project settings, and control runtime options such as menu flow, button styling, keyboard-only decision input, subtitles, locale selection, music behavior, and display preferences.
+6. **Compile and export** — Run the full pipeline: FFmpeg compositing → HLS conversion → manifest generation → packaging. The editor produces a runnable `dist/` folder and a `dist.zip` bundle.
+7. **Play offline or self-host** — Extract `dist.zip` and run `./start.sh` (Linux/macOS) or `start.bat` (Windows). Open `http://localhost:8090` in any browser — no internet connection required for local playback.
 
 ---
 
@@ -28,33 +29,48 @@
 
 ### Editor Features
 
-- **Visual graph authoring** with React Flow.
-- **Scene editing** with layered video and audio tracks.
-- **Background music selection** per scene from project assets.
+- **Visual graph authoring** with React Flow for scene, state, and condition nodes.
+- **Scene editing** with layered video compositing, audio tracks, layer ordering, start offsets, freeze-last-frame support, and per-layer looping.
+- **Scene properties** including end nodes, auto-continue, scene-level loop video, background color, and background music selection.
+- **Decision authoring** with default decisions, keyboard hotkey assignment, conditional availability expressions, and scene decision ordering.
 - **State mutation nodes** using Spring SpEL.
-- **Conditional branching** with ordered condition nodes and fallback logic.
+- **Conditional branching** with ordered condition nodes and explicit else/fallback logic.
+- **Localization tools** for locale management, scene subtitles, and translated decision labels.
 - **Asset management** for upload, folder creation, tagging, and media browsing.
+- **Validation tooling** for root/end-node issues, missing default decisions, missing scene decision edges, invalid transition targets, missing else branches, and unreachable nodes.
 - **Preview compilation** for individual scenes and transitions.
-- **Project settings** for resolution, FPS, audio settings, output paths, and default background color.
-- **Custom CSS editing** for runtime branding and styling.
+- **Project settings** for assets/output paths, preview and compile resolutions, FPS, audio settings, decision timeout, default locale, default background color, FFmpeg threads, hidden decision buttons, and input indicators.
+- **Custom CSS editing** split into `buttons.css`, `subtitles.css`, and `custom.css`, plus an in-editor runtime CSS reference tab.
 - **Auto-save** of project state in the embedded SQLite database.
 
 ### Runtime Features
 
 - **Main menu** with Continue, New Game, and Settings actions.
 - **Pause overlay** for in-game control and quick access to settings.
-- **Settings panel** for music volume, video volume, music toggle, button placement, button colors, and resolution.
-- **Save/resume support** across browser refreshes.
+- **Settings panel** for music volume, video volume, music toggle, button placement, button colors, subtitles on/off, locale selection, and resolution.
+- **Save/resume support** with saved-game detection and Continue flow.
 - **Offline playback** from the packaged runtime bundle.
-- **Background music playback** during scenes.
+- **Background music playback** during scenes, with current music preserved when a scene does not override it.
+- **Localized subtitles and translated decision labels** when locales are configured.
 - **Freeze-frame decision UI** when a scene ends and the player needs to choose the next path.
-- **Decision preloading** to keep transitions smooth.
+- **Keyboard decision input** with per-decision hotkeys, optional visible key hints, and project-level hidden-button mode.
+- **Bottom-screen input indicator** for keyboard-only decision mode.
+- **Decision timeout fallback** for automatic default-choice selection.
+- **Conditional decisions** evaluated from current runtime state.
+- **Scene auto-continue** when no explicit decision is required.
+- **Looping scene playback** while waiting for decisions when enabled.
+- **Decision, transition, and next-scene preloading** to keep playback smooth.
+- **End screen** with replay and return-to-menu actions.
 
 ### Packaging and Runtime Output
 
-- **Self-contained server/client bundle** for local or hosted playback.
-- **Compiled HLS video assets** for browser-friendly delivery.
-- **Included project CSS** with a base stylesheet plus optional `custom.css` override.
+- **Self-contained Java server/client bundle** for local or hosted playback.
+- **Compiled multi-resolution HLS output** for scenes and transitions, with master playlists for browser-friendly delivery.
+- **Generated manifest** filtered to the reachable graph and localization content used by the game.
+- **Included runtime styling files** with `default.css`, `buttons.css`, `subtitles.css`, and `custom.css`.
+- **Bundled startup scripts and package README** for quick local launch on Linux/macOS and Windows.
+- **Referenced background-music assets copied into the package** so exported projects remain self-contained.
+- **Runnable `dist/` folder plus `dist.zip` archive** for distribution.
 - **Cross-platform output** for Linux and Windows.
 
 ---
