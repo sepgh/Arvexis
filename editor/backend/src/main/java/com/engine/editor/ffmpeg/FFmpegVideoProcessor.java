@@ -231,7 +231,7 @@ public class FFmpegVideoProcessor implements VideoProcessor {
             }
         }
 
-        String filterComplex = buildOverlayFilter(layers, tracks);
+        String filterComplex = buildOverlayFilter(layers, tracks, spec.getOutputResolution());
         if (filterComplex != null) {
             builder.filterComplex(filterComplex);
             builder.mapVideo("[vout]");
@@ -259,17 +259,29 @@ public class FFmpegVideoProcessor implements VideoProcessor {
      *
      * Returns {@code null} when there are no layers and no tracks (nothing to filter).
      */
-    private String buildOverlayFilter(List<VideoLayerSpec> layers, List<AudioTrackSpec> tracks) {
+    private String buildOverlayFilter(List<VideoLayerSpec> layers, List<AudioTrackSpec> tracks,
+                                      String outputResolution) {
         if (layers.isEmpty() && tracks.isEmpty()) return null;
 
         List<String> parts = new ArrayList<>();
         String currentVideo = "[0:v]";
+        String[] canvasSize = parseResolution(outputResolution);
+        String canvasWidth = canvasSize != null ? canvasSize[0] : null;
+        String canvasHeight = canvasSize != null ? canvasSize[1] : null;
         // input 0 is the background; layers start at input index 1
         for (int i = 0; i < layers.size(); i++) {
             int inputIdx = i + 1;
             String nextLabel = (i == layers.size() - 1) ? "[vout]" : "[ov" + i + "]";
             String eofAction = layers.get(i).isFreezeLastFrame() ? "repeat" : "pass";
-            parts.add(currentVideo + "[" + inputIdx + ":v]overlay=0:0:format=auto:eof_action=" + eofAction + nextLabel);
+            String overlayInput = "[" + inputIdx + ":v]";
+            if (canvasWidth != null && canvasHeight != null) {
+                String scaledLabel = "[vs" + i + "]";
+                parts.add("[" + inputIdx + ":v]scale=w=" + canvasWidth + ":h=" + canvasHeight
+                    + ":force_original_aspect_ratio=decrease,setsar=1" + scaledLabel);
+                overlayInput = scaledLabel;
+            }
+            parts.add(currentVideo + overlayInput
+                + "overlay=(W-w)/2:(H-h)/2:format=auto:eof_action=" + eofAction + nextLabel);
             currentVideo = nextLabel;
         }
 
@@ -290,5 +302,15 @@ public class FFmpegVideoProcessor implements VideoProcessor {
         }
 
         return String.join(";", parts);
+    }
+
+    private String[] parseResolution(String resolution) {
+        if (resolution == null) return null;
+        String[] parts = resolution.toLowerCase().split("x", 2);
+        if (parts.length != 2) return null;
+        String width = parts[0].trim();
+        String height = parts[1].trim();
+        if (width.isEmpty() || height.isEmpty()) return null;
+        return new String[] { width, height };
     }
 }
