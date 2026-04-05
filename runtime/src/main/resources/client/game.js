@@ -767,14 +767,18 @@ function drawArc(fraction) {
 
 // ── Freeze frame ──────────────────────────────────────────────────────────────
 
-function captureFreeze() {
+function captureFreezeFrom(videoElement) {
   try {
-    freezeCanvas.width  = videoEl.videoWidth  || 1280;
-    freezeCanvas.height = videoEl.videoHeight || 720;
+    freezeCanvas.width  = videoElement.videoWidth  || 1280;
+    freezeCanvas.height = videoElement.videoHeight || 720;
     const ctx = freezeCanvas.getContext('2d');
-    ctx.drawImage(videoEl, 0, 0, freezeCanvas.width, freezeCanvas.height);
+    ctx.drawImage(videoElement, 0, 0, freezeCanvas.width, freezeCanvas.height);
     freezeCanvas.style.display = 'block';
   } catch { /* cross-origin or no frame */ }
+}
+
+function captureFreeze() {
+  captureFreezeFrom(videoEl);
 }
 
 function hideFreeze() {
@@ -832,6 +836,8 @@ async function playTransition(trans) {
     function cleanup() {
       if (cleaned) return;
       cleaned = true;
+      captureFreezeFrom(transEl);
+      transEl.pause();
       transEl.classList.remove('active');
       transEl.style.backgroundColor = '';
       if (transHls) { transHls.destroy(); transHls = null; }
