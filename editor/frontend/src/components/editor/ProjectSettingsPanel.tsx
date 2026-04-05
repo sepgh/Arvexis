@@ -16,6 +16,7 @@ interface ProjectSettingsForm {
   defaultLocaleCode: string
   defaultBackgroundColor: string
   hideDecisionButtons: boolean
+  showDecisionInputIndicator: boolean
   ffmpegThreads: string
 }
 
@@ -33,6 +34,7 @@ function toForm(config: ProjectConfig): ProjectSettingsForm {
     defaultLocaleCode: config.defaultLocaleCode ?? '',
     defaultBackgroundColor: config.defaultBackgroundColor ?? '#000000',
     hideDecisionButtons: config.hideDecisionButtons ?? false,
+    showDecisionInputIndicator: config.showDecisionInputIndicator ?? false,
     ffmpegThreads: config.ffmpegThreads == null ? '' : String(config.ffmpegThreads),
   }
 }
@@ -110,6 +112,7 @@ export default function ProjectSettingsPanel() {
         defaultLocaleCode: currentForm.defaultLocaleCode.trim() || undefined,
         defaultBackgroundColor,
         hideDecisionButtons: currentForm.hideDecisionButtons,
+        showDecisionInputIndicator: currentForm.hideDecisionButtons && currentForm.showDecisionInputIndicator,
         ffmpegThreadsAuto,
         ffmpegThreads: ffmpegThreadsAuto ? undefined : Number(ffmpegThreadsTrimmed),
       })
@@ -232,18 +235,35 @@ export default function ProjectSettingsPanel() {
           </Field>
 
           <Field label="Decision Input Mode" hint="Hide decision buttons in the runtime and rely only on assigned keyboard keys plus the timeout fallback">
-            <label className="flex items-center gap-3 cursor-pointer rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5">
-              <input
-                type="checkbox"
-                checked={currentForm.hideDecisionButtons}
-                onChange={(e) => setForm((prev) => prev ? { ...prev, hideDecisionButtons: e.target.checked } : prev)}
-                className="w-4 h-4 accent-primary"
-              />
-              <div className="flex flex-col gap-0.5">
-                <span className="text-sm font-medium text-foreground">Hide decision buttons at runtime</span>
-                <span className="text-xs text-muted-foreground">Players can still choose using the keyboard keys assigned to each decision.</span>
-              </div>
-            </label>
+            <div className="flex flex-col gap-3">
+              <label className="flex items-center gap-3 cursor-pointer rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5">
+                <input
+                  type="checkbox"
+                  checked={currentForm.hideDecisionButtons}
+                  onChange={(e) => setForm((prev) => prev ? { ...prev, hideDecisionButtons: e.target.checked } : prev)}
+                  className="w-4 h-4 accent-primary"
+                />
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-sm font-medium text-foreground">Hide decision buttons at runtime</span>
+                  <span className="text-xs text-muted-foreground">Players can still choose using the keyboard keys assigned to each decision.</span>
+                </div>
+              </label>
+
+              {currentForm.hideDecisionButtons && (
+                <label className="ml-7 flex items-center gap-3 cursor-pointer rounded-lg border border-border/40 bg-muted/10 px-3 py-2.5">
+                  <input
+                    type="checkbox"
+                    checked={currentForm.showDecisionInputIndicator}
+                    onChange={(e) => setForm((prev) => prev ? { ...prev, showDecisionInputIndicator: e.target.checked } : prev)}
+                    className="w-4 h-4 accent-primary"
+                  />
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-sm font-medium text-foreground">Show bottom-screen input indicator</span>
+                    <span className="text-xs text-muted-foreground">Displays a small runtime indicator when hidden keyboard decisions become available.</span>
+                  </div>
+                </label>
+              )}
+            </div>
           </Field>
 
           <Field label="Default Locale Code" hint="Used when a locale is not explicitly selected">

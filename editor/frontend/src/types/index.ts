@@ -229,6 +229,7 @@ export interface ProjectConfig {
   defaultLocaleCode?: string
   defaultBackgroundColor?: string
   hideDecisionButtons?: boolean
+  showDecisionInputIndicator?: boolean
   ffmpegThreads?: number | null    // null = Auto (let FFmpeg decide)
 }
 

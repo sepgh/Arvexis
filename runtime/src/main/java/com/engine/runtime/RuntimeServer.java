@@ -275,6 +275,7 @@ public class RuntimeServer {
         resp.put("decisionAppearanceConfig", scene != null ? scene.decisionAppearanceConfig : null);
         resp.put("decisionTimeoutSecs", engine.decisionTimeoutSecs());
         resp.put("hideDecisionButtons", engine.hideDecisionButtons());
+        resp.put("showDecisionInputIndicator", engine.showDecisionInputIndicator());
         resp.put("decisions",         decisions.stream().map(d -> {
             Map<String, Object> dm = new LinkedHashMap<>();
             dm.put("key",       d.key());

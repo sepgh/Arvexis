@@ -15,6 +15,7 @@ public record UpdateProjectConfigRequest(
     String defaultLocaleCode,
     String defaultBackgroundColor,
     Boolean hideDecisionButtons,
+    Boolean showDecisionInputIndicator,
     Boolean ffmpegThreadsAuto,
     Integer ffmpegThreads
 ) {}

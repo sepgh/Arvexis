@@ -36,6 +36,7 @@ export interface UpdateProjectConfigPayload {
   defaultLocaleCode?: string
   defaultBackgroundColor?: string
   hideDecisionButtons?: boolean
+  showDecisionInputIndicator?: boolean
   ffmpegThreadsAuto?: boolean
   ffmpegThreads?: number | null
 }

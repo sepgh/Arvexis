@@ -409,6 +409,7 @@ public class ManifestService {
         p.put("defaultLocaleCode",   c.getDefaultLocaleCode());
         p.put("defaultBackgroundColor", c.getDefaultBackgroundColor());
         p.put("hideDecisionButtons", c.isHideDecisionButtons());
+        p.put("showDecisionInputIndicator", c.isShowDecisionInputIndicator());
         return p;
     }
 

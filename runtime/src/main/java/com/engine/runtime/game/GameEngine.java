@@ -52,6 +52,10 @@ public class GameEngine {
         return manifest.project != null && manifest.project.hideDecisionButtons;
     }
 
+    public boolean showDecisionInputIndicator() {
+        return manifest.project != null && manifest.project.showDecisionInputIndicator;
+    }
+
     /**
      * Result of a decision traversal.
      *

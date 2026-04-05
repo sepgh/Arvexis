@@ -24,6 +24,7 @@ public class Manifest {
         @JsonProperty("decisionTimeoutSecs")  public double decisionTimeoutSecs = 5.0;
         @JsonProperty("defaultLocaleCode")    public String defaultLocaleCode;
         @JsonProperty("hideDecisionButtons")  public boolean hideDecisionButtons;
+        @JsonProperty("showDecisionInputIndicator") public boolean showDecisionInputIndicator;
     }
 
     // ── Node ──────────────────────────────────────────────────────────────────

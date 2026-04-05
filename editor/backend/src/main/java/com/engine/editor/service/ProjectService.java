@@ -101,6 +101,7 @@ public class ProjectService {
         config.setDecisionTimeoutSecs(req.decisionTimeoutSecs() != null ? req.decisionTimeoutSecs() : 5.0);
         config.setDefaultBackgroundColor(req.defaultBackgroundColor() != null ? req.defaultBackgroundColor() : "#000000");
         config.setHideDecisionButtons(false);
+        config.setShowDecisionInputIndicator(false);
         config.setFfmpegThreads(req.ffmpegThreads());  // null = Auto
 
         insertConfig(config);
@@ -173,6 +174,7 @@ public class ProjectService {
         if (req.defaultLocaleCode() != null)      currentConfig.setDefaultLocaleCode(req.defaultLocaleCode());
         if (req.defaultBackgroundColor() != null) currentConfig.setDefaultBackgroundColor(req.defaultBackgroundColor());
         if (req.hideDecisionButtons() != null)     currentConfig.setHideDecisionButtons(req.hideDecisionButtons());
+        if (req.showDecisionInputIndicator() != null) currentConfig.setShowDecisionInputIndicator(req.showDecisionInputIndicator());
         if (Boolean.TRUE.equals(req.ffmpegThreadsAuto())) {
             currentConfig.setFfmpegThreads(null);
         } else if (req.ffmpegThreads() != null) {
@@ -244,8 +246,8 @@ public class ProjectService {
                 (id, name, assets_directory, output_directory, preview_resolution,
                  compile_resolutions, fps, audio_sample_rate, audio_bit_rate,
                  decision_timeout_secs, default_locale_code, default_background_color,
-                 hide_decision_buttons, ffmpeg_threads)
-            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 hide_decision_buttons, show_decision_input_indicator, ffmpeg_threads)
+            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             config.getName(),
             config.getAssetsDirectory(),
@@ -259,6 +261,7 @@ public class ProjectService {
             config.getDefaultLocaleCode(),
             config.getDefaultBackgroundColor(),
             config.isHideDecisionButtons() ? 1 : 0,
+            config.isShowDecisionInputIndicator() ? 1 : 0,
             config.getFfmpegThreads()
         );
     }
@@ -270,7 +273,8 @@ public class ProjectService {
                 preview_resolution = ?, compile_resolutions = ?, fps = ?,
                 audio_sample_rate = ?, audio_bit_rate = ?,
                 decision_timeout_secs = ?, default_locale_code = ?,
-                default_background_color = ?, hide_decision_buttons = ?, ffmpeg_threads = ?
+                default_background_color = ?, hide_decision_buttons = ?,
+                show_decision_input_indicator = ?, ffmpeg_threads = ?
             WHERE id = 1
             """,
             config.getName(),
@@ -285,6 +289,7 @@ public class ProjectService {
             config.getDefaultLocaleCode(),
             config.getDefaultBackgroundColor(),
             config.isHideDecisionButtons() ? 1 : 0,
+            config.isShowDecisionInputIndicator() ? 1 : 0,
             config.getFfmpegThreads()
         );
     }
@@ -306,6 +311,7 @@ public class ProjectService {
                 c.setDefaultLocaleCode(rs.getString("default_locale_code"));
                 c.setDefaultBackgroundColor(rs.getString("default_background_color"));
                 c.setHideDecisionButtons(rs.getInt("hide_decision_buttons") == 1);
+                c.setShowDecisionInputIndicator(rs.getInt("show_decision_input_indicator") == 1);
                 int threads = rs.getInt("ffmpeg_threads");
                 c.setFfmpegThreads(rs.wasNull() ? null : threads);
                 return c;

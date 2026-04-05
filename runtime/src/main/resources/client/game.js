@@ -40,6 +40,7 @@ const transEl           = $('transition-el');
 const freezeCanvas      = $('freeze-canvas');
 const decisionOverlay   = $('decision-overlay');
 const decisionButtons   = $('decision-buttons');
+const decisionInputIndicator = $('decision-input-indicator');
 const countdownEl       = $('countdown');
 const countdownNum      = $('countdown-num');
 const countdownArc      = $('countdown-arc');
@@ -119,6 +120,25 @@ function setActiveDecisionHotkeys(decisions) {
 
 function clearActiveDecisionHotkeys() {
   activeDecisionHotkeys = new Map();
+}
+
+function showDecisionInputIndicator(decisions) {
+  if (!decisionInputIndicator) return;
+  const shouldShow = !!(currentState && currentState.hideDecisionButtons && currentState.showDecisionInputIndicator);
+  const hotkeys = (decisions || [])
+    .map((decision) => formatDecisionHotkey(decision.keyboardKey))
+    .filter(Boolean);
+  const text = shouldShow && hotkeys.length > 0
+    ? `Input ready — press ${hotkeys.join(' / ')}`
+    : '';
+  decisionInputIndicator.textContent = text;
+  decisionInputIndicator.classList.toggle('visible', text !== '');
+}
+
+function hideDecisionInputIndicator() {
+  if (!decisionInputIndicator) return;
+  decisionInputIndicator.textContent = '';
+  decisionInputIndicator.classList.remove('visible');
 }
 
 function applySettings() {
@@ -715,6 +735,7 @@ function showDecisions(decisions, timeoutSecs) {
   }
 
   decisionOverlay.classList.toggle('visible', !hideDecisionButtons);
+  showDecisionInputIndicator(decisions);
   startCountdown(timeoutSecs, () => {
     if (!decisionMade) {
       decisionMade = true;
@@ -728,6 +749,7 @@ function hideDecisions() {
   clearActiveDecisionHotkeys();
   decisionOverlay.classList.remove('visible');
   decisionButtons.innerHTML = '';
+  hideDecisionInputIndicator();
 }
 
 // ── Countdown ─────────────────────────────────────────────────────────────────
