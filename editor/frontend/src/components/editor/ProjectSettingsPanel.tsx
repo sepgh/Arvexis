@@ -199,8 +199,8 @@ export default function ProjectSettingsPanel() {
             <Field label="Audio Sample Rate">
               <input
                 type="number"
-                min={8000}
-                step={1000}
+                min={1}
+                step={1}
                 value={currentForm.audioSampleRate}
                 onChange={(e) => setForm((prev) => prev ? { ...prev, audioSampleRate: e.target.value } : prev)}
                 className="input-base"
