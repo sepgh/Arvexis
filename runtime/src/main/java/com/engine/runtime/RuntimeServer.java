@@ -274,10 +274,12 @@ public class RuntimeServer {
         resp.put("duration",          scene != null ? scene.computedDuration : null);
         resp.put("decisionAppearanceConfig", scene != null ? scene.decisionAppearanceConfig : null);
         resp.put("decisionTimeoutSecs", engine.decisionTimeoutSecs());
+        resp.put("hideDecisionButtons", engine.hideDecisionButtons());
         resp.put("decisions",         decisions.stream().map(d -> {
             Map<String, Object> dm = new LinkedHashMap<>();
             dm.put("key",       d.key());
             dm.put("isDefault", d.isDefault());
+            dm.put("keyboardKey", d.keyboardKey());
             return dm;
         }).toList());
         resp.put("preloadUrls",       engine.preloadUrlsForScene(s.currentSceneId));

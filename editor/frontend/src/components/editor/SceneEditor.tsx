@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type KeyboardEvent } from 'react'
 import type { SceneDataResponse, VideoLayerData, AudioTrackData, Asset } from '@/types'
 import {
   getSceneData, saveVideoLayers, saveAudioTracks, saveDecisions,
@@ -21,6 +21,21 @@ interface SceneEditorProps {
 }
 
 type Section = 'layers' | 'audio' | 'decisions' | 'props'
+
+function formatKeyboardKeyLabel(key: string | null | undefined): string {
+  if (!key) return 'Assign key'
+  if (key === ' ') return 'Space'
+  return key
+}
+
+function normalizeCapturedKeyboardKey(key: string): string | null {
+  if (!key || key === 'Unidentified') return null
+  if (key === ' ') return 'Space'
+  if (key === 'Spacebar') return 'Space'
+  if (['Shift', 'Control', 'Alt', 'Meta'].includes(key)) return null
+  if (key.length === 1) return key.toUpperCase()
+  return key
+}
 
 export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue: initialAutoContinue, loopVideo: initialLoopVideo, backgroundColor: initialBg, musicAssetId: initialMusicAssetId, onNodeUpdated }: SceneEditorProps) {
   const projectDefaultBackgroundColor = useEditorStore(
@@ -213,13 +228,23 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
   // ── Decisions ─────────────────────────────────────────────────────────────
 
   const [newDecisionKey, setNewDecisionKey] = useState('')
+  const [capturingDecisionId, setCapturingDecisionId] = useState<number | null>(null)
+
+  function toDecisionReq(d: SceneDataResponse['decisions'][number]): DecisionItemRequest {
+    return {
+      decisionKey: d.decisionKey,
+      isDefault: d.isDefault,
+      decisionOrder: d.decisionOrder,
+      keyboardKey: d.keyboardKey ?? null,
+    }
+  }
 
   async function addDecision() {
     if (!data || !newDecisionKey.trim()) return
     const existing = data.decisions
     const newDecisions: DecisionItemRequest[] = [
-      ...existing.map(d => ({ decisionKey: d.decisionKey, isDefault: d.isDefault, decisionOrder: d.decisionOrder })),
-      { decisionKey: newDecisionKey.trim(), isDefault: existing.length === 0, decisionOrder: existing.length },
+      ...existing.map(toDecisionReq),
+      { decisionKey: newDecisionKey.trim(), isDefault: existing.length === 0, decisionOrder: existing.length, keyboardKey: null },
     ]
     const result = await withSave(() => saveDecisions(nodeId, newDecisions))
     if (result) { setData(result); setNewDecisionKey('') }
@@ -228,17 +253,50 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
   async function removeDecision(decId: number) {
     if (!data) return
     const filtered = data.decisions.filter(d => d.id !== decId)
-    let decisions = filtered.map((d, i) => ({ decisionKey: d.decisionKey, isDefault: d.isDefault, decisionOrder: i }))
+    let decisions = filtered.map((d, i) => ({ ...toDecisionReq(d), decisionOrder: i }))
     if (decisions.length > 0 && !decisions.some(d => d.isDefault)) decisions[0].isDefault = true
     const result = await withSave(() => saveDecisions(nodeId, decisions))
-    if (result) setData(result)
+    if (result) {
+      setData(result)
+      if (capturingDecisionId === decId) setCapturingDecisionId(null)
+    }
   }
 
   async function setDefaultDecision(decisionKey: string) {
     if (!data) return
-    const decisions = data.decisions.map(d => ({ decisionKey: d.decisionKey, isDefault: d.decisionKey === decisionKey, decisionOrder: d.decisionOrder }))
+    const decisions = data.decisions.map(d => ({ ...toDecisionReq(d), isDefault: d.decisionKey === decisionKey }))
     const result = await withSave(() => saveDecisions(nodeId, decisions))
     if (result) setData(result)
+  }
+
+  async function setDecisionKeyboardKey(decisionId: number, keyboardKey: string | null) {
+    if (!data) return
+    const decisions = data.decisions.map(d => (
+      d.id === decisionId ? { ...toDecisionReq(d), keyboardKey } : toDecisionReq(d)
+    ))
+    const result = await withSave(() => saveDecisions(nodeId, decisions))
+    if (result) {
+      setData(result)
+      setCapturingDecisionId(null)
+    }
+  }
+
+  async function handleDecisionKeyCapture(decisionId: number, event: KeyboardEvent<HTMLButtonElement>) {
+    if (event.repeat) return
+    if (event.key === 'Tab') return
+    event.preventDefault()
+    event.stopPropagation()
+    if (event.key === 'Escape') {
+      setCapturingDecisionId(null)
+      return
+    }
+    if (event.key === 'Backspace' || event.key === 'Delete') {
+      await setDecisionKeyboardKey(decisionId, null)
+      return
+    }
+    const keyboardKey = normalizeCapturedKeyboardKey(event.key)
+    if (!keyboardKey) return
+    await setDecisionKeyboardKey(decisionId, keyboardKey)
   }
 
   // ── Properties ────────────────────────────────────────────────────────────
@@ -356,21 +414,51 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
         {section === 'decisions' && (
           <>
             {data?.decisions.map(d => (
-              <div key={d.id} className="flex items-center gap-2 p-2 rounded-lg bg-muted/40 border border-border/50">
+              <div key={d.id} className="flex items-start gap-2 p-2 rounded-lg bg-muted/40 border border-border/50">
                 <button
                   onClick={() => setDefaultDecision(d.decisionKey)}
                   title="Set as default"
-                  className={['w-3 h-3 rounded-full border shrink-0 transition-colors',
+                  className={['w-3 h-3 rounded-full border shrink-0 transition-colors mt-1.5',
                     d.isDefault ? 'bg-amber-400 border-amber-400' : 'border-muted-foreground hover:border-amber-400',
                   ].join(' ')}
                 />
-                <span className="flex-1 text-sm text-foreground truncate">{d.decisionKey}</span>
+                <div className="flex-1 min-w-0 flex flex-col gap-2">
+                  <span className="text-sm text-foreground truncate">{d.decisionKey}</span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => setCapturingDecisionId(d.id)}
+                      onKeyDown={(event) => handleDecisionKeyCapture(d.id, event)}
+                      onBlur={() => setCapturingDecisionId((prev) => prev === d.id ? null : prev)}
+                      className={[
+                        'rounded-md border text-xs px-2.5 py-1.5 transition-colors',
+                        capturingDecisionId === d.id
+                          ? 'border-primary text-primary bg-primary/10'
+                          : 'border-border/70 text-muted-foreground hover:text-foreground hover:border-border',
+                      ].join(' ')}
+                    >
+                      {capturingDecisionId === d.id ? 'Press key…' : formatKeyboardKeyLabel(d.keyboardKey)}
+                    </button>
+                    {d.keyboardKey && (
+                      <button
+                        type="button"
+                        onClick={() => setDecisionKeyboardKey(d.id, null)}
+                        className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        Clear key
+                      </button>
+                    )}
+                  </div>
+                </div>
                 {d.isDefault && <span className="text-xs text-amber-400">default</span>}
                 <button onClick={() => removeDecision(d.id)} className="text-muted-foreground hover:text-red-400 text-sm leading-none">×</button>
               </div>
             ))}
             {!data?.decisions.length && (
               <p className="text-sm text-muted-foreground text-center py-2">No decisions defined. Scene uses default CONTINUE.</p>
+            )}
+            {!!data?.decisions.length && (
+              <p className="text-xs text-muted-foreground">Click a key field, then press the keyboard key to assign. Press Delete or Backspace to clear.</p>
             )}
             <div className="flex gap-2 mt-1">
               <input

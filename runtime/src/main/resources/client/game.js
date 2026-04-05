@@ -19,6 +19,7 @@ let currentMusicUrl = null; // currently playing music URL
 let gamePaused      = false;
 let loopHandler     = null;  // persistent 'ended' handler for manual video looping
 let sceneVideoListeners = []; // per-scene listeners attached to videoEl
+let activeDecisionHotkeys = new Map();
 
 // ── App state machine ────────────────────────────────────────────────────────
 // Screens: 'menu' | 'game' | 'paused' | 'settings'
@@ -94,6 +95,30 @@ function loadSettings() {
 
 function saveSettings() {
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {}
+}
+
+function normalizeDecisionHotkey(key) {
+  if (!key || key === 'Unidentified') return null;
+  if (key === ' ' || key === 'Spacebar') return 'space';
+  return String(key).toLowerCase();
+}
+
+function formatDecisionHotkey(key) {
+  if (!key) return '';
+  if (key === ' ') return 'Space';
+  return key;
+}
+
+function setActiveDecisionHotkeys(decisions) {
+  activeDecisionHotkeys = new Map();
+  for (const d of decisions || []) {
+    const normalized = normalizeDecisionHotkey(d.keyboardKey);
+    if (normalized) activeDecisionHotkeys.set(normalized, d);
+  }
+}
+
+function clearActiveDecisionHotkeys() {
+  activeDecisionHotkeys = new Map();
 }
 
 function applySettings() {
@@ -285,7 +310,24 @@ document.addEventListener('keydown', (e) => {
       applySettings();
       showScreen(settingsReturnTo);
     }
+    return;
   }
+
+  if (appScreen !== 'game' || gamePaused || decisionMade) {
+    return;
+  }
+
+  const decision = activeDecisionHotkeys.get(normalizeDecisionHotkey(e.key));
+  if (!decision) {
+    return;
+  }
+
+  e.preventDefault();
+  e.stopPropagation();
+  decisionMade = true;
+  clearCountdown();
+  hideDecisions();
+  makeDecision(decision.key);
 });
 
 function pauseGame() {
@@ -444,6 +486,7 @@ function clearSceneVideoListeners() {
 async function loadScene(state) {
   currentState = state;
   decisionMade = false;
+  clearActiveDecisionHotkeys();
 
   // Clean up scene listeners from previous scene to avoid stale handlers
   clearSceneVideoListeners();
@@ -646,27 +689,32 @@ function preloadScene(url) {
 
 function showDecisions(decisions, timeoutSecs) {
   decisionButtons.innerHTML = '';
+  setActiveDecisionHotkeys(decisions);
 
   const defaultDecision = decisions.find(d => d.isDefault) || decisions[0];
+  const hideDecisionButtons = !!(currentState && currentState.hideDecisionButtons);
 
   // Decision translations from the current state response
   const dtMap = (currentState && currentState.decisionTranslations) || {};
 
-  for (const d of decisions) {
-    const btn = document.createElement('button');
-    btn.className = 'decision-btn' + (d.isDefault ? ' default' : '');
-    btn.textContent = dtMap[d.key] || d.key;
-    btn.addEventListener('click', () => {
-      if (decisionMade) return;
-      decisionMade = true;
-      clearCountdown();
-      hideDecisions();
-      makeDecision(d.key);
-    });
-    decisionButtons.appendChild(btn);
+  if (!hideDecisionButtons) {
+    for (const d of decisions) {
+      const btn = document.createElement('button');
+      btn.className = 'decision-btn' + (d.isDefault ? ' default' : '');
+      const label = dtMap[d.key] || d.key;
+      btn.textContent = d.keyboardKey ? `${label} [${formatDecisionHotkey(d.keyboardKey)}]` : label;
+      btn.addEventListener('click', () => {
+        if (decisionMade) return;
+        decisionMade = true;
+        clearCountdown();
+        hideDecisions();
+        makeDecision(d.key);
+      });
+      decisionButtons.appendChild(btn);
+    }
   }
 
-  decisionOverlay.classList.add('visible');
+  decisionOverlay.classList.toggle('visible', !hideDecisionButtons);
   startCountdown(timeoutSecs, () => {
     if (!decisionMade) {
       decisionMade = true;
@@ -677,7 +725,9 @@ function showDecisions(decisions, timeoutSecs) {
 }
 
 function hideDecisions() {
+  clearActiveDecisionHotkeys();
   decisionOverlay.classList.remove('visible');
+  decisionButtons.innerHTML = '';
 }
 
 // ── Countdown ─────────────────────────────────────────────────────────────────

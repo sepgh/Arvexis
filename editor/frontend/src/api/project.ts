@@ -19,6 +19,7 @@ export interface CreateProjectPayload {
   audioBitRate?: number
   decisionTimeoutSecs?: number
   defaultBackgroundColor?: string
+  hideDecisionButtons?: boolean
   ffmpegThreads?: number | null
 }
 
@@ -34,6 +35,7 @@ export interface UpdateProjectConfigPayload {
   decisionTimeoutSecs?: number
   defaultLocaleCode?: string
   defaultBackgroundColor?: string
+  hideDecisionButtons?: boolean
   ffmpegThreadsAuto?: boolean
   ffmpegThreads?: number | null
 }

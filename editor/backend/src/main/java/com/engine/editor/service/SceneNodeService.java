@@ -34,7 +34,7 @@ public class SceneNodeService {
     ) {}
 
     public record DecisionItemData(
-        long id, String decisionKey, boolean isDefault, int decisionOrder
+        long id, String decisionKey, boolean isDefault, int decisionOrder, String keyboardKey
     ) {}
 
     public record SceneDataResponse(
@@ -110,21 +110,32 @@ public class SceneNodeService {
             throw new ProjectException("Exactly one decision must be marked as default");
 
         Set<String> keys = new HashSet<>();
+        Set<String> keyboardKeys = new HashSet<>();
         for (DecisionItemRequest r : reqs) {
-            if (r.decisionKey() == null || r.decisionKey().isBlank())
+            String decisionKey = r.decisionKey() != null ? r.decisionKey().trim() : null;
+            if (decisionKey == null || decisionKey.isBlank())
                 throw new ProjectException("decisionKey must not be blank");
-            if (!keys.add(r.decisionKey()))
-                throw new ProjectException("Duplicate decisionKey: " + r.decisionKey());
+            if (!keys.add(decisionKey))
+                throw new ProjectException("Duplicate decisionKey: " + decisionKey);
+            String keyboardKey = normalizeKeyboardKey(r.keyboardKey());
+            if (keyboardKey != null) {
+                if ("escape".equalsIgnoreCase(keyboardKey))
+                    throw new ProjectException("keyboardKey Escape is reserved");
+                String normalizedKeyboardKey = keyboardKey.toLowerCase(Locale.ROOT);
+                if (!keyboardKeys.add(normalizedKeyboardKey))
+                    throw new ProjectException("Duplicate keyboardKey: " + keyboardKey);
+            }
         }
 
         jdbc.update("DELETE FROM scene_decisions WHERE node_id = ?", nodeId);
         for (int i = 0; i < reqs.size(); i++) {
             DecisionItemRequest r = reqs.get(i);
             int order = r.decisionOrder() != null ? r.decisionOrder() : i;
+            String keyboardKey = normalizeKeyboardKey(r.keyboardKey());
             jdbc.update("""
-                INSERT INTO scene_decisions (node_id, decision_key, is_default, decision_order)
-                VALUES (?, ?, ?, ?)
-                """, nodeId, r.decisionKey().trim(), Boolean.TRUE.equals(r.isDefault()) ? 1 : 0, order);
+                INSERT INTO scene_decisions (node_id, decision_key, is_default, decision_order, keyboard_key)
+                VALUES (?, ?, ?, ?, ?)
+                """, nodeId, r.decisionKey().trim(), Boolean.TRUE.equals(r.isDefault()) ? 1 : 0, order, keyboardKey);
         }
         return getSceneData(nodeId);
     }
@@ -190,13 +201,14 @@ public class SceneNodeService {
 
     private List<DecisionItemData> loadDecisions(JdbcTemplate jdbc, String nodeId) {
         return jdbc.query("""
-            SELECT id, decision_key, is_default, decision_order
+            SELECT id, decision_key, is_default, decision_order, keyboard_key
             FROM scene_decisions WHERE node_id = ? ORDER BY decision_order
             """, (rs, rowNum) -> new DecisionItemData(
                 rs.getLong("id"),
                 rs.getString("decision_key"),
                 rs.getInt("is_default") == 1,
-                rs.getInt("decision_order")
+                rs.getInt("decision_order"),
+                rs.getString("keyboard_key")
             ), nodeId);
     }
 
@@ -230,5 +242,11 @@ public class SceneNodeService {
             "SELECT COUNT(*) FROM assets WHERE id=?", Integer.class, assetId);
         if (count == null || count == 0)
             throw new ProjectException("Asset not found: " + assetId);
+    }
+
+    private String normalizeKeyboardKey(String keyboardKey) {
+        if (keyboardKey == null) return null;
+        String trimmed = keyboardKey.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

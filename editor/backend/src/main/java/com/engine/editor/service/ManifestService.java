@@ -211,7 +211,7 @@ public class ManifestService {
 
         // Decisions
         List<Map<String, Object>> decs = jdbc.queryForList("""
-            SELECT decision_key, is_default, decision_order
+            SELECT decision_key, is_default, decision_order, keyboard_key
             FROM scene_decisions WHERE node_id=? ORDER BY decision_order
             """, nodeId);
         List<Map<String, Object>> decList = new ArrayList<>();
@@ -220,6 +220,7 @@ public class ManifestService {
             d.put("decisionKey",   r.get("decision_key"));
             d.put("isDefault",     intFlag(r.get("is_default")));
             d.put("decisionOrder", r.get("decision_order"));
+            d.put("keyboardKey",   r.get("keyboard_key"));
             decList.add(d);
         }
         n.put("decisions", decList);
@@ -407,6 +408,7 @@ public class ManifestService {
         p.put("decisionTimeoutSecs", c.getDecisionTimeoutSecs());
         p.put("defaultLocaleCode",   c.getDefaultLocaleCode());
         p.put("defaultBackgroundColor", c.getDefaultBackgroundColor());
+        p.put("hideDecisionButtons", c.isHideDecisionButtons());
         return p;
     }
 

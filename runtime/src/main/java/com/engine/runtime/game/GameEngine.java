@@ -48,6 +48,10 @@ public class GameEngine {
         return manifest.project != null ? manifest.project.decisionTimeoutSecs : 5.0;
     }
 
+    public boolean hideDecisionButtons() {
+        return manifest.project != null && manifest.project.hideDecisionButtons;
+    }
+
     /**
      * Result of a decision traversal.
      *
@@ -121,11 +125,11 @@ public class GameEngine {
     public List<DecisionInfo> availableDecisions(String sceneId) {
         Manifest.NodeData scene = nodeById(sceneId);
         if (scene == null || scene.decisions == null || scene.decisions.isEmpty()) {
-            return List.of(new DecisionInfo("CONTINUE", true));
+            return List.of(new DecisionInfo("CONTINUE", true, null));
         }
         return scene.decisions.stream()
             .sorted(Comparator.comparingInt(d -> d.decisionOrder))
-            .map(d -> new DecisionInfo(d.decisionKey, d.isDefault))
+            .map(d -> new DecisionInfo(d.decisionKey, d.isDefault, d.keyboardKey))
             .toList();
     }
 
@@ -137,7 +141,7 @@ public class GameEngine {
         return !hasExplicitDecisions && scene.autoContinue;
     }
 
-    public record DecisionInfo(String key, boolean isDefault) {}
+    public record DecisionInfo(String key, boolean isDefault, String keyboardKey) {}
 
     /**
      * Read-only traversal: returns the TraversalResult for a given decision without
