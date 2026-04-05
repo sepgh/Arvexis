@@ -12,6 +12,7 @@ import java.io.InputStream;
 import java.nio.file.*;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -207,7 +208,9 @@ public class CompileService {
 
             // ── Stage 5: Package dist/ + create ZIP (92→100%) ──────────────
             if (job.isCancelRequested()) { job.markCancelled(); return; }
-            Path zipPath = buildPackage(job, projectDir, outputBase, manifestFile);
+            Path sourceAssetsDir = Path.of(config.getAssetsDirectory()).normalize();
+            Set<String> referencedMusicAssetPaths = collectReferencedMusicAssetPaths(sceneNodes);
+            Path zipPath = buildPackage(job, projectDir, outputBase, manifestFile, sourceAssetsDir, referencedMusicAssetPaths);
 
             lastZipPath = zipPath;
             job.markDone(zipPath.toAbsolutePath().toString());
@@ -221,7 +224,8 @@ public class CompileService {
     // ── Packaging ─────────────────────────────────────────────────────────────
 
     private Path buildPackage(PreviewJob job, Path projectDir, Path outputBase,
-                               Path manifestFile) throws Exception {
+                               Path manifestFile, Path sourceAssetsDir,
+                               Set<String> referencedMusicAssetPaths) throws Exception {
         Path distDir = projectDir.resolve("dist");
         Files.createDirectories(distDir);
 
@@ -282,8 +286,7 @@ public class CompileService {
         // Create dist.zip
         job.setProgress(97, "Packaging: creating ZIP archive…");
         Path zipFile = projectDir.resolve("dist.zip");
-        Path assetsDir = projectDir.resolve("assets");
-        createZip(distDir, outputBase, assetsDir, zipFile);
+        createZip(distDir, outputBase, sourceAssetsDir, referencedMusicAssetPaths, zipFile);
 
         job.setProgress(100, "Package ready.");
         return zipFile;
@@ -315,7 +318,9 @@ public class CompileService {
                "Delete it to reset to the beginning.\n";
     }
 
-    private void createZip(Path distDir, Path outputBase, Path assetsDir, Path zipFile) throws IOException {
+    private void createZip(Path distDir, Path outputBase, Path assetsDir,
+                            Set<String> referencedMusicAssetPaths,
+                            Path zipFile) throws IOException {
         try (ZipOutputStream zos = new ZipOutputStream(
                 Files.newOutputStream(zipFile,
                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING))) {
@@ -346,27 +351,33 @@ public class CompileService {
                 }
             }
 
-            // Add assets/ (audio files for background music) under game/assets/
-            if (Files.isDirectory(assetsDir)) {
-                try (var walk = Files.walk(assetsDir)) {
-                    walk.filter(Files::isRegularFile)
-                        .filter(p -> {
-                            String fn = p.getFileName().toString().toLowerCase();
-                            return fn.endsWith(".mp3") || fn.endsWith(".ogg") ||
-                                   fn.endsWith(".wav") || fn.endsWith(".aac") ||
-                                   fn.endsWith(".flac");
-                        })
-                        .forEach(p -> {
-                            String name = "game/assets/" + assetsDir.relativize(p).toString();
-                            try {
-                                zos.putNextEntry(new ZipEntry(name));
-                                Files.copy(p, zos);
-                                zos.closeEntry();
-                            } catch (IOException e) { throw new RuntimeException(e); }
-                        });
+            // Add only referenced background-music assets under game/assets/
+            if (Files.isDirectory(assetsDir) && referencedMusicAssetPaths != null && !referencedMusicAssetPaths.isEmpty()) {
+                for (String relPath : referencedMusicAssetPaths) {
+                    Path assetPath = assetsDir.resolve(relPath).normalize();
+                    if (!assetPath.startsWith(assetsDir) || !Files.isRegularFile(assetPath)) {
+                        continue;
+                    }
+                    String name = "game/assets/" + relPath.replace('\\', '/');
+                    try {
+                        zos.putNextEntry(new ZipEntry(name));
+                        Files.copy(assetPath, zos);
+                        zos.closeEntry();
+                    } catch (IOException e) { throw new RuntimeException(e); }
                 }
             }
         }
+    }
+
+    private Set<String> collectReferencedMusicAssetPaths(List<Map<String, Object>> sceneNodes) {
+        return sceneNodes.stream()
+            .map(node -> node.get("musicAssetRelPath"))
+            .filter(String.class::isInstance)
+            .map(String.class::cast)
+            .map(String::trim)
+            .filter(path -> !path.isBlank())
+            .map(path -> path.replace('\\', '/'))
+            .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     // ── Scene compilation ─────────────────────────────────────────────────────
