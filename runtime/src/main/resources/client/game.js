@@ -555,6 +555,7 @@ async function loadScene(state) {
   videoEl.loop = false; // always false; looping is handled manually so 'ended' always fires
 
   const decisions  = state.decisions || [];
+  const hasExplicitDecisions = !!state.hasExplicitDecisions;
   const timeout    = state.decisionTimeoutSecs || 5;
   const isEnd      = state.isEnd;
 
@@ -611,6 +612,37 @@ async function loadScene(state) {
           captureFreeze();
           if (isEnd) { showEndScreen(); return; }
           if (!decisionMade) showDecisions(decisions, timeout);
+        }, { once: true });
+      }
+    } else if (hasExplicitDecisions) {
+      if (appearAt !== null) {
+        addSceneVideoListener('timeupdate', function onTimeUpdate() {
+          if (videoEl.currentTime >= appearAt) {
+            videoEl.removeEventListener('timeupdate', onTimeUpdate);
+            showUnavailableDecisionsError();
+          }
+        });
+      }
+
+      if (loopVideo) {
+        let unavailableShown = false;
+        loopHandler = function onLoop() {
+          if (decisionMade) { videoEl.removeEventListener('ended', loopHandler); loopHandler = null; return; }
+          if (isEnd) { videoEl.removeEventListener('ended', loopHandler); loopHandler = null; captureFreeze(); showEndScreen(); return; }
+          if (!unavailableShown && appearAt === null) {
+            unavailableShown = true;
+            showUnavailableDecisionsError();
+            return;
+          }
+          if (hlsInstance) hlsInstance.startLoad(0);
+          videoEl.currentTime = 0;
+          videoEl.play().catch(() => {});
+        };
+        addSceneVideoListener('ended', loopHandler);
+      } else {
+        addSceneVideoListener('ended', function onEnded() {
+          videoEl.removeEventListener('ended', onEnded);
+          if (!decisionMade) showUnavailableDecisionsError();
         }, { once: true });
       }
     } else if (isEnd) {
@@ -707,7 +739,22 @@ function preloadScene(url) {
 
 // ── Decisions ─────────────────────────────────────────────────────────────────
 
+function showUnavailableDecisionsError() {
+  if (decisionMade) return;
+  decisionMade = true;
+  clearCountdown();
+  hideDecisions();
+  captureFreeze();
+  videoEl.pause();
+  stopSubtitleSync();
+  showError('No decisions are currently available for this scene.');
+}
+
 function showDecisions(decisions, timeoutSecs) {
+  if (!decisions || decisions.length === 0) {
+    showUnavailableDecisionsError();
+    return;
+  }
   decisionButtons.innerHTML = '';
   setActiveDecisionHotkeys(decisions);
 

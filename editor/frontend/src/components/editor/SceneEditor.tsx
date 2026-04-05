@@ -9,6 +9,7 @@ import { updateNode } from '@/api/graph'
 import { startScenePreview, type PreviewJobStatus } from '@/api/preview'
 import { useEditorStore } from '@/store'
 import PreviewModal from './PreviewModal'
+import SpelInput from './SpelInput'
 
 interface SceneEditorProps {
   nodeId: string
@@ -21,6 +22,8 @@ interface SceneEditorProps {
 }
 
 type Section = 'layers' | 'audio' | 'decisions' | 'props'
+
+const DEFAULT_DECISION_CONDITION_EXPRESSION = "#state['FLAG'] == 1"
 
 function formatKeyboardKeyLabel(key: string | null | undefined): string {
   if (!key) return 'Assign key'
@@ -75,6 +78,35 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
     } finally {
       setPreviewing(false)
     }
+  }
+
+  function updateDecisionConditionDraft(decisionId: number, value: string) {
+    setDecisionConditionDrafts((prev) => ({ ...prev, [decisionId]: value }))
+  }
+
+  async function setDecisionConditionExpression(decisionId: number, conditionExpression: string | null) {
+    if (!data) return
+    const decisions = data.decisions.map(d => (
+      d.id === decisionId ? { ...toDecisionReq(d), conditionExpression } : toDecisionReq(d)
+    ))
+    const result = await withSave(() => saveDecisions(nodeId, decisions))
+    if (result) setData(result)
+  }
+
+  async function toggleDecisionConditional(decisionId: number, enabled: boolean) {
+    if (!enabled) {
+      setDecisionConditionDrafts((prev) => ({ ...prev, [decisionId]: '' }))
+      await setDecisionConditionExpression(decisionId, null)
+      return
+    }
+    const nextExpression = (decisionConditionDrafts[decisionId] ?? '').trim() || DEFAULT_DECISION_CONDITION_EXPRESSION
+    setDecisionConditionDrafts((prev) => ({ ...prev, [decisionId]: nextExpression }))
+    await setDecisionConditionExpression(decisionId, nextExpression)
+  }
+
+  async function saveDecisionCondition(decisionId: number) {
+    const nextExpression = (decisionConditionDrafts[decisionId] ?? '').trim()
+    await setDecisionConditionExpression(decisionId, nextExpression || null)
   }
 
   useEffect(() => {
@@ -229,6 +261,14 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
 
   const [newDecisionKey, setNewDecisionKey] = useState('')
   const [capturingDecisionId, setCapturingDecisionId] = useState<number | null>(null)
+  const [decisionConditionDrafts, setDecisionConditionDrafts] = useState<Record<number, string>>({})
+
+  useEffect(() => {
+    if (!data) return
+    setDecisionConditionDrafts(
+      Object.fromEntries(data.decisions.map((d) => [d.id, d.conditionExpression ?? '']))
+    )
+  }, [data])
 
   function toDecisionReq(d: SceneDataResponse['decisions'][number]): DecisionItemRequest {
     return {
@@ -236,6 +276,7 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
       isDefault: d.isDefault,
       decisionOrder: d.decisionOrder,
       keyboardKey: d.keyboardKey ?? null,
+      conditionExpression: d.conditionExpression ?? null,
     }
   }
 
@@ -244,7 +285,13 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
     const existing = data.decisions
     const newDecisions: DecisionItemRequest[] = [
       ...existing.map(toDecisionReq),
-      { decisionKey: newDecisionKey.trim(), isDefault: existing.length === 0, decisionOrder: existing.length, keyboardKey: null },
+      {
+        decisionKey: newDecisionKey.trim(),
+        isDefault: existing.length === 0,
+        decisionOrder: existing.length,
+        keyboardKey: null,
+        conditionExpression: null,
+      },
     ]
     const result = await withSave(() => saveDecisions(nodeId, newDecisions))
     if (result) { setData(result); setNewDecisionKey('') }
@@ -449,6 +496,24 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
                       </button>
                     )}
                   </div>
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={!!d.conditionExpression?.trim()}
+                      onChange={e => toggleDecisionConditional(d.id, e.target.checked)}
+                      className="w-3.5 h-3.5 accent-primary"
+                    />
+                    <span className="text-[11px] text-muted-foreground">Conditional decision</span>
+                  </label>
+                  {!!d.conditionExpression?.trim() && (
+                    <SpelInput
+                      value={decisionConditionDrafts[d.id] ?? d.conditionExpression ?? ''}
+                      onChange={value => updateDecisionConditionDraft(d.id, value)}
+                      onBlur={() => saveDecisionCondition(d.id)}
+                      mode="boolean"
+                      placeholder="#state['SCORE'] > 50"
+                    />
+                  )}
                 </div>
                 {d.isDefault && <span className="text-xs text-amber-400">default</span>}
                 <button onClick={() => removeDecision(d.id)} className="text-muted-foreground hover:text-red-400 text-sm leading-none">×</button>
@@ -458,7 +523,7 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
               <p className="text-sm text-muted-foreground text-center py-2">No decisions defined. Scene uses default CONTINUE.</p>
             )}
             {!!data?.decisions.length && (
-              <p className="text-xs text-muted-foreground">Click a key field, then press the keyboard key to assign. Press Delete or Backspace to clear.</p>
+              <p className="text-xs text-muted-foreground">Click a key field, then press the keyboard key to assign. Press Delete or Backspace to clear. Conditional expressions can use `#KEY` and `#state['KEY']`.</p>
             )}
             <div className="flex gap-2 mt-1">
               <input

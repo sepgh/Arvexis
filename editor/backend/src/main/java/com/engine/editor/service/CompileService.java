@@ -283,6 +283,28 @@ public class CompileService {
             }
         }
 
+        // Copy compiled HLS output into dist/output so dist/ can be run directly.
+        job.setProgress(96, "Packaging: copying runtime media…");
+        Path distOutputDir = distDir.resolve("output");
+        copyDirectoryContents(outputBase, distOutputDir);
+
+        // Copy only referenced background-music assets into dist/assets.
+        if (Files.isDirectory(sourceAssetsDir) && referencedMusicAssetPaths != null && !referencedMusicAssetPaths.isEmpty()) {
+            Path distAssetsDir = distDir.resolve("assets");
+            for (String relPath : referencedMusicAssetPaths) {
+                Path assetPath = sourceAssetsDir.resolve(relPath).normalize();
+                if (!assetPath.startsWith(sourceAssetsDir) || !Files.isRegularFile(assetPath)) {
+                    continue;
+                }
+                Path distAssetPath = distAssetsDir.resolve(relPath).normalize();
+                if (!distAssetPath.startsWith(distAssetsDir)) {
+                    continue;
+                }
+                Files.createDirectories(distAssetPath.getParent());
+                Files.copy(assetPath, distAssetPath, StandardCopyOption.REPLACE_EXISTING);
+            }
+        }
+
         // Create dist.zip
         job.setProgress(97, "Packaging: creating ZIP archive…");
         Path zipFile = projectDir.resolve("dist.zip");
@@ -316,6 +338,24 @@ public class CompileService {
                "## Game State\n\n" +
                "Game progress is saved in `game-state.json` next to the manifest.  " +
                "Delete it to reset to the beginning.\n";
+    }
+
+    private void copyDirectoryContents(Path sourceDir, Path targetDir) throws IOException {
+        if (!Files.isDirectory(sourceDir)) {
+            return;
+        }
+        Files.createDirectories(targetDir);
+        try (var walk = Files.walk(sourceDir)) {
+            for (Path sourcePath : walk.filter(Files::isRegularFile).toList()) {
+                Path relative = sourceDir.relativize(sourcePath);
+                Path targetPath = targetDir.resolve(relative).normalize();
+                if (!targetPath.startsWith(targetDir)) {
+                    continue;
+                }
+                Files.createDirectories(targetPath.getParent());
+                Files.copy(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
+            }
+        }
     }
 
     private void createZip(Path distDir, Path outputBase, Path assetsDir,

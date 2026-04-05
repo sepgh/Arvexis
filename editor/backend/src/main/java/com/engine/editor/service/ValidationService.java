@@ -73,6 +73,27 @@ public class ValidationService {
             }
         }
 
+        // ── Error: explicit scene decision without matching outgoing edge ───────
+        List<Map<String, Object>> sceneDecisions = jdbc.queryForList("""
+            SELECT sd.node_id, sd.decision_key, n.name AS node_name
+            FROM scene_decisions sd
+            JOIN nodes n ON n.id = sd.node_id
+            ORDER BY sd.node_id, sd.decision_order
+            """);
+        for (Map<String, Object> row : sceneDecisions) {
+            String sceneId = (String) row.get("node_id");
+            String decisionKey = (String) row.get("decision_key");
+            Integer edgeCount = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM edges WHERE source_node_id=? AND source_decision_key=?",
+                Integer.class, sceneId, decisionKey);
+            if (edgeCount == null || edgeCount == 0) {
+                errors.add(new ValidationIssue("error", "DECISION_MISSING_EDGE",
+                    "Scene '" + row.get("node_name") + "' has decision '" + decisionKey +
+                        "' but no outgoing edge is connected to it.",
+                    sceneId, null));
+            }
+        }
+
         // ── Error: state node with != 1 outgoing edge ──────────────────────────
         for (Map<String, Object> n : nodes) {
             if (!"state".equals(n.get("type"))) continue;

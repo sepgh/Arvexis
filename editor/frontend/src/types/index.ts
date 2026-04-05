@@ -117,6 +117,7 @@ export interface DecisionItemData {
   isDefault: boolean
   decisionOrder: number
   keyboardKey?: string | null
+  conditionExpression?: string | null
 }
 
 export interface SceneDataResponse {

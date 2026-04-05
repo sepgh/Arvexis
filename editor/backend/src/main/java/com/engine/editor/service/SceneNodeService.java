@@ -15,9 +15,11 @@ import java.util.*;
 public class SceneNodeService {
 
     private final ProjectService projectService;
+    private final SpelValidationService spelValidationService;
 
-    public SceneNodeService(ProjectService projectService) {
+    public SceneNodeService(ProjectService projectService, SpelValidationService spelValidationService) {
         this.projectService = projectService;
+        this.spelValidationService = spelValidationService;
     }
 
     // ── Response DTOs ─────────────────────────────────────────────────────────
@@ -34,7 +36,7 @@ public class SceneNodeService {
     ) {}
 
     public record DecisionItemData(
-        long id, String decisionKey, boolean isDefault, int decisionOrder, String keyboardKey
+        long id, String decisionKey, boolean isDefault, int decisionOrder, String keyboardKey, String conditionExpression
     ) {}
 
     public record SceneDataResponse(
@@ -118,12 +120,19 @@ public class SceneNodeService {
             if (!keys.add(decisionKey))
                 throw new ProjectException("Duplicate decisionKey: " + decisionKey);
             String keyboardKey = normalizeKeyboardKey(r.keyboardKey());
+            String conditionExpression = normalizeConditionExpression(r.conditionExpression());
             if (keyboardKey != null) {
                 if ("escape".equalsIgnoreCase(keyboardKey))
                     throw new ProjectException("keyboardKey Escape is reserved");
                 String normalizedKeyboardKey = keyboardKey.toLowerCase(Locale.ROOT);
                 if (!keyboardKeys.add(normalizedKeyboardKey))
                     throw new ProjectException("Duplicate keyboardKey: " + keyboardKey);
+            }
+            if (conditionExpression != null) {
+                SpelValidationService.ValidationResult validation = spelValidationService.validate(conditionExpression, "boolean");
+                if (!validation.valid()) {
+                    throw new ProjectException("Invalid condition for decision '" + decisionKey + "': " + validation.error());
+                }
             }
         }
 
@@ -132,10 +141,11 @@ public class SceneNodeService {
             DecisionItemRequest r = reqs.get(i);
             int order = r.decisionOrder() != null ? r.decisionOrder() : i;
             String keyboardKey = normalizeKeyboardKey(r.keyboardKey());
+            String conditionExpression = normalizeConditionExpression(r.conditionExpression());
             jdbc.update("""
-                INSERT INTO scene_decisions (node_id, decision_key, is_default, decision_order, keyboard_key)
-                VALUES (?, ?, ?, ?, ?)
-                """, nodeId, r.decisionKey().trim(), Boolean.TRUE.equals(r.isDefault()) ? 1 : 0, order, keyboardKey);
+                INSERT INTO scene_decisions (node_id, decision_key, is_default, decision_order, keyboard_key, condition_expression)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """, nodeId, r.decisionKey().trim(), Boolean.TRUE.equals(r.isDefault()) ? 1 : 0, order, keyboardKey, conditionExpression);
         }
         return getSceneData(nodeId);
     }
@@ -201,14 +211,15 @@ public class SceneNodeService {
 
     private List<DecisionItemData> loadDecisions(JdbcTemplate jdbc, String nodeId) {
         return jdbc.query("""
-            SELECT id, decision_key, is_default, decision_order, keyboard_key
+            SELECT id, decision_key, is_default, decision_order, keyboard_key, condition_expression
             FROM scene_decisions WHERE node_id = ? ORDER BY decision_order
             """, (rs, rowNum) -> new DecisionItemData(
                 rs.getLong("id"),
                 rs.getString("decision_key"),
                 rs.getInt("is_default") == 1,
                 rs.getInt("decision_order"),
-                rs.getString("keyboard_key")
+                rs.getString("keyboard_key"),
+                rs.getString("condition_expression")
             ), nodeId);
     }
 
@@ -247,6 +258,12 @@ public class SceneNodeService {
     private String normalizeKeyboardKey(String keyboardKey) {
         if (keyboardKey == null) return null;
         String trimmed = keyboardKey.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String normalizeConditionExpression(String conditionExpression) {
+        if (conditionExpression == null) return null;
+        String trimmed = conditionExpression.trim();
         return trimmed.isEmpty() ? null : trimmed;
     }
 }

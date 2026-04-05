@@ -264,7 +264,8 @@ public class RuntimeServer {
 
     private Map<String, Object> buildStateResponse(GameState s, String locale) {
         Manifest.NodeData scene = engine.nodeById(s.currentSceneId);
-        List<GameEngine.DecisionInfo> decisions = engine.availableDecisions(s.currentSceneId);
+        List<GameEngine.DecisionInfo> decisions = engine.availableDecisions(s, s.currentSceneId);
+        boolean hasExplicitDecisions = engine.sceneHasExplicitDecisions(s.currentSceneId);
 
         Map<String, Object> resp = new LinkedHashMap<>();
         resp.put("currentSceneId",    s.currentSceneId);
@@ -276,6 +277,7 @@ public class RuntimeServer {
         resp.put("decisionTimeoutSecs", engine.decisionTimeoutSecs());
         resp.put("hideDecisionButtons", engine.hideDecisionButtons());
         resp.put("showDecisionInputIndicator", engine.showDecisionInputIndicator());
+        resp.put("hasExplicitDecisions", hasExplicitDecisions);
         resp.put("decisions",         decisions.stream().map(d -> {
             Map<String, Object> dm = new LinkedHashMap<>();
             dm.put("key",       d.key());

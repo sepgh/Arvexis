@@ -53,6 +53,7 @@ public class Manifest {
         @JsonProperty("isDefault")     public boolean isDefault;
         @JsonProperty("decisionOrder") public int     decisionOrder;
         @JsonProperty("keyboardKey")   public String  keyboardKey;
+        @JsonProperty("conditionExpression") public String conditionExpression;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
