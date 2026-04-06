@@ -8,7 +8,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.file.*;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.*;
@@ -39,6 +38,8 @@ public class CompileService {
         "wipe",       "wipeleft",
         "dissolve",   "dissolve"
     );
+
+    private static final String RUNTIME_RELEASES_URL = "https://github.com/sepgh/Arvexis/releases";
 
     private final ManifestService      manifestService;
     private final ProjectService       projectService;
@@ -227,31 +228,32 @@ public class CompileService {
                                Path manifestFile, Path sourceAssetsDir,
                                Set<String> referencedMusicAssetPaths) throws Exception {
         Path distDir = projectDir.resolve("dist");
-        Files.createDirectories(distDir);
+        recreateDirectory(distDir);
 
         // manifest.json
         job.setProgress(92, "Packaging: copying manifest…");
         Files.copy(manifestFile, distDir.resolve("manifest.json"),
             StandardCopyOption.REPLACE_EXISTING);
 
-        // runtime.jar from classpath resource
-        job.setProgress(93, "Packaging: extracting runtime…");
-        try (InputStream in = getClass().getResourceAsStream("/bundled/runtime.jar")) {
-            if (in != null) {
-                Files.copy(in, distDir.resolve("runtime.jar"), StandardCopyOption.REPLACE_EXISTING);
-            } else {
-                System.err.println("[CompileService] /bundled/runtime.jar not found in classpath");
-            }
-        }
-
         // start.sh
-        job.setProgress(94, "Packaging: writing startup scripts…");
+        job.setProgress(93, "Packaging: writing startup scripts…");
         Path startSh = distDir.resolve("start.sh");
         Files.writeString(startSh,
             "#!/bin/sh\n" +
-            "# Arvexis — Runtime\n" +
-            "# Usage: ./start.sh [--port 8090]\n" +
-            "java -jar runtime.jar \"$@\"\n",
+            "set -e\n" +
+            "if [ -x \"./arvexis-runtime\" ]; then\n" +
+            "  exec ./arvexis-runtime \"$@\"\n" +
+            "fi\n" +
+            "if [ -x \"./arvexis-runtime-linux-x64\" ]; then\n" +
+            "  exec ./arvexis-runtime-linux-x64 \"$@\"\n" +
+            "fi\n" +
+            "if [ -f \"./arvexis-runtime.jar\" ]; then\n" +
+            "  exec java -jar ./arvexis-runtime.jar \"$@\"\n" +
+            "fi\n" +
+            "echo \"Arvexis runtime is not bundled with this export.\"\n" +
+            "echo \"Download a runtime binary for your platform or arvexis-runtime.jar from:\"\n" +
+            "echo \"  " + RUNTIME_RELEASES_URL + "\"\n" +
+            "exit 1\n",
             StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
         try {
             Set<PosixFilePermission> perms = new HashSet<>(
@@ -264,12 +266,26 @@ public class CompileService {
         // start.bat
         Files.writeString(distDir.resolve("start.bat"),
             "@echo off\r\n" +
-            "REM Arvexis — Runtime\r\n" +
-            "java -jar runtime.jar %*\r\n",
+            "if exist arvexis-runtime.exe (\r\n" +
+            "  arvexis-runtime.exe %*\r\n" +
+            "  goto :eof\r\n" +
+            ")\r\n" +
+            "if exist arvexis-runtime-windows-x64.exe (\r\n" +
+            "  arvexis-runtime-windows-x64.exe %*\r\n" +
+            "  goto :eof\r\n" +
+            ")\r\n" +
+            "if exist arvexis-runtime.jar (\r\n" +
+            "  java -jar arvexis-runtime.jar %*\r\n" +
+            "  goto :eof\r\n" +
+            ")\r\n" +
+            "echo Arvexis runtime is not bundled with this export.\r\n" +
+            "echo Download a runtime binary for your platform or arvexis-runtime.jar from:\r\n" +
+            "echo " + RUNTIME_RELEASES_URL + "\r\n" +
+            "exit /b 1\r\n",
             StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
 
         // README.md
-        job.setProgress(95, "Packaging: writing README…");
+        job.setProgress(94, "Packaging: writing README…");
         String projectName = projectDir.getFileName().toString();
         Files.writeString(distDir.resolve("README.md"),
             buildReadme(projectName),
@@ -284,7 +300,7 @@ public class CompileService {
         }
 
         // Copy compiled HLS output into dist/output so dist/ can be run directly.
-        job.setProgress(96, "Packaging: copying runtime media…");
+        job.setProgress(95, "Packaging: copying runtime media…");
         Path distOutputDir = distDir.resolve("output");
         copyDirectoryContents(outputBase, distOutputDir);
 
@@ -306,9 +322,9 @@ public class CompileService {
         }
 
         // Create dist.zip
-        job.setProgress(97, "Packaging: creating ZIP archive…");
+        job.setProgress(96, "Packaging: creating ZIP archive…");
         Path zipFile = projectDir.resolve("dist.zip");
-        createZip(distDir, outputBase, sourceAssetsDir, referencedMusicAssetPaths, zipFile);
+        createZip(distDir, zipFile);
 
         job.setProgress(100, "Package ready.");
         return zipFile;
@@ -316,17 +332,27 @@ public class CompileService {
 
     private String buildReadme(String projectName) {
         return "# " + projectName + " — Interactive Video\n\n" +
+               "## Runtime Download\n\n" +
+               "The runtime executable is no longer bundled with this package.\n\n" +
+               "Download a runtime artifact from **" + RUNTIME_RELEASES_URL + "** and place it in this folder before starting the game.\n\n" +
+               "Supported runtime artifact names:\n\n" +
+               "- `arvexis-runtime.jar` — cross-platform, requires Java 21 or newer\n" +
+               "- `arvexis-runtime-linux-x64` — Linux x64 native binary\n" +
+               "- `arvexis-runtime-windows-x64.exe` — Windows x64 native binary\n\n" +
+               "You can also rename the native binary to `arvexis-runtime` or `arvexis-runtime.exe` to match the launcher defaults.\n\n" +
                "## Running Locally (Offline)\n\n" +
-               "**Requirements**: Java 17 or newer\n\n" +
+               "**Requirements**: a runtime binary for your platform, or Java 21 or newer if you use `arvexis-runtime.jar`\n\n" +
                "1. Unzip this archive\n" +
-               "2. Open a terminal in the unzipped folder\n" +
-               "3. Run `./start.sh` (Linux/Mac) or `start.bat` (Windows)\n" +
-               "4. Open your browser at **http://localhost:8090/**\n\n" +
+               "2. Download a runtime artifact from the releases page and place it in the unzipped folder\n" +
+               "3. Open a terminal in the unzipped folder\n" +
+               "4. Run `./start.sh` (Linux/Mac) or `start.bat` (Windows)\n" +
+               "5. Open your browser at **http://localhost:8090/**\n\n" +
                "To use a different port: `./start.sh --port 9000`\n\n" +
                "## Running Online (Self-Hosted)\n\n" +
                "1. Copy the unzipped folder to your server\n" +
-               "2. Run `java -jar runtime.jar --port 80` (or behind a reverse proxy on port 80/443)\n" +
-               "3. Point your domain or IP at the server\n\n" +
+               "2. Download a runtime artifact from the releases page into that folder\n" +
+               "3. Run the runtime binary for your platform, or `java -jar arvexis-runtime.jar --port 80`\n" +
+               "4. Point your domain or IP at the server\n\n" +
                "For HTTPS, use a reverse proxy such as nginx or Caddy in front of the runtime.\n\n" +
                "### nginx example (reverse proxy to port 8090)\n\n" +
                "```nginx\n" +
@@ -338,6 +364,19 @@ public class CompileService {
                "## Game State\n\n" +
                "Game progress is saved in `game-state.json` next to the manifest.  " +
                "Delete it to reset to the beginning.\n";
+    }
+
+    private void recreateDirectory(Path dir) throws IOException {
+        if (Files.exists(dir)) {
+            try (var walk = Files.walk(dir)) {
+                for (Path path : walk.sorted(Comparator.reverseOrder()).toList()) {
+                    if (!path.equals(dir)) {
+                        Files.deleteIfExists(path);
+                    }
+                }
+            }
+        }
+        Files.createDirectories(dir);
     }
 
     private void copyDirectoryContents(Path sourceDir, Path targetDir) throws IOException {
@@ -358,53 +397,21 @@ public class CompileService {
         }
     }
 
-    private void createZip(Path distDir, Path outputBase, Path assetsDir,
-                            Set<String> referencedMusicAssetPaths,
-                            Path zipFile) throws IOException {
+    private void createZip(Path distDir, Path zipFile) throws IOException {
         try (ZipOutputStream zos = new ZipOutputStream(
                 Files.newOutputStream(zipFile,
                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING))) {
 
-            // Add dist/ contents (manifest, runtime.jar, scripts, README, CSS files)
+            // Add dist/ contents (manifest, scripts, README, CSS files, output, assets)
             try (var walk = Files.walk(distDir)) {
                 walk.filter(Files::isRegularFile).forEach(p -> {
-                    String name = "game/" + distDir.relativize(p).toString();
+                    String name = "game/" + distDir.relativize(p).toString().replace('\\', '/');
                     try {
                         zos.putNextEntry(new ZipEntry(name));
                         Files.copy(p, zos);
                         zos.closeEntry();
                     } catch (IOException e) { throw new RuntimeException(e); }
                 });
-            }
-
-            // Add output/ (compiled HLS) under game/output/
-            if (Files.isDirectory(outputBase)) {
-                try (var walk = Files.walk(outputBase)) {
-                    walk.filter(Files::isRegularFile).forEach(p -> {
-                        String name = "game/output/" + outputBase.relativize(p).toString();
-                        try {
-                            zos.putNextEntry(new ZipEntry(name));
-                            Files.copy(p, zos);
-                            zos.closeEntry();
-                        } catch (IOException e) { throw new RuntimeException(e); }
-                    });
-                }
-            }
-
-            // Add only referenced background-music assets under game/assets/
-            if (Files.isDirectory(assetsDir) && referencedMusicAssetPaths != null && !referencedMusicAssetPaths.isEmpty()) {
-                for (String relPath : referencedMusicAssetPaths) {
-                    Path assetPath = assetsDir.resolve(relPath).normalize();
-                    if (!assetPath.startsWith(assetsDir) || !Files.isRegularFile(assetPath)) {
-                        continue;
-                    }
-                    String name = "game/assets/" + relPath.replace('\\', '/');
-                    try {
-                        zos.putNextEntry(new ZipEntry(name));
-                        Files.copy(assetPath, zos);
-                        zos.closeEntry();
-                    } catch (IOException e) { throw new RuntimeException(e); }
-                }
             }
         }
     }

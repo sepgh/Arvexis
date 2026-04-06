@@ -13,7 +13,10 @@ RUNTIME="$ROOT/runtime"
 echo "==> [1/3] Building runtime JAR..."
 cd "$RUNTIME"
 mvn clean package -DskipTests -q
-cp "$RUNTIME/target/runtime-1.0.0.jar" "$BACKEND/src/main/resources/bundled/runtime.jar"
+JAR=$(ls "$RUNTIME/target/runtime-"*.jar 2>/dev/null | grep -v sources | head -1)
+echo "Runtime has been built and is available at:"
+echo "$JAR"
+echo "It can be used to run the game/interactive-video if placed next to `dist`"
 
 echo "==> [2/3] Building frontend..."
 cd "$FRONTEND"
