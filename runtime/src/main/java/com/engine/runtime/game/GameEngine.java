@@ -49,11 +49,19 @@ public class GameEngine {
         return manifest.project != null ? manifest.project.decisionTimeoutSecs : 5.0;
     }
 
-    public boolean hideDecisionButtons() {
+    public boolean hideDecisionButtons(String sceneId) {
+        Manifest.NodeData scene = nodeById(sceneId);
+        if (scene != null && scene.hideDecisionButtons != null) {
+            return scene.hideDecisionButtons;
+        }
         return manifest.project != null && manifest.project.hideDecisionButtons;
     }
 
-    public boolean showDecisionInputIndicator() {
+    public boolean showDecisionInputIndicator(String sceneId) {
+        Manifest.NodeData scene = nodeById(sceneId);
+        if (scene != null && scene.showDecisionInputIndicator != null) {
+            return scene.showDecisionInputIndicator;
+        }
         return manifest.project != null && manifest.project.showDecisionInputIndicator;
     }
 

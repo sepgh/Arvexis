@@ -149,6 +149,8 @@ public class ManifestService {
         String cfg = (String) nodeFullRow.get("decision_appearance_config");
         n.put("decisionAppearanceConfig", cfg);
         n.put("loopVideo", intFlag(nodeFullRow.get("loop_video")));
+        n.put("hideDecisionButtons", nullableIntFlag(nodeFullRow.get("hide_decision_buttons")));
+        n.put("showDecisionInputIndicator", nullableIntFlag(nodeFullRow.get("show_decision_input_indicator")));
 
         // Background music asset
         String musicAssetId = (String) nodeFullRow.get("music_asset_id");
@@ -429,6 +431,13 @@ public class ManifestService {
 
     private boolean intFlag(Object val) {
         if (val == null) return false;
+        if (val instanceof Boolean b) return b;
+        if (val instanceof Number n) return n.intValue() == 1;
+        return "1".equals(val.toString()) || "true".equalsIgnoreCase(val.toString());
+    }
+
+    private Boolean nullableIntFlag(Object val) {
+        if (val == null) return null;
         if (val instanceof Boolean b) return b;
         if (val instanceof Number n) return n.intValue() == 1;
         return "1".equals(val.toString()) || "true".equalsIgnoreCase(val.toString());

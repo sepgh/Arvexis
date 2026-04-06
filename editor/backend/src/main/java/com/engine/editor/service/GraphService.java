@@ -91,6 +91,15 @@ public class GraphService {
                           : existing.getDecisionAppearanceConfig();
         String musicAsset = Boolean.TRUE.equals(req.clearMusicAsset()) ? null
                           : (req.musicAssetId() != null ? req.musicAssetId() : existing.getMusicAssetId());
+        Boolean hideDecisionButtons = Boolean.TRUE.equals(req.clearDecisionInputModeOverride())
+            ? null
+            : (req.hideDecisionButtons() != null ? req.hideDecisionButtons() : existing.getHideDecisionButtons());
+        Boolean showDecisionInputIndicator = Boolean.TRUE.equals(req.clearDecisionInputModeOverride())
+            ? null
+            : (req.showDecisionInputIndicator() != null ? req.showDecisionInputIndicator() : existing.getShowDecisionInputIndicator());
+        if (hideDecisionButtons != null && !hideDecisionButtons) {
+            showDecisionInputIndicator = false;
+        }
         double posX       = req.posX() != null ? req.posX() : existing.getPosX();
         double posY       = req.posY() != null ? req.posY() : existing.getPosY();
 
@@ -98,9 +107,11 @@ public class GraphService {
 
         jdbc.update("""
             UPDATE nodes SET name=?, is_end=?, auto_continue=?, loop_video=?, background_color=?,
-                decision_appearance_config=?, music_asset_id=?, pos_x=?, pos_y=?
+                decision_appearance_config=?, music_asset_id=?, hide_decision_buttons=?,
+                show_decision_input_indicator=?, pos_x=?, pos_y=?
             WHERE id=?
-            """, name, isEnd ? 1 : 0, autoCont ? 1 : 0, loopVid ? 1 : 0, bgColor, dac, musicAsset, posX, posY, id);
+            """, name, isEnd ? 1 : 0, autoCont ? 1 : 0, loopVid ? 1 : 0, bgColor, dac, musicAsset,
+            toDbFlag(hideDecisionButtons), toDbFlag(showDecisionInputIndicator), posX, posY, id);
 
         return getNode(id);
     }
@@ -233,6 +244,8 @@ public class GraphService {
         n.setBackgroundColor(rs.getString("background_color"));
         n.setDecisionAppearanceConfig(rs.getString("decision_appearance_config"));
         n.setMusicAssetId(rs.getString("music_asset_id"));
+        n.setHideDecisionButtons(nullableFlag(rs, "hide_decision_buttons"));
+        n.setShowDecisionInputIndicator(nullableFlag(rs, "show_decision_input_indicator"));
         n.setPosX(rs.getDouble("pos_x"));
         n.setPosY(rs.getDouble("pos_y"));
         return n;
@@ -269,6 +282,16 @@ public class GraphService {
             "SELECT COUNT(*) FROM nodes WHERE id=?", Integer.class, nodeId);
         if (count == null || count == 0)
             throw new ProjectException("Node not found: " + nodeId);
+    }
+
+    private Integer toDbFlag(Boolean value) {
+        if (value == null) return null;
+        return value ? 1 : 0;
+    }
+
+    private Boolean nullableFlag(ResultSet rs, String columnName) throws SQLException {
+        int value = rs.getInt(columnName);
+        return rs.wasNull() ? null : value == 1;
     }
 
     private List<GraphNode.NodeExit> loadExits(JdbcTemplate jdbc, GraphNode node) {

@@ -20,6 +20,8 @@ export interface GraphNode {
   backgroundColor?: string
   decisionAppearanceConfig?: DecisionAppearanceConfig
   musicAssetId?: string | null
+  hideDecisionButtons?: boolean | null
+  showDecisionInputIndicator?: boolean | null
   posX: number
   posY: number
   exits: NodeExit[]

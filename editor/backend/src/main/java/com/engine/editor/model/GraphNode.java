@@ -18,6 +18,8 @@ public class GraphNode {
     private String backgroundColor;
     private String decisionAppearanceConfig;
     private String musicAssetId;
+    private Boolean hideDecisionButtons;
+    private Boolean showDecisionInputIndicator;
     private double posX;
     private double posY;
     private List<NodeExit> exits;
@@ -59,6 +61,16 @@ public class GraphNode {
 
     public String getMusicAssetId() { return musicAssetId; }
     public void setMusicAssetId(String musicAssetId) { this.musicAssetId = musicAssetId; }
+
+    public Boolean getHideDecisionButtons() { return hideDecisionButtons; }
+    public void setHideDecisionButtons(Boolean hideDecisionButtons) {
+        this.hideDecisionButtons = hideDecisionButtons;
+    }
+
+    public Boolean getShowDecisionInputIndicator() { return showDecisionInputIndicator; }
+    public void setShowDecisionInputIndicator(Boolean showDecisionInputIndicator) {
+        this.showDecisionInputIndicator = showDecisionInputIndicator;
+    }
 
     public double getPosX() { return posX; }
     public void setPosX(double posX) { this.posX = posX; }

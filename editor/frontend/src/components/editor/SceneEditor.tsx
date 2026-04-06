@@ -18,6 +18,8 @@ interface SceneEditorProps {
   loopVideo: boolean
   backgroundColor: string | null
   musicAssetId: string | null
+  hideDecisionButtons: boolean | null
+  showDecisionInputIndicator: boolean | null
   onNodeUpdated?: () => void
 }
 
@@ -40,10 +42,21 @@ function normalizeCapturedKeyboardKey(key: string): string | null {
   return key
 }
 
-export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue: initialAutoContinue, loopVideo: initialLoopVideo, backgroundColor: initialBg, musicAssetId: initialMusicAssetId, onNodeUpdated }: SceneEditorProps) {
-  const projectDefaultBackgroundColor = useEditorStore(
-    (s) => s.projectConfig?.defaultBackgroundColor ?? '#000000'
-  )
+function describeDecisionInputMode(hideDecisionButtons: boolean, showDecisionInputIndicator: boolean): string {
+  if (!hideDecisionButtons) {
+    return 'Decision buttons stay visible in runtime.'
+  }
+  if (showDecisionInputIndicator) {
+    return 'Decision buttons are hidden and the bottom-screen input indicator is shown when hotkeys are available.'
+  }
+  return 'Decision buttons are hidden and players choose using assigned keyboard keys.'
+}
+
+export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue: initialAutoContinue, loopVideo: initialLoopVideo, backgroundColor: initialBg, musicAssetId: initialMusicAssetId, hideDecisionButtons: initialHideDecisionButtons, showDecisionInputIndicator: initialShowDecisionInputIndicator, onNodeUpdated }: SceneEditorProps) {
+  const projectConfig = useEditorStore((s) => s.projectConfig)
+  const projectDefaultBackgroundColor = projectConfig?.defaultBackgroundColor ?? '#000000'
+  const projectHideDecisionButtons = projectConfig?.hideDecisionButtons ?? false
+  const projectShowDecisionInputIndicator = projectHideDecisionButtons && (projectConfig?.showDecisionInputIndicator ?? false)
   const [data, setData]     = useState<SceneDataResponse | null>(null)
   const [assets, setAssets] = useState<Asset[]>([])
   const [loading, setLoading] = useState(true)
@@ -57,6 +70,16 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
   const [loopVideo, setLoopVideo] = useState(initialLoopVideo)
   const [bgColor, setBgColor]     = useState(initialBg ?? projectDefaultBackgroundColor)
   const [musicAssetId, setMusicAssetId] = useState<string | null>(initialMusicAssetId)
+  const [useSceneDecisionInputMode, setUseSceneDecisionInputMode] = useState(
+    initialHideDecisionButtons != null || initialShowDecisionInputIndicator != null
+  )
+  const [hideDecisionButtons, setHideDecisionButtons] = useState(
+    initialHideDecisionButtons ?? projectHideDecisionButtons
+  )
+  const [showDecisionInputIndicator, setShowDecisionInputIndicator] = useState(
+    (initialHideDecisionButtons ?? projectHideDecisionButtons)
+      && (initialShowDecisionInputIndicator ?? projectShowDecisionInputIndicator)
+  )
   const [previewJob, setPreviewJob] = useState<PreviewJobStatus | null>(null)
   const [previewing, setPreviewing] = useState(false)
 
@@ -66,7 +89,13 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
     setLoopVideo(initialLoopVideo)
     setBgColor(initialBg ?? projectDefaultBackgroundColor)
     setMusicAssetId(initialMusicAssetId)
-  }, [initialIsEnd, initialAutoContinue, initialLoopVideo, initialBg, projectDefaultBackgroundColor, initialMusicAssetId, nodeId])
+    setUseSceneDecisionInputMode(initialHideDecisionButtons != null || initialShowDecisionInputIndicator != null)
+    setHideDecisionButtons(initialHideDecisionButtons ?? projectHideDecisionButtons)
+    setShowDecisionInputIndicator(
+      (initialHideDecisionButtons ?? projectHideDecisionButtons)
+        && (initialShowDecisionInputIndicator ?? projectShowDecisionInputIndicator)
+    )
+  }, [initialIsEnd, initialAutoContinue, initialLoopVideo, initialBg, projectDefaultBackgroundColor, initialMusicAssetId, initialHideDecisionButtons, initialShowDecisionInputIndicator, projectHideDecisionButtons, projectShowDecisionInputIndicator, nodeId])
 
   async function handlePreview() {
     setPreviewing(true)
@@ -355,6 +384,12 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
     } else {
       payload.clearMusicAsset = true
     }
+    if (useSceneDecisionInputMode) {
+      payload.hideDecisionButtons = hideDecisionButtons
+      payload.showDecisionInputIndicator = hideDecisionButtons && showDecisionInputIndicator
+    } else {
+      payload.clearDecisionInputModeOverride = true
+    }
     const result = await withSave(() => updateNode(nodeId, payload))
     if (result && onNodeUpdated) onNodeUpdated()
   }
@@ -586,6 +621,65 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
                 <p className="text-muted-foreground" style={{ fontSize: 13 }}>Video replays continuously while waiting for a decision.</p>
               </div>
             </label>
+            <div className="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/20 px-3 py-3">
+              <div>
+                <span className="font-medium text-foreground" style={{ fontSize: 14 }}>Decision input mode</span>
+                <p className="text-muted-foreground" style={{ fontSize: 13 }}>Override the project decision input mode for this scene only.</p>
+              </div>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={useSceneDecisionInputMode}
+                  onChange={e => setUseSceneDecisionInputMode(e.target.checked)}
+                  className="w-4 h-4 accent-primary"
+                />
+                <div>
+                  <span className="font-medium text-foreground" style={{ fontSize: 14 }}>Use scene-specific settings</span>
+                  <p className="text-muted-foreground" style={{ fontSize: 13 }}>Leave off to inherit the current project default.</p>
+                </div>
+              </label>
+              {!useSceneDecisionInputMode ? (
+                <div className="rounded-lg border border-border/40 bg-muted/10 px-3 py-2.5">
+                  <span className="text-xs font-medium text-foreground">Using project default</span>
+                  <p className="text-xs text-muted-foreground" style={{ marginTop: 4 }}>
+                    {describeDecisionInputMode(projectHideDecisionButtons, projectShowDecisionInputIndicator)}
+                  </p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  <label className="flex items-center gap-3 cursor-pointer rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5">
+                    <input
+                      type="checkbox"
+                      checked={hideDecisionButtons}
+                      onChange={e => {
+                        const checked = e.target.checked
+                        setHideDecisionButtons(checked)
+                        if (!checked) setShowDecisionInputIndicator(false)
+                      }}
+                      className="w-4 h-4 accent-primary"
+                    />
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-sm font-medium text-foreground">Hide decision buttons at runtime</span>
+                      <span className="text-xs text-muted-foreground">Players can still choose using the keyboard keys assigned to each decision.</span>
+                    </div>
+                  </label>
+                  {hideDecisionButtons && (
+                    <label className="ml-7 flex items-center gap-3 cursor-pointer rounded-lg border border-border/40 bg-muted/10 px-3 py-2.5">
+                      <input
+                        type="checkbox"
+                        checked={showDecisionInputIndicator}
+                        onChange={e => setShowDecisionInputIndicator(e.target.checked)}
+                        className="w-4 h-4 accent-primary"
+                      />
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-sm font-medium text-foreground">Show bottom-screen input indicator</span>
+                        <span className="text-xs text-muted-foreground">Displays a small runtime indicator when hidden keyboard decisions become available.</span>
+                      </div>
+                    </label>
+                  )}
+                </div>
+              )}
+            </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-muted-foreground" style={{ fontSize: 14 }}>Background color</label>
               <div className="flex items-center gap-2">
