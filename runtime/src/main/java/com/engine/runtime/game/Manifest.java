@@ -45,6 +45,8 @@ public class Manifest {
         @JsonProperty("loopVideo")                public boolean loopVideo;
         @JsonProperty("musicAssetId")             public String musicAssetId;
         @JsonProperty("musicAssetRelPath")        public String musicAssetRelPath;
+        @JsonProperty("hideDecisionButtons")      public Boolean hideDecisionButtons;
+        @JsonProperty("showDecisionInputIndicator") public Boolean showDecisionInputIndicator;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

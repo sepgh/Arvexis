@@ -17,6 +17,9 @@ export interface UpdateNodePayload {
   decisionAppearanceConfig?: string
   musicAssetId?: string | null
   clearMusicAsset?: boolean
+  hideDecisionButtons?: boolean | null
+  showDecisionInputIndicator?: boolean | null
+  clearDecisionInputModeOverride?: boolean
   posX?: number
   posY?: number
 }

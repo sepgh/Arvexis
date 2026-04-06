@@ -266,6 +266,8 @@ public class RuntimeServer {
         Manifest.NodeData scene = engine.nodeById(s.currentSceneId);
         List<GameEngine.DecisionInfo> decisions = engine.availableDecisions(s, s.currentSceneId);
         boolean hasExplicitDecisions = engine.sceneHasExplicitDecisions(s.currentSceneId);
+        boolean hideDecisionButtons = engine.hideDecisionButtons(s.currentSceneId);
+        boolean showDecisionInputIndicator = engine.showDecisionInputIndicator(s.currentSceneId);
 
         Map<String, Object> resp = new LinkedHashMap<>();
         resp.put("currentSceneId",    s.currentSceneId);
@@ -275,8 +277,8 @@ public class RuntimeServer {
         resp.put("duration",          scene != null ? scene.computedDuration : null);
         resp.put("decisionAppearanceConfig", scene != null ? scene.decisionAppearanceConfig : null);
         resp.put("decisionTimeoutSecs", engine.decisionTimeoutSecs());
-        resp.put("hideDecisionButtons", engine.hideDecisionButtons());
-        resp.put("showDecisionInputIndicator", engine.showDecisionInputIndicator());
+        resp.put("hideDecisionButtons", hideDecisionButtons);
+        resp.put("showDecisionInputIndicator", hideDecisionButtons && showDecisionInputIndicator);
         resp.put("hasExplicitDecisions", hasExplicitDecisions);
         resp.put("decisions",         decisions.stream().map(d -> {
             Map<String, Object> dm = new LinkedHashMap<>();

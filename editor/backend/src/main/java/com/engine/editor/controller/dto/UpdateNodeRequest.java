@@ -9,6 +9,9 @@ public record UpdateNodeRequest(
     String decisionAppearanceConfig,
     String musicAssetId,
     Boolean clearMusicAsset,
+    Boolean hideDecisionButtons,
+    Boolean showDecisionInputIndicator,
+    Boolean clearDecisionInputModeOverride,
     Double posX,
     Double posY
 ) {}

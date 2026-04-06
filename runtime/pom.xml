@@ -6,7 +6,7 @@
 
     <groupId>com.engine</groupId>
     <artifactId>runtime</artifactId>
-    <version>1.0.0</version>
+    <version>1.1.0-RELEASE</version>
     <name>Arvexis — Compiled Runtime</name>
 
     <properties>
@@ -75,4 +75,26 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>native</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.graalvm.buildtools</groupId>
+                        <artifactId>native-maven-plugin</artifactId>
+                        <version>0.10.2</version>
+                        <configuration>
+                            <imageName>arvexis-runtime</imageName>
+                            <mainClass>com.engine.runtime.Main</mainClass>
+                            <buildArgs>
+                                <buildArg>-H:+ReportExceptionStackTraces</buildArg>
+                            </buildArgs>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

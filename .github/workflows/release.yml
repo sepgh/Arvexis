@@ -12,7 +12,6 @@ on:
         type: string
 
 jobs:
-  # ── Build native binaries on each platform ──────────────────────────────────
   build-native:
     name: Native binary — ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
@@ -21,14 +20,29 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            name: Linux x64
+            name: Editor Linux x64
+            component: editor
+            project_path: editor/backend
             artifact: arvexis-editor-linux-x64
             binary: editor/backend/target/arvexis-editor
-
           - os: windows-latest
-            name: Windows x64
+            name: Editor Windows x64
+            component: editor
+            project_path: editor/backend
             artifact: arvexis-editor-windows-x64
             binary: editor/backend/target/arvexis-editor.exe
+          - os: ubuntu-latest
+            name: Runtime Linux x64
+            component: runtime
+            project_path: runtime
+            artifact: arvexis-runtime-linux-x64
+            binary: runtime/target/arvexis-runtime
+          - os: windows-latest
+            name: Runtime Windows x64
+            component: runtime
+            project_path: runtime
+            artifact: arvexis-runtime-windows-x64
+            binary: runtime/target/arvexis-runtime.exe
 
     steps:
       - name: Checkout
@@ -42,6 +56,7 @@ jobs:
           cache: maven
 
       - name: Set up Node.js 20
+        if: matrix.component == 'editor'
         uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -49,15 +64,15 @@ jobs:
           cache-dependency-path: editor/frontend/package-lock.json
 
       - name: Build frontend
+        if: matrix.component == 'editor'
         run: |
           cd editor/frontend
           npm ci
           npm run build
 
       - name: Build native binary
-        run: |
-          cd editor/backend
-          mvn -Pnative native:compile -DskipTests -q
+        working-directory: ${{ matrix.project_path }}
+        run: mvn -Pnative native:compile -DskipTests -q
 
       - name: Make binary executable (Linux)
         if: runner.os == 'Linux'
@@ -69,10 +84,23 @@ jobs:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.binary }}
 
-  # ── Also build the cross-platform JAR ───────────────────────────────────────
   build-jar:
-    name: JAR (cross-platform)
+    name: JAR — ${{ matrix.name }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Editor
+            component: editor
+            project_path: editor/backend
+            artifact: arvexis-editor-jar
+            jar: editor/backend/target/editor-backend-*.jar
+          - name: Runtime
+            component: runtime
+            project_path: runtime
+            artifact: arvexis-runtime-jar
+            jar: runtime/target/runtime-*.jar
 
     steps:
       - name: Checkout
@@ -86,27 +114,30 @@ jobs:
           cache: maven
 
       - name: Set up Node.js 20
+        if: matrix.component == 'editor'
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: npm
           cache-dependency-path: editor/frontend/package-lock.json
 
-      - name: Build frontend + JAR
+      - name: Build frontend
+        if: matrix.component == 'editor'
         run: |
           cd editor/frontend
           npm ci
           npm run build
-          cd ../backend
-          mvn package -DskipTests -q
+
+      - name: Build JAR
+        working-directory: ${{ matrix.project_path }}
+        run: mvn package -DskipTests -q
 
       - name: Upload JAR
         uses: actions/upload-artifact@v4
         with:
-          name: arvexis-editor-jar
-          path: editor/backend/target/editor-backend-*.jar
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.jar }}
 
-  # ── Create draft GitHub release with all artifacts ──────────────────────────
   release:
     name: Create draft release
     needs: [build-native, build-jar]
@@ -131,14 +162,23 @@ jobs:
       - name: Prepare release files
         run: |
           mkdir -p release
-          # Copy Linux binary
-          cp artifacts/arvexis-editor-linux-x64/arvexis-editor release/arvexis-editor-linux-x64 || echo "Linux binary not found"
+
+          cp artifacts/arvexis-editor-linux-x64/arvexis-editor release/arvexis-editor-linux-x64 || echo "Editor Linux binary not found"
           chmod +x release/arvexis-editor-linux-x64 || true
-          # Copy Windows binary
-          cp artifacts/arvexis-editor-windows-x64/arvexis-editor.exe release/arvexis-editor-windows-x64.exe || echo "Windows binary not found"
-          # Copy JAR
-          JAR=$(find artifacts/arvexis-editor-jar -name "*.jar" | head -1)
-          cp "$JAR" release/arvexis-editor.jar || echo "JAR not found"
+
+          cp artifacts/arvexis-editor-windows-x64/arvexis-editor.exe release/arvexis-editor-windows-x64.exe || echo "Editor Windows binary not found"
+
+          cp artifacts/arvexis-runtime-linux-x64/arvexis-runtime release/arvexis-runtime-linux-x64 || echo "Runtime Linux binary not found"
+          chmod +x release/arvexis-runtime-linux-x64 || true
+
+          cp artifacts/arvexis-runtime-windows-x64/arvexis-runtime.exe release/arvexis-runtime-windows-x64.exe || echo "Runtime Windows binary not found"
+
+          EDITOR_JAR=$(find artifacts/arvexis-editor-jar -name "*.jar" | head -1)
+          if [ -n "$EDITOR_JAR" ]; then cp "$EDITOR_JAR" release/arvexis-editor.jar; else echo "Editor JAR not found"; fi
+
+          RUNTIME_JAR=$(find artifacts/arvexis-runtime-jar -name "runtime-*.jar" ! -name "original-*" | head -1)
+          if [ -n "$RUNTIME_JAR" ]; then cp "$RUNTIME_JAR" release/arvexis-runtime.jar; else echo "Runtime JAR not found"; fi
+
           ls -la release/
 
       - name: Create draft release
@@ -147,9 +187,9 @@ jobs:
           draft: true
           generate_release_notes: true
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          name: "Arvexis Editor ${{ github.event.inputs.tag || github.ref_name }}"
+          name: "Arvexis ${{ github.event.inputs.tag || github.ref_name }}"
           body: |
-            ## Downloads
+            ## Editor downloads
 
             | Platform | File |
             |----------|------|
@@ -157,21 +197,31 @@ jobs:
             | Windows x64 (native, no JVM) | `arvexis-editor-windows-x64.exe` |
             | All platforms (requires Java 21) | `arvexis-editor.jar` |
 
-            **Run the JAR:**
+            ## Runtime downloads
+
+            | Platform | File |
+            |----------|------|
+            | Linux x64 (native, no JVM) | `arvexis-runtime-linux-x64` |
+            | Windows x64 (native, no JVM) | `arvexis-runtime-windows-x64.exe` |
+            | All platforms (requires Java 21) | `arvexis-runtime.jar` |
+
+            Exported game packages no longer bundle the runtime. Download a runtime artifact from this release and place it next to the exported `start.sh` or `start.bat` launcher before running the package.
+
+            **Run the editor JAR:**
             ```
             java -jar arvexis-editor.jar
             ```
             Then open http://localhost:8080
 
-            **CLI options:**
+            **Run the runtime JAR inside an exported game folder:**
             ```
-            java -jar arvexis-editor.jar \
-              --server.port=9090 \
-              --editor.log.path=/custom/logs \
-              --logging.level.com.engine.editor=DEBUG
+            java -jar arvexis-runtime.jar
             ```
           files: |
             release/arvexis-editor-linux-x64
             release/arvexis-editor-windows-x64.exe
             release/arvexis-editor.jar
+            release/arvexis-runtime-linux-x64
+            release/arvexis-runtime-windows-x64.exe
+            release/arvexis-runtime.jar
           fail_on_unmatched_files: false

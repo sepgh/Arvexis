@@ -62,6 +62,8 @@ export default function NodeEditorPanel({ nodeData, onConditionsChanged, onNodeU
             loopVideo={nodeData.loopVideo}
             backgroundColor={nodeData.backgroundColor ?? null}
             musicAssetId={nodeData.musicAssetId ?? null}
+            hideDecisionButtons={nodeData.hideDecisionButtons ?? null}
+            showDecisionInputIndicator={nodeData.showDecisionInputIndicator ?? null}
             onNodeUpdated={onNodeUpdated}
           />
         )}

@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    name: Build JAR (Linux x64)
+    name: Build editor + runtime JARs
     runs-on: ubuntu-latest
 
     steps:
@@ -41,6 +41,11 @@ jobs:
           cd editor/backend
           mvn package -DskipTests -q
 
+      - name: Build runtime JAR
+        run: |
+          cd runtime
+          mvn package -DskipTests -q
+
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
         with:
@@ -49,7 +54,7 @@ jobs:
           retention-days: 14
 
   test:
-    name: Run tests
+    name: Run editor + runtime tests
     runs-on: ubuntu-latest
 
     steps:
@@ -66,4 +71,9 @@ jobs:
       - name: Run backend tests
         run: |
           cd editor/backend
+          mvn test -q
+
+      - name: Run runtime tests
+        run: |
+          cd runtime
           mvn test -q
