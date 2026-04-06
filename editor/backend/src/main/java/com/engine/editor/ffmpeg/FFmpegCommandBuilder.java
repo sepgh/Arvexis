@@ -182,6 +182,15 @@ public class FFmpegCommandBuilder {
         return this;
     }
 
+    /** Limit the output duration with {@code -t <seconds>}. */
+    public FFmpegCommandBuilder duration(double seconds) {
+        if (seconds > 0) {
+            extraArgs.add("-t");
+            extraArgs.add(String.format("%.6f", seconds));
+        }
+        return this;
+    }
+
     /** Configure HLS segmentation output. */
     public FFmpegCommandBuilder hlsSegmentDuration(int seconds) {
         extraArgs.add("-hls_time");

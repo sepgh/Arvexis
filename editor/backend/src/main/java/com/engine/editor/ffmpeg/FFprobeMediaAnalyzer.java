@@ -92,6 +92,7 @@ public class FFprobeMediaAnalyzer {
         JsonNode streams = root.path("streams");
         JsonNode videoStream = findStream(streams, "video");
         JsonNode audioStream = findStream(streams, "audio");
+        info.setHasAudio(audioStream != null);
 
         if (videoStream != null) {
             info.setMediaType("video");

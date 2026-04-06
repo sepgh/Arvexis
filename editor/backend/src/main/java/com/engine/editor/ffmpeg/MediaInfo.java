@@ -9,6 +9,7 @@ public class MediaInfo {
     private Integer height;
     private Double frameRate;
     private Double duration;
+    private boolean hasAudio;
     private boolean hasAlpha;
     private Long fileSize;
     private String pixelFormat;
@@ -53,6 +54,9 @@ public class MediaInfo {
     public Double getDuration() { return duration; }
     public void setDuration(Double duration) { this.duration = duration; }
 
+    public boolean isHasAudio() { return hasAudio; }
+    public void setHasAudio(boolean hasAudio) { this.hasAudio = hasAudio; }
+
     public boolean isHasAlpha() { return hasAlpha; }
     public void setHasAlpha(boolean hasAlpha) { this.hasAlpha = hasAlpha; }
 
@@ -72,6 +76,7 @@ public class MediaInfo {
     public String toString() {
         return "MediaInfo{filePath='" + filePath + "', mediaType='" + mediaType +
                "', codec='" + codec + "', resolution=" + getResolution() +
-               ", duration=" + duration + ", hasAlpha=" + hasAlpha + '}';
+               ", duration=" + duration + ", hasAudio=" + hasAudio +
+               ", hasAlpha=" + hasAlpha + '}';
     }
 }

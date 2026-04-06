@@ -199,8 +199,9 @@ public class TransitionPreviewService {
                 Path.of((String) row.get("file_path")), resolveStartAt(row.get("start_at"), row.get("start_at_frames"), fps), i));
         }
 
-        double duration = computeDuration(layerRows, audioRows, fps);
-        if (duration <= 0) duration = fallbackDur;
+        double duration = fallbackDur > 0 ? fallbackDur : computeDuration(layerRows, audioRows, fps);
+        if (duration <= 0) duration = computeDuration(layerRows, audioRows, fps);
+        if (duration <= 0) duration = 1.0;
 
         String bgHex = transitionBg != null && !transitionBg.isBlank() ? transitionBg
                      : config.getDefaultBackgroundColor() != null ? config.getDefaultBackgroundColor()

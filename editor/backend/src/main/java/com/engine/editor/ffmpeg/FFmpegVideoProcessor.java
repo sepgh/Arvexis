@@ -198,7 +198,9 @@ public class FFmpegVideoProcessor implements VideoProcessor {
         );
 
         List<VideoLayerSpec> layers = spec.getVideoLayers();
-        for (VideoLayerSpec layer : layers) {
+        List<Integer> audioInputIndexes = new ArrayList<>();
+        for (int i = 0; i < layers.size(); i++) {
+            VideoLayerSpec layer = layers.get(i);
             List<String> preOpts = new ArrayList<>();
             if (layer.isLoopLayer()) {
                 preOpts.add("-stream_loop");
@@ -217,10 +219,14 @@ public class FFmpegVideoProcessor implements VideoProcessor {
             } else {
                 builder.input(layer.getFilePath().toAbsolutePath().toString());
             }
+            if (inputHasAudio(layer.getFilePath())) {
+                audioInputIndexes.add(i + 1);
+            }
         }
 
         List<AudioTrackSpec> tracks = spec.getAudioTracks();
-        for (AudioTrackSpec track : tracks) {
+        for (int i = 0; i < tracks.size(); i++) {
+            AudioTrackSpec track = tracks.get(i);
             if (track.getStartAt() > 0) {
                 builder.inputWithOptions(
                     List.of("-itsoffset", String.format("%.6f", track.getStartAt())),
@@ -229,9 +235,10 @@ public class FFmpegVideoProcessor implements VideoProcessor {
             } else {
                 builder.input(track.getFilePath().toAbsolutePath().toString());
             }
+            audioInputIndexes.add(layers.size() + i + 1);
         }
 
-        String filterComplex = buildOverlayFilter(layers, tracks, spec.getOutputResolution());
+        String filterComplex = buildOverlayFilter(layers, audioInputIndexes, spec.getOutputResolution(), spec.getDuration());
         if (filterComplex != null) {
             builder.filterComplex(filterComplex);
             builder.mapVideo("[vout]");
@@ -239,7 +246,7 @@ public class FFmpegVideoProcessor implements VideoProcessor {
             builder.map("0:v");
         }
 
-        if (!tracks.isEmpty()) {
+        if (!audioInputIndexes.isEmpty()) {
             builder.map("[aout]");
         }
 
@@ -247,6 +254,7 @@ public class FFmpegVideoProcessor implements VideoProcessor {
                .pixelFormat("yuv420p")
                .frameRate(spec.getFps())
                .audioCodec("aac")
+               .duration(spec.getDuration())
                .output(spec.getOutputPath().toAbsolutePath().toString());
 
         return builder.build();
@@ -259,9 +267,9 @@ public class FFmpegVideoProcessor implements VideoProcessor {
      *
      * Returns {@code null} when there are no layers and no tracks (nothing to filter).
      */
-    private String buildOverlayFilter(List<VideoLayerSpec> layers, List<AudioTrackSpec> tracks,
-                                      String outputResolution) {
-        if (layers.isEmpty() && tracks.isEmpty()) return null;
+    private String buildOverlayFilter(List<VideoLayerSpec> layers, List<Integer> audioInputIndexes,
+                                      String outputResolution, double duration) {
+        if (layers.isEmpty() && audioInputIndexes.isEmpty()) return null;
 
         List<String> parts = new ArrayList<>();
         String currentVideo = "[0:v]";
@@ -291,17 +299,28 @@ public class FFmpegVideoProcessor implements VideoProcessor {
         }
 
         // Audio mixing — audio inputs follow video layer inputs
-        if (!tracks.isEmpty()) {
-            int audioInputOffset = layers.size() + 1; // +1 for bg color source
+        if (!audioInputIndexes.isEmpty()) {
             StringBuilder amix = new StringBuilder();
-            for (int i = 0; i < tracks.size(); i++) {
-                amix.append("[").append(audioInputOffset + i).append(":a]");
+            for (Integer inputIndex : audioInputIndexes) {
+                amix.append("[").append(inputIndex).append(":a]");
             }
-            amix.append("amix=inputs=").append(tracks.size()).append(":normalize=0[aout]");
+            amix.append("amix=inputs=").append(audioInputIndexes.size())
+                .append(":normalize=0,atrim=0:")
+                .append(String.format("%.6f", duration))
+                .append("[aout]");
             parts.add(amix.toString());
         }
 
         return String.join(";", parts);
+    }
+
+    private boolean inputHasAudio(Path filePath) {
+        try {
+            return analyzer.analyze(filePath).isHasAudio();
+        } catch (IOException e) {
+            log.warn("Failed to detect embedded audio for {}: {}", filePath, e.getMessage());
+            return false;
+        }
     }
 
     private String[] parseResolution(String resolution) {
