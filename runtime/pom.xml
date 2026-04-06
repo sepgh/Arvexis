@@ -6,7 +6,7 @@
 
     <groupId>com.engine</groupId>
     <artifactId>runtime</artifactId>
-    <version>1.0.0</version>
+    <version>1.1.0-RELEASE</version>
     <name>Arvexis — Compiled Runtime</name>
 
     <properties>
