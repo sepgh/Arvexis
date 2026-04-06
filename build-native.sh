@@ -9,6 +9,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FRONTEND="$ROOT/editor/frontend"
 BACKEND="$ROOT/editor/backend"
+RUNTIME="$ROOT/runtime"
+
 
 # Verify GraalVM
 if ! java -version 2>&1 | grep -qi "graalvm\|native"; then
@@ -18,7 +20,6 @@ if ! java -version 2>&1 | grep -qi "graalvm\|native"; then
     exit 1
 fi
 
-RUNTIME="$ROOT/runtime"
 
 echo "==> [1/3] Building runtime JAR..."
 cd "$RUNTIME"
