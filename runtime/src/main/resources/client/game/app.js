@@ -21,8 +21,9 @@ export function createAppController(ctx, { apiFetch, settingsController, ui, pla
 
   function pauseGame() {
     ctx.state.gamePaused = true;
-    ctx.dom.videoEl.pause();
+    playback.pauseVideo();
     ctx.dom.musicEl.pause();
+    playback.pauseAmbient();
     decisions.clearCountdown();
     playback.stopSubtitleSync();
     ui.showScreen('paused');
@@ -31,8 +32,13 @@ export function createAppController(ctx, { apiFetch, settingsController, ui, pla
   function resumeGame() {
     ctx.state.gamePaused = false;
     ui.showScreen('game');
-    ctx.dom.videoEl.play().catch(() => {});
+    if (ctx.dom.transEl.classList.contains('active')) {
+      ctx.dom.transEl.play().catch(() => {});
+    } else {
+      ctx.dom.videoEl.play().catch(() => {});
+    }
     if (ctx.settings.musicEnabled && ctx.dom.musicEl.src) ctx.dom.musicEl.play().catch(() => {});
+    playback.resumeAmbient();
     playback.startSubtitleSync();
   }
 
@@ -48,7 +54,7 @@ export function createAppController(ctx, { apiFetch, settingsController, ui, pla
       ui.showSpinner('Loading…');
       try {
         const state = await apiFetch('/api/game/state' + settingsController.localeQueryString());
-        await scene.loadScene(state);
+        await scene.loadScene(state, { restoreAmbientState: true });
       } catch (error) {
         ui.showError('Failed to load: ' + (error.message || error));
       }
@@ -92,6 +98,7 @@ export function createAppController(ctx, { apiFetch, settingsController, ui, pla
     ctx.$('end-menu').addEventListener('click', () => {
       ctx.dom.endScreen.classList.remove('visible');
       playback.stopMusic();
+      playback.stopAmbient();
       ui.showScreen('menu');
       checkContinue();
     });
@@ -107,6 +114,10 @@ export function createAppController(ctx, { apiFetch, settingsController, ui, pla
         if (ctx.state.appScreen === 'game') pauseGame();
         else if (ctx.state.appScreen === 'paused') resumeGame();
         else if (ctx.state.appScreen === 'settings') closeSettings();
+        return;
+      }
+
+      if (event.repeat) {
         return;
       }
 

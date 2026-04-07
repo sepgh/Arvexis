@@ -9,6 +9,7 @@ public class ProjectConfigData {
     private String outputDirectory;
     private String previewResolution;
     private List<String> compileResolutions;
+    private List<AmbientZoneData> ambientZones;
     private int fps;
     private int audioSampleRate;
     private int audioBitRate;
@@ -35,6 +36,9 @@ public class ProjectConfigData {
 
     public List<String> getCompileResolutions() { return compileResolutions; }
     public void setCompileResolutions(List<String> compileResolutions) { this.compileResolutions = compileResolutions; }
+
+    public List<AmbientZoneData> getAmbientZones() { return ambientZones; }
+    public void setAmbientZones(List<AmbientZoneData> ambientZones) { this.ambientZones = ambientZones; }
 
     public int getFps() { return fps; }
     public void setFps(int fps) { this.fps = fps; }

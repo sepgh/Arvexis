@@ -9,8 +9,8 @@ import { createAppController } from './game/app.js';
 
 const ctx = createRuntimeContext();
 const ui = createUiController(ctx);
-const settingsController = createSettingsController(ctx, { apiFetch });
 const playback = createPlaybackController(ctx, ui);
+const settingsController = createSettingsController(ctx, { apiFetch, playback });
 const decisions = createDecisionController(ctx, ui, playback);
 const scene = createSceneController(ctx, {
   apiFetch,

@@ -1,8 +1,10 @@
 package com.engine.editor.service;
 
+import com.engine.editor.controller.dto.AmbientZoneRequest;
 import com.engine.editor.controller.dto.CreateProjectRequest;
 import com.engine.editor.controller.dto.UpdateProjectConfigRequest;
 import com.engine.editor.exception.ProjectException;
+import com.engine.editor.model.AmbientZoneData;
 import com.engine.editor.model.ProjectConfigData;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -20,8 +22,13 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
 
 /**
  * Manages the project lifecycle: create, open, close.
@@ -95,6 +102,7 @@ public class ProjectService {
         config.setPreviewResolution(req.previewResolution() != null ? req.previewResolution() : "1280x720");
         config.setCompileResolutions(req.compileResolutions() != null
             ? req.compileResolutions() : List.of("2K", "1080p", "720p"));
+        config.setAmbientZones(List.of());
         config.setFps(req.fps() != null ? req.fps() : 30);
         config.setAudioSampleRate(req.audioSampleRate() != null ? req.audioSampleRate() : 44100);
         config.setAudioBitRate(req.audioBitRate() != null ? req.audioBitRate() : 128);
@@ -105,11 +113,11 @@ public class ProjectService {
         config.setFfmpegThreads(req.ffmpegThreads());  // null = Auto
 
         insertConfig(config);
-        currentConfig     = config;
+        currentConfig     = loadConfig();
         currentProjectPath = projectDir;
 
         log.info("Created project '{}' at {}", config.getName(), projectDir);
-        return config;
+        return currentConfig;
     }
 
     public synchronized ProjectConfigData openProject(String directoryPath) {
@@ -167,6 +175,11 @@ public class ProjectService {
         if (req.outputDirectory() != null)        currentConfig.setOutputDirectory(req.outputDirectory());
         if (req.previewResolution() != null)      currentConfig.setPreviewResolution(req.previewResolution());
         if (req.compileResolutions() != null)     currentConfig.setCompileResolutions(req.compileResolutions());
+        if (req.ambientZones() != null) {
+            List<AmbientZoneData> ambientZones = normalizeAmbientZones(req.ambientZones());
+            ensureAmbientZoneReferencesRemainValid(ambientZones);
+            currentConfig.setAmbientZones(ambientZones);
+        }
         if (req.fps() != null)                    currentConfig.setFps(req.fps());
         if (req.audioSampleRate() != null)        currentConfig.setAudioSampleRate(req.audioSampleRate());
         if (req.audioBitRate() != null)           currentConfig.setAudioBitRate(req.audioBitRate());
@@ -182,6 +195,7 @@ public class ProjectService {
         }
 
         saveConfig(currentConfig);
+        currentConfig = loadConfig();
         return currentConfig;
     }
 
@@ -264,6 +278,7 @@ public class ProjectService {
             config.isShowDecisionInputIndicator() ? 1 : 0,
             config.getFfmpegThreads()
         );
+        saveAmbientZones(config.getAmbientZones());
     }
 
     private void saveConfig(ProjectConfigData config) {
@@ -292,32 +307,160 @@ public class ProjectService {
             config.isShowDecisionInputIndicator() ? 1 : 0,
             config.getFfmpegThreads()
         );
+        saveAmbientZones(config.getAmbientZones());
     }
 
     private ProjectConfigData loadConfig() {
-        List<ProjectConfigData> rows = currentJdbc.query(
-            "SELECT * FROM project_config WHERE id = 1",
-            (rs, rowNum) -> {
-                ProjectConfigData c = new ProjectConfigData();
-                c.setName(rs.getString("name"));
-                c.setAssetsDirectory(rs.getString("assets_directory"));
-                c.setOutputDirectory(rs.getString("output_directory"));
-                c.setPreviewResolution(rs.getString("preview_resolution"));
-                c.setCompileResolutions(fromJson(rs.getString("compile_resolutions")));
-                c.setFps(rs.getInt("fps"));
-                c.setAudioSampleRate(rs.getInt("audio_sample_rate"));
-                c.setAudioBitRate(rs.getInt("audio_bit_rate"));
-                c.setDecisionTimeoutSecs(rs.getDouble("decision_timeout_secs"));
-                c.setDefaultLocaleCode(rs.getString("default_locale_code"));
-                c.setDefaultBackgroundColor(rs.getString("default_background_color"));
-                c.setHideDecisionButtons(rs.getInt("hide_decision_buttons") == 1);
-                c.setShowDecisionInputIndicator(rs.getInt("show_decision_input_indicator") == 1);
-                int threads = rs.getInt("ffmpeg_threads");
-                c.setFfmpegThreads(rs.wasNull() ? null : threads);
-                return c;
+        List<Map<String, Object>> rows = currentJdbc.queryForList("SELECT * FROM project_config WHERE id = 1");
+        if (rows.isEmpty()) {
+            return null;
+        }
+        Map<String, Object> row = rows.get(0);
+        ProjectConfigData c = new ProjectConfigData();
+        c.setName((String) row.get("name"));
+        c.setAssetsDirectory((String) row.get("assets_directory"));
+        c.setOutputDirectory((String) row.get("output_directory"));
+        c.setPreviewResolution((String) row.get("preview_resolution"));
+        c.setCompileResolutions(fromJson((String) row.get("compile_resolutions")));
+        c.setFps(((Number) row.get("fps")).intValue());
+        c.setAudioSampleRate(((Number) row.get("audio_sample_rate")).intValue());
+        c.setAudioBitRate(((Number) row.get("audio_bit_rate")).intValue());
+        c.setDecisionTimeoutSecs(((Number) row.get("decision_timeout_secs")).doubleValue());
+        c.setDefaultLocaleCode((String) row.get("default_locale_code"));
+        c.setDefaultBackgroundColor((String) row.get("default_background_color"));
+        c.setHideDecisionButtons(((Number) row.get("hide_decision_buttons")).intValue() == 1);
+        c.setShowDecisionInputIndicator(((Number) row.get("show_decision_input_indicator")).intValue() == 1);
+        Object threads = row.get("ffmpeg_threads");
+        c.setFfmpegThreads(threads instanceof Number number ? number.intValue() : null);
+        c.setAmbientZones(loadAmbientZones(c.getAssetsDirectory()));
+        return c;
+    }
+
+    private List<AmbientZoneData> normalizeAmbientZones(List<AmbientZoneRequest> requests) {
+        if (requests == null || requests.isEmpty()) {
+            return List.of();
+        }
+        List<AmbientZoneData> zones = new ArrayList<>();
+        Set<String> seenIds = new LinkedHashSet<>();
+        for (AmbientZoneRequest request : requests) {
+            if (request == null) {
+                continue;
             }
+            String name = request.name() != null ? request.name().trim() : "";
+            if (name.isBlank()) {
+                throw new ProjectException("Ambient zone name must not be blank");
+            }
+            String assetId = request.assetId() != null ? request.assetId().trim() : null;
+            if (assetId == null || assetId.isBlank()) {
+                throw new ProjectException("Ambient zone '" + name + "' must reference an audio asset");
+            }
+            requireAudioAssetExists(assetId);
+            String id = request.id() != null && !request.id().isBlank()
+                ? request.id().trim()
+                : UUID.randomUUID().toString();
+            if (!seenIds.add(id)) {
+                throw new ProjectException("Duplicate ambient zone id: " + id);
+            }
+            AmbientZoneData zone = new AmbientZoneData();
+            zone.setId(id);
+            zone.setName(name);
+            zone.setAssetId(assetId);
+            Double defaultVolume = AmbientSupport.clampVolume(request.defaultVolume());
+            Integer defaultFadeMs = AmbientSupport.clampFadeMs(request.defaultFadeMs());
+            zone.setDefaultVolume(defaultVolume != null ? defaultVolume : 1.0);
+            zone.setDefaultFadeMs(defaultFadeMs != null ? defaultFadeMs : 1000);
+            zone.setLoop(request.loop() == null || request.loop());
+            zones.add(zone);
+        }
+        return List.copyOf(zones);
+    }
+
+    private void saveAmbientZones(List<AmbientZoneData> zones) {
+        currentJdbc.update("DELETE FROM ambient_zones");
+        if (zones == null || zones.isEmpty()) {
+            return;
+        }
+        for (AmbientZoneData zone : zones) {
+            currentJdbc.update("""
+                INSERT INTO ambient_zones (id, name, asset_id, default_volume, default_fade_ms, loop)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                zone.getId(),
+                zone.getName(),
+                zone.getAssetId(),
+                zone.getDefaultVolume(),
+                zone.getDefaultFadeMs(),
+                zone.isLoop() ? 1 : 0
+            );
+        }
+    }
+
+    private List<AmbientZoneData> loadAmbientZones(String assetsDirectory) {
+        return currentJdbc.query("""
+            SELECT z.id, z.name, z.asset_id, z.default_volume, z.default_fade_ms, z.loop,
+                   a.file_name, a.file_path
+            FROM ambient_zones z
+            LEFT JOIN assets a ON a.id = z.asset_id
+            ORDER BY z.name COLLATE NOCASE, z.id
+            """, (rs, rowNum) -> {
+                AmbientZoneData zone = new AmbientZoneData();
+                zone.setId(rs.getString("id"));
+                zone.setName(rs.getString("name"));
+                zone.setAssetId(rs.getString("asset_id"));
+                zone.setAssetFileName(rs.getString("file_name"));
+                zone.setAssetRelPath(relPath(assetsDirectory, rs.getString("file_path")));
+                zone.setDefaultVolume(rs.getDouble("default_volume"));
+                zone.setDefaultFadeMs(rs.getInt("default_fade_ms"));
+                zone.setLoop(rs.getInt("loop") == 1);
+                return zone;
+            });
+    }
+
+    private void requireAudioAssetExists(String assetId) {
+        Integer count = currentJdbc.queryForObject(
+            "SELECT COUNT(*) FROM assets WHERE id = ? AND media_type = 'audio'",
+            Integer.class,
+            assetId
         );
-        return rows.isEmpty() ? null : rows.get(0);
+        if (count == null || count == 0) {
+            throw new ProjectException("Audio asset not found: " + assetId);
+        }
+    }
+
+    private void ensureAmbientZoneReferencesRemainValid(List<AmbientZoneData> zones) {
+        Set<String> validZoneIds = zones.stream()
+            .map(AmbientZoneData::getId)
+            .filter(Objects::nonNull)
+            .collect(LinkedHashSet::new, Set::add, Set::addAll);
+
+        List<String> missingSceneRefs = currentJdbc.queryForList(
+            "SELECT DISTINCT ambient_zone_id FROM nodes WHERE ambient_action = 'set' AND ambient_zone_id IS NOT NULL",
+            String.class
+        ).stream().filter(zoneId -> !validZoneIds.contains(zoneId)).toList();
+        if (!missingSceneRefs.isEmpty()) {
+            throw new ProjectException("Ambient zone still referenced by scene config: " + missingSceneRefs.get(0));
+        }
+
+        List<String> missingEdgeRefs = currentJdbc.queryForList(
+            "SELECT DISTINCT ambient_zone_id FROM edge_ambient WHERE ambient_action = 'set' AND ambient_zone_id IS NOT NULL",
+            String.class
+        ).stream().filter(zoneId -> !validZoneIds.contains(zoneId)).toList();
+        if (!missingEdgeRefs.isEmpty()) {
+            throw new ProjectException("Ambient zone still referenced by edge config: " + missingEdgeRefs.get(0));
+        }
+    }
+
+    private String relPath(String assetsDir, String filePath) {
+        if (filePath == null || assetsDir == null) {
+            return filePath;
+        }
+        try {
+            Path base = Path.of(assetsDir).toAbsolutePath().normalize();
+            Path file = Path.of(filePath).toAbsolutePath().normalize();
+            return base.relativize(file).toString().replace('\\', '/');
+        } catch (Exception e) {
+            return filePath;
+        }
     }
 
     private String toJson(List<String> list) {

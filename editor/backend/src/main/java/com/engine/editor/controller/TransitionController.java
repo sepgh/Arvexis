@@ -1,5 +1,6 @@
 package com.engine.editor.controller;
 
+import com.engine.editor.controller.dto.AmbientConfigRequest;
 import com.engine.editor.controller.dto.AudioTrackRequest;
 import com.engine.editor.controller.dto.VideoLayerRequest;
 import com.engine.editor.service.TransitionService;
@@ -58,5 +59,13 @@ public class TransitionController {
         @RequestBody Map<String, String> body
     ) {
         return ResponseEntity.ok(transitionService.setBackgroundColor(id, body.get("backgroundColor")));
+    }
+
+    @PutMapping("/ambient")
+    public ResponseEntity<TransitionResponse> setAmbient(
+        @PathVariable String id,
+        @RequestBody AmbientConfigRequest body
+    ) {
+        return ResponseEntity.ok(transitionService.setAmbientConfig(id, body));
     }
 }

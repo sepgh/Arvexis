@@ -23,10 +23,18 @@ public class GameEngine {
     private final Manifest manifest;
     private final Map<String, Manifest.NodeData>   nodeById         = new HashMap<>();
     private final Map<String, List<Manifest.EdgeData>> edgesBySource = new HashMap<>();
+    private final Map<String, Manifest.AmbientZoneData> ambientZoneById = new HashMap<>();
     private final ExpressionParser parser = new SpelExpressionParser();
 
     public GameEngine(Manifest manifest) {
         this.manifest = manifest;
+        if (manifest.ambientZones != null) {
+            for (Manifest.AmbientZoneData zone : manifest.ambientZones) {
+                if (zone != null && zone.id != null) {
+                    ambientZoneById.put(zone.id, zone);
+                }
+            }
+        }
         for (Manifest.NodeData n : manifest.nodes) {
             nodeById.put(n.id, n);
         }
@@ -43,6 +51,10 @@ public class GameEngine {
 
     public Manifest.NodeData nodeById(String id) {
         return nodeById.get(id);
+    }
+
+    public Manifest.AmbientZoneData ambientZoneById(String id) {
+        return ambientZoneById.get(id);
     }
 
     public double decisionTimeoutSecs() {
@@ -71,10 +83,12 @@ public class GameEngine {
      * @param nextScene   the scene node reached after traversal
      * @param transEdge   the edge whose transition applies (only the edge directly into the
      *                    first-encountered scene node), or null for instant jump
+     * @param sceneEdge   the edge that leads to the next scene
      */
     public record TraversalResult(
         Manifest.NodeData     nextScene,
-        Manifest.EdgeData     transEdge
+        Manifest.EdgeData     transEdge,
+        Manifest.EdgeData     sceneEdge
     ) {}
 
     /**
@@ -114,7 +128,7 @@ public class GameEngine {
                     transEdge = currentEdge.transition != null ? currentEdge : null;
                     state.currentSceneId = targetId;
                     state.gameOver = target.isEnd;
-                    return new TraversalResult(target, transEdge);
+                    return new TraversalResult(target, transEdge, currentEdge);
                 }
                 case "state" -> {
                     executeAssignments(target, state);
@@ -137,12 +151,15 @@ public class GameEngine {
 
     /**
      * Returns the decisions available from the given scene, with their keys.
-     * If the scene has no explicit decisions, returns a synthetic CONTINUE.
+     * If the scene has no explicit decisions and exactly one outgoing edge,
+     * returns a synthetic CONTINUE.
      */
     public List<DecisionInfo> availableDecisions(GameState state, String sceneId) {
         Manifest.NodeData scene = nodeById(sceneId);
         if (scene == null || scene.decisions == null || scene.decisions.isEmpty()) {
-            return List.of(new DecisionInfo("CONTINUE", true, null));
+            return hasSyntheticContinue(sceneId)
+                ? List.of(new DecisionInfo("CONTINUE", true, null))
+                : List.of();
         }
         return scene.decisions.stream()
             .sorted(Comparator.comparingInt(d -> d.decisionOrder))
@@ -161,7 +178,7 @@ public class GameEngine {
         Manifest.NodeData scene = nodeById(sceneId);
         if (scene == null) return false;
         boolean hasExplicitDecisions = sceneHasExplicitDecisions(sceneId);
-        return !hasExplicitDecisions && scene.autoContinue;
+        return !hasExplicitDecisions && scene.autoContinue && hasSyntheticContinue(sceneId);
     }
 
     public record DecisionInfo(String key, boolean isDefault, String keyboardKey) {}
@@ -190,6 +207,24 @@ public class GameEngine {
             .filter(e -> e.transition != null && !"none".equals(e.transition.type))
             .map(e -> "/hls/trans_" + e.id + "/master.m3u8")
             .toList();
+    }
+
+    public List<String> preloadSceneUrlsForScene(GameState state, String sceneId) {
+        if (sceneId == null) {
+            return List.of();
+        }
+        Set<String> urls = new LinkedHashSet<>();
+        for (DecisionInfo decision : availableDecisions(state, sceneId)) {
+            TraversalResult traversal = peek(state, decision.key());
+            if (traversal == null || traversal.nextScene() == null || traversal.nextScene().id == null) {
+                continue;
+            }
+            if (sceneId.equals(traversal.nextScene().id)) {
+                continue;
+            }
+            urls.add("/hls/" + traversal.nextScene().id + "/master.m3u8");
+        }
+        return List.copyOf(urls);
     }
 
     // ── Localization helpers ────────────────────────────────────────────────────
@@ -316,6 +351,10 @@ public class GameEngine {
             .orElse(null);
     }
 
+    private boolean hasSyntheticContinue(String sceneId) {
+        return edgesBySource.getOrDefault(sceneId, List.of()).size() == 1;
+    }
+
     private EvaluationContext buildContext(GameState state) {
         SimpleEvaluationContext ctx = SimpleEvaluationContext.forReadWriteDataBinding().build();
         state.variables.forEach(ctx::setVariable);
@@ -343,7 +382,7 @@ public class GameEngine {
     private boolean isDecisionAvailable(GameState state, String sceneId, String decisionKey) {
         Manifest.NodeData scene = nodeById(sceneId);
         if (scene == null || scene.decisions == null || scene.decisions.isEmpty()) {
-            return "CONTINUE".equals(decisionKey);
+            return "CONTINUE".equals(decisionKey) && hasSyntheticContinue(sceneId);
         }
         return scene.decisions.stream()
             .filter(d -> decisionKey.equals(d.decisionKey))

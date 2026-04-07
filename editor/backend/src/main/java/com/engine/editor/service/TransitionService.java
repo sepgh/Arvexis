@@ -1,8 +1,10 @@
 package com.engine.editor.service;
 
+import com.engine.editor.controller.dto.AmbientConfigRequest;
 import com.engine.editor.controller.dto.AudioTrackRequest;
 import com.engine.editor.controller.dto.VideoLayerRequest;
 import com.engine.editor.exception.ProjectException;
+import com.engine.editor.model.AmbientConfigData;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -48,6 +50,7 @@ public class TransitionService {
         String type,
         Double duration,
         String backgroundColor,
+        AmbientConfigData ambient,
         List<TransitionLayerData> videoLayers,
         List<TransitionAudioData> audioTracks
     ) {}
@@ -85,12 +88,13 @@ public class TransitionService {
         Double duration      = (Double) r[4];
         String bgColor       = (String) r[5];
         boolean allowed      = "scene".equals(targetType);
+        AmbientConfigData ambient = allowed ? loadAmbientConfig(jdbc, edgeId) : AmbientSupport.defaultConfig();
 
         List<TransitionLayerData> layers = allowed ? loadVideoLayers(jdbc, edgeId) : List.of();
         List<TransitionAudioData> audio  = allowed ? loadAudioTracks(jdbc, edgeId) : List.of();
 
         return new TransitionResponse(edgeId, sourceNodeId, targetNodeId, targetType,
-            allowed, transType, duration, bgColor, layers, audio);
+            allowed, transType, duration, bgColor, ambient, layers, audio);
     }
 
     // ── Update type/duration ──────────────────────────────────────────────────
@@ -131,6 +135,42 @@ public class TransitionService {
         requireTargetIsScene(jdbc, edgeId);
         jdbc.update("UPDATE edge_transitions SET background_color = ? WHERE edge_id = ?",
             backgroundColor, edgeId);
+        return getTransition(edgeId);
+    }
+
+    public TransitionResponse setAmbientConfig(String edgeId, AmbientConfigRequest request) {
+        JdbcTemplate jdbc = projectService.requireJdbc();
+        requireEdge(jdbc, edgeId);
+        requireTargetIsScene(jdbc, edgeId);
+
+        AmbientConfigData current = loadAmbientConfig(jdbc, edgeId);
+        String action = request != null && request.action() != null ? request.action() : current.getAction();
+        String zoneId = request != null && request.zoneId() != null ? request.zoneId() : current.getZoneId();
+        Double volumeOverride = request != null && Boolean.TRUE.equals(request.clearVolumeOverride())
+            ? null
+            : (request != null && request.volumeOverride() != null ? request.volumeOverride() : current.getVolumeOverride());
+        Integer fadeMsOverride = request != null && Boolean.TRUE.equals(request.clearFadeMsOverride())
+            ? null
+            : (request != null && request.fadeMsOverride() != null ? request.fadeMsOverride() : current.getFadeMsOverride());
+
+        AmbientConfigData ambient = AmbientSupport.normalizeConfig(action, zoneId, volumeOverride, fadeMsOverride);
+        if ("set".equals(ambient.getAction())) {
+            requireAmbientZoneExists(ambient.getZoneId());
+        }
+
+        jdbc.update("DELETE FROM edge_ambient WHERE edge_id = ?", edgeId);
+        if (!"inherit".equals(ambient.getAction())) {
+            jdbc.update("""
+                INSERT INTO edge_ambient (edge_id, ambient_action, ambient_zone_id, ambient_volume_override, ambient_fade_ms_override)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                edgeId,
+                ambient.getAction(),
+                ambient.getZoneId(),
+                ambient.getVolumeOverride(),
+                ambient.getFadeMsOverride()
+            );
+        }
         return getTransition(edgeId);
     }
 
@@ -221,6 +261,27 @@ public class TransitionService {
             ), edgeId);
     }
 
+    private AmbientConfigData loadAmbientConfig(JdbcTemplate jdbc, String edgeId) {
+        List<AmbientConfigData> rows = jdbc.query(
+            "SELECT ambient_action, ambient_zone_id, ambient_volume_override, ambient_fade_ms_override FROM edge_ambient WHERE edge_id = ?",
+            (rs, rowNum) -> AmbientSupport.normalizeConfig(
+                rs.getString("ambient_action"),
+                rs.getString("ambient_zone_id"),
+                nullableDouble(rs, "ambient_volume_override"),
+                nullableInteger(rs, "ambient_fade_ms_override")
+            ),
+            edgeId
+        );
+        if (rows.isEmpty()) {
+            return AmbientSupport.defaultConfig();
+        }
+        AmbientConfigData ambient = rows.get(0);
+        if ("set".equals(ambient.getAction())) {
+            requireAmbientZoneExists(ambient.getZoneId());
+        }
+        return ambient;
+    }
+
     private void requireEdge(JdbcTemplate jdbc, String edgeId) {
         Integer c = jdbc.queryForObject("SELECT COUNT(*) FROM edges WHERE id=?", Integer.class, edgeId);
         if (c == null || c == 0) throw new ProjectException("Edge not found: " + edgeId);
@@ -235,8 +296,29 @@ public class TransitionService {
             throw new ProjectException("Transition only allowed on edges targeting scene nodes");
     }
 
+    private void requireAmbientZoneExists(String zoneId) {
+        if (zoneId == null || zoneId.isBlank()) {
+            throw new ProjectException("Ambient zone id is required");
+        }
+        boolean exists = projectService.getConfig().getAmbientZones() != null
+            && projectService.getConfig().getAmbientZones().stream().anyMatch(zone -> zoneId.equals(zone.getId()));
+        if (!exists) {
+            throw new ProjectException("Ambient zone not found: " + zoneId);
+        }
+    }
+
     private void requireAssetExists(JdbcTemplate jdbc, String assetId) {
         Integer c = jdbc.queryForObject("SELECT COUNT(*) FROM assets WHERE id=?", Integer.class, assetId);
         if (c == null || c == 0) throw new ProjectException("Asset not found: " + assetId);
+    }
+
+    private Double nullableDouble(ResultSet rs, String columnName) throws SQLException {
+        double value = rs.getDouble(columnName);
+        return rs.wasNull() ? null : value;
+    }
+
+    private Integer nullableInteger(ResultSet rs, String columnName) throws SQLException {
+        int value = rs.getInt(columnName);
+        return rs.wasNull() ? null : value;
     }
 }

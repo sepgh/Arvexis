@@ -1,6 +1,6 @@
 const SETTINGS_KEY = 'arvexis_settings';
 
-export function createSettingsController(ctx, { apiFetch }) {
+export function createSettingsController(ctx, { apiFetch, playback }) {
   function loadSettings() {
     try {
       const saved = localStorage.getItem(SETTINGS_KEY);
@@ -27,8 +27,10 @@ export function createSettingsController(ctx, { apiFetch }) {
     if (ctx.settings.musicEnabled && ctx.dom.musicEl.src && ctx.dom.musicEl.paused && ctx.state.appScreen === 'game') {
       ctx.dom.musicEl.play().catch(() => {});
     }
+    playback.refreshAmbientVolume();
 
     ctx.dom.videoEl.volume = ctx.settings.videoVolume;
+    ctx.dom.transEl.volume = ctx.settings.videoVolume;
 
     document.documentElement.style.setProperty('--arvexis-btn-bg', hexToRgba(ctx.settings.btnBg, 0.65));
     document.documentElement.style.setProperty('--arvexis-btn-text', ctx.settings.btnText);
@@ -41,6 +43,7 @@ export function createSettingsController(ctx, { apiFetch }) {
     }
 
     ctx.dom.settingMusicVol.value = Math.round(ctx.settings.musicVolume * 100);
+    ctx.dom.settingAmbientVol.value = Math.round(ctx.settings.ambientVolume * 100);
     ctx.dom.settingVideoVol.value = Math.round(ctx.settings.videoVolume * 100);
     ctx.dom.settingMusicEnabled.checked = ctx.settings.musicEnabled;
     ctx.dom.settingBtnBg.value = ctx.settings.btnBg;
@@ -50,6 +53,7 @@ export function createSettingsController(ctx, { apiFetch }) {
     if (ctx.dom.settingSubtitlesEnabled) ctx.dom.settingSubtitlesEnabled.checked = ctx.settings.subtitlesEnabled;
     if (ctx.dom.settingLocale) ctx.dom.settingLocale.value = ctx.settings.locale;
     ctx.dom.musicVolDisplay.textContent = Math.round(ctx.settings.musicVolume * 100) + '%';
+    ctx.dom.ambientVolDisplay.textContent = Math.round(ctx.settings.ambientVolume * 100) + '%';
     ctx.dom.videoVolDisplay.textContent = Math.round(ctx.settings.videoVolume * 100) + '%';
     ctx.dom.btnBgDisplay.textContent = ctx.settings.btnBg;
     ctx.dom.btnTextDisplay.textContent = ctx.settings.btnText;
@@ -85,10 +89,17 @@ export function createSettingsController(ctx, { apiFetch }) {
       ctx.dom.musicEl.volume = ctx.settings.musicEnabled ? ctx.settings.musicVolume : 0;
     });
 
+    ctx.dom.settingAmbientVol.addEventListener('input', () => {
+      ctx.settings.ambientVolume = ctx.dom.settingAmbientVol.value / 100;
+      ctx.dom.ambientVolDisplay.textContent = ctx.dom.settingAmbientVol.value + '%';
+      playback.refreshAmbientVolume();
+    });
+
     ctx.dom.settingVideoVol.addEventListener('input', () => {
       ctx.settings.videoVolume = ctx.dom.settingVideoVol.value / 100;
       ctx.dom.videoVolDisplay.textContent = ctx.dom.settingVideoVol.value + '%';
       ctx.dom.videoEl.volume = ctx.settings.videoVolume;
+      ctx.dom.transEl.volume = ctx.settings.videoVolume;
     });
 
     ctx.dom.settingMusicEnabled.addEventListener('change', () => {

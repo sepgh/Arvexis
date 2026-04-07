@@ -23,6 +23,16 @@ public class FFmpegVideoProcessor implements VideoProcessor {
     private static final Logger log = LoggerFactory.getLogger(FFmpegVideoProcessor.class);
     private static final int DEFAULT_TIMEOUT_SECONDS = 600;
 
+    private static final class AudioInputSpec {
+        private final int inputIndex;
+        private final double startAt;
+
+        private AudioInputSpec(int inputIndex, double startAt) {
+            this.inputIndex = inputIndex;
+            this.startAt = startAt;
+        }
+    }
+
     private String ffmpegPath = "ffmpeg";
     private String ffprobePath = "ffprobe";
 
@@ -121,18 +131,40 @@ public class FFmpegVideoProcessor implements VideoProcessor {
 
         String segmentPattern = outputDir.resolve("segment_%05d.ts").toAbsolutePath().toString();
         String playlistPath   = outputDir.resolve(options.getPlaylistName()).toAbsolutePath().toString();
+        MediaInfo mediaInfo = analyzer.analyze(inputPath);
+        double frameRate = mediaInfo.getFrameRate() != null && mediaInfo.getFrameRate() > 0
+            ? mediaInfo.getFrameRate()
+            : 30.0;
+        int segmentDuration = Math.max(1, options.getSegmentDurationSeconds());
+        int gopSize = Math.max(1, (int) Math.round(frameRate * segmentDuration));
+        String forceKeyFramesExpr = "expr:gte(t,n_forced*" + segmentDuration + ")";
 
         List<String> command = FFmpegCommandBuilder.create()
             .ffmpegPath(ffmpegPath)
             .overwrite()
             .hideBanner()
             .logLevel("error")
+            .globalArg("-fflags")
+            .globalArg("+genpts")
             .input(inputPath.toAbsolutePath().toString())
-            .videoCodec("copy")
-            .audioCodec("copy")
-            .hlsSegmentDuration(options.getSegmentDurationSeconds())
+            .videoCodec("libx264")
+            .pixelFormat("yuv420p")
+            .audioCodec("aac")
+            .hlsSegmentDuration(segmentDuration)
             .hlsPlaylistType("vod")
             .hlsSegmentFilename(segmentPattern)
+            .extraArgs(
+                "-preset", "veryfast",
+                "-crf", "18",
+                "-g", String.valueOf(gopSize),
+                "-keyint_min", String.valueOf(gopSize),
+                "-sc_threshold", "0",
+                "-force_key_frames", forceKeyFramesExpr,
+                "-hls_flags", "independent_segments",
+                "-avoid_negative_ts", "make_zero",
+                "-muxdelay", "0",
+                "-muxpreload", "0"
+            )
             .output(playlistPath)
             .build();
 
@@ -198,7 +230,7 @@ public class FFmpegVideoProcessor implements VideoProcessor {
         );
 
         List<VideoLayerSpec> layers = spec.getVideoLayers();
-        List<Integer> audioInputIndexes = new ArrayList<>();
+        List<AudioInputSpec> audioInputs = new ArrayList<>();
         for (int i = 0; i < layers.size(); i++) {
             VideoLayerSpec layer = layers.get(i);
             List<String> preOpts = new ArrayList<>();
@@ -220,7 +252,7 @@ public class FFmpegVideoProcessor implements VideoProcessor {
                 builder.input(layer.getFilePath().toAbsolutePath().toString());
             }
             if (inputHasAudio(layer.getFilePath())) {
-                audioInputIndexes.add(i + 1);
+                audioInputs.add(new AudioInputSpec(i + 1, layer.getStartAt()));
             }
         }
 
@@ -235,10 +267,10 @@ public class FFmpegVideoProcessor implements VideoProcessor {
             } else {
                 builder.input(track.getFilePath().toAbsolutePath().toString());
             }
-            audioInputIndexes.add(layers.size() + i + 1);
+            audioInputs.add(new AudioInputSpec(layers.size() + i + 1, track.getStartAt()));
         }
 
-        String filterComplex = buildOverlayFilter(layers, audioInputIndexes, spec.getOutputResolution(), spec.getDuration());
+        String filterComplex = buildOverlayFilter(layers, audioInputs, spec.getOutputResolution(), spec.getDuration());
         if (filterComplex != null) {
             builder.filterComplex(filterComplex);
             builder.mapVideo("[vout]");
@@ -246,7 +278,7 @@ public class FFmpegVideoProcessor implements VideoProcessor {
             builder.map("0:v");
         }
 
-        if (!audioInputIndexes.isEmpty()) {
+        if (!audioInputs.isEmpty()) {
             builder.map("[aout]");
         }
 
@@ -267,9 +299,9 @@ public class FFmpegVideoProcessor implements VideoProcessor {
      *
      * Returns {@code null} when there are no layers and no tracks (nothing to filter).
      */
-    private String buildOverlayFilter(List<VideoLayerSpec> layers, List<Integer> audioInputIndexes,
+    private String buildOverlayFilter(List<VideoLayerSpec> layers, List<AudioInputSpec> audioInputs,
                                       String outputResolution, double duration) {
-        if (layers.isEmpty() && audioInputIndexes.isEmpty()) return null;
+        if (layers.isEmpty() && audioInputs.isEmpty()) return null;
 
         List<String> parts = new ArrayList<>();
         String currentVideo = "[0:v]";
@@ -299,12 +331,18 @@ public class FFmpegVideoProcessor implements VideoProcessor {
         }
 
         // Audio mixing — audio inputs follow video layer inputs
-        if (!audioInputIndexes.isEmpty()) {
+        if (!audioInputs.isEmpty()) {
             StringBuilder amix = new StringBuilder();
-            for (Integer inputIndex : audioInputIndexes) {
-                amix.append("[").append(inputIndex).append(":a]");
+            for (int i = 0; i < audioInputs.size(); i++) {
+                AudioInputSpec audioInput = audioInputs.get(i);
+                String audioLabel = "[am" + i + "]";
+                String ptsExpr = audioInput.startAt > 0
+                    ? String.format("PTS-STARTPTS+%.6f/TB", audioInput.startAt)
+                    : "PTS-STARTPTS";
+                parts.add("[" + audioInput.inputIndex + ":a]asetpts=" + ptsExpr + audioLabel);
+                amix.append(audioLabel);
             }
-            amix.append("amix=inputs=").append(audioInputIndexes.size())
+            amix.append("amix=inputs=").append(audioInputs.size())
                 .append(":normalize=0,atrim=0:")
                 .append(String.format("%.6f", duration))
                 .append("[aout]");

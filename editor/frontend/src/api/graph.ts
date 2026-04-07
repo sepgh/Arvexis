@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { GraphNode, GraphEdge } from '@/types'
+import type { AmbientConfigRequest, GraphNode, GraphEdge } from '@/types'
 
 export interface CreateNodePayload {
   name: string
@@ -17,6 +17,7 @@ export interface UpdateNodePayload {
   decisionAppearanceConfig?: string
   musicAssetId?: string | null
   clearMusicAsset?: boolean
+  ambient?: AmbientConfigRequest
   hideDecisionButtons?: boolean | null
   showDecisionInputIndicator?: boolean | null
   clearDecisionInputModeOverride?: boolean

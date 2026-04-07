@@ -23,6 +23,7 @@ import NodeEditorPanel from '@/components/editor/NodeEditorPanel'
 import EdgeEditorPanel from '@/components/editor/EdgeEditorPanel'
 import ValidationPanel from '@/components/editor/ValidationPanel'
 import ProjectSettingsPanel from '@/components/editor/ProjectSettingsPanel'
+import AmbientZonesPanel from '@/components/editor/AmbientZonesPanel'
 import LabeledEdge from '@/components/canvas/LabeledEdge'
 import ResizableSidePanel from '@/components/layout/ResizableSidePanel'
 import LocalizationPanel from '@/components/editor/LocalizationPanel'
@@ -49,6 +50,7 @@ function GraphCanvas() {
   const validationPanelOpen     = useEditorStore(s => s.validationPanelOpen)
   const localizationPanelOpen   = useEditorStore(s => s.localizationPanelOpen)
   const projectSettingsPanelOpen = useEditorStore(s => s.projectSettingsPanelOpen)
+  const ambientZonesPanelOpen    = useEditorStore(s => s.ambientZonesPanelOpen)
   const customCssPanelOpen        = useEditorStore(s => s.customCssPanelOpen)
 
   const {
@@ -168,6 +170,11 @@ function GraphCanvas() {
       {projectSettingsPanelOpen && (
         <ResizableSidePanel side="right" initialWidth={460} minWidth={360} maxWidth={720}>
           <ProjectSettingsPanel />
+        </ResizableSidePanel>
+      )}
+      {ambientZonesPanelOpen && (
+        <ResizableSidePanel side="right" initialWidth={480} minWidth={360} maxWidth={760}>
+          <AmbientZonesPanel />
         </ResizableSidePanel>
       )}
       {customCssPanelOpen && (

@@ -18,6 +18,7 @@ public class GraphNode {
     private String backgroundColor;
     private String decisionAppearanceConfig;
     private String musicAssetId;
+    private AmbientConfigData ambient;
     private Boolean hideDecisionButtons;
     private Boolean showDecisionInputIndicator;
     private double posX;
@@ -61,6 +62,9 @@ public class GraphNode {
 
     public String getMusicAssetId() { return musicAssetId; }
     public void setMusicAssetId(String musicAssetId) { this.musicAssetId = musicAssetId; }
+
+    public AmbientConfigData getAmbient() { return ambient; }
+    public void setAmbient(AmbientConfigData ambient) { this.ambient = ambient; }
 
     public Boolean getHideDecisionButtons() { return hideDecisionButtons; }
     public void setHideDecisionButtons(Boolean hideDecisionButtons) {

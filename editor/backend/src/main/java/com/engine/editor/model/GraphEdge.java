@@ -9,6 +9,7 @@ public class GraphEdge {
     private String sourceConditionName;
     private String targetNodeId;
     private EdgeTransitionData transition;
+    private AmbientConfigData ambient;
 
     public GraphEdge() {}
 
@@ -36,4 +37,7 @@ public class GraphEdge {
 
     public EdgeTransitionData getTransition() { return transition; }
     public void setTransition(EdgeTransitionData transition) { this.transition = transition; }
+
+    public AmbientConfigData getAmbient() { return ambient; }
+    public void setAmbient(AmbientConfigData ambient) { this.ambient = ambient; }
 }

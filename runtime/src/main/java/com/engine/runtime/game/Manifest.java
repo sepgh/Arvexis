@@ -11,6 +11,7 @@ public class Manifest {
 
     @JsonProperty("rootNodeId")   public String rootNodeId;
     @JsonProperty("project")      public ProjectConfig project;
+    @JsonProperty("ambientZones") public List<AmbientZoneData> ambientZones;
     @JsonProperty("nodes")        public List<NodeData> nodes;
     @JsonProperty("edges")        public List<EdgeData> edges;
     @JsonProperty("localization") public LocalizationData localization;
@@ -45,6 +46,7 @@ public class Manifest {
         @JsonProperty("loopVideo")                public boolean loopVideo;
         @JsonProperty("musicAssetId")             public String musicAssetId;
         @JsonProperty("musicAssetRelPath")        public String musicAssetRelPath;
+        @JsonProperty("ambient")                  public AmbientConfigData ambient;
         @JsonProperty("hideDecisionButtons")      public Boolean hideDecisionButtons;
         @JsonProperty("showDecisionInputIndicator") public Boolean showDecisionInputIndicator;
     }
@@ -80,6 +82,7 @@ public class Manifest {
         @JsonProperty("targetNodeId")         public String         targetNodeId;
         @JsonProperty("sourceDecisionKey")    public String         sourceDecisionKey;
         @JsonProperty("sourceConditionOrder") public Integer        sourceConditionOrder;
+        @JsonProperty("ambient")              public AmbientConfigData ambient;
         @JsonProperty("transition")           public TransitionData transition;
     }
 
@@ -88,6 +91,26 @@ public class Manifest {
         @JsonProperty("type")            public String type;
         @JsonProperty("duration")        public double duration;
         @JsonProperty("backgroundColor") public String backgroundColor;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class AmbientZoneData {
+        @JsonProperty("id")            public String id;
+        @JsonProperty("name")          public String name;
+        @JsonProperty("assetId")       public String assetId;
+        @JsonProperty("assetFileName") public String assetFileName;
+        @JsonProperty("assetRelPath")  public String assetRelPath;
+        @JsonProperty("defaultVolume") public double defaultVolume;
+        @JsonProperty("defaultFadeMs") public int defaultFadeMs;
+        @JsonProperty("loop")          public boolean loop;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class AmbientConfigData {
+        @JsonProperty("action")         public String action;
+        @JsonProperty("zoneId")         public String zoneId;
+        @JsonProperty("volumeOverride") public Double volumeOverride;
+        @JsonProperty("fadeMsOverride") public Integer fadeMsOverride;
     }
 
     // ── Localization ──────────────────────────────────────────────────────────

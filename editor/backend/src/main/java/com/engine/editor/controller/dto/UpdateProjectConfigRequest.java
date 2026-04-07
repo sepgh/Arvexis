@@ -8,6 +8,7 @@ public record UpdateProjectConfigRequest(
     String outputDirectory,
     String previewResolution,
     List<String> compileResolutions,
+    List<AmbientZoneRequest> ambientZones,
     Integer fps,
     Integer audioSampleRate,
     Integer audioBitRate,

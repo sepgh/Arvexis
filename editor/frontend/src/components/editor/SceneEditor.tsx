@@ -1,5 +1,5 @@
 import { useState, useEffect, type KeyboardEvent } from 'react'
-import type { SceneDataResponse, VideoLayerData, AudioTrackData, Asset } from '@/types'
+import type { AmbientAction, AmbientConfig, AmbientConfigRequest, SceneDataResponse, VideoLayerData, AudioTrackData, Asset } from '@/types'
 import {
   getSceneData, saveVideoLayers, saveAudioTracks, saveDecisions,
   type VideoLayerRequest, type AudioTrackRequest, type DecisionItemRequest,
@@ -18,6 +18,7 @@ interface SceneEditorProps {
   loopVideo: boolean
   backgroundColor: string | null
   musicAssetId: string | null
+  ambient: AmbientConfig | null
   hideDecisionButtons: boolean | null
   showDecisionInputIndicator: boolean | null
   onNodeUpdated?: () => void
@@ -52,8 +53,59 @@ function describeDecisionInputMode(hideDecisionButtons: boolean, showDecisionInp
   return 'Decision buttons are hidden and players choose using assigned keyboard keys.'
 }
 
-export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue: initialAutoContinue, loopVideo: initialLoopVideo, backgroundColor: initialBg, musicAssetId: initialMusicAssetId, hideDecisionButtons: initialHideDecisionButtons, showDecisionInputIndicator: initialShowDecisionInputIndicator, onNodeUpdated }: SceneEditorProps) {
+function normalizeAmbientAction(action: AmbientConfig['action'] | null | undefined): AmbientAction {
+  if (action === 'set' || action === 'stop') {
+    return action
+  }
+  return 'inherit'
+}
+
+function buildAmbientRequest(
+  action: AmbientAction,
+  zoneId: string,
+  useVolumeOverride: boolean,
+  volumeOverride: string,
+  useFadeOverride: boolean,
+  fadeMsOverride: string,
+): AmbientConfigRequest {
+  if (action === 'stop') {
+    return {
+      action,
+      clearVolumeOverride: true,
+      clearFadeMsOverride: true,
+    }
+  }
+  const request: AmbientConfigRequest = {
+    action,
+    clearVolumeOverride: !useVolumeOverride,
+    clearFadeMsOverride: !useFadeOverride,
+  }
+  if (action === 'set') {
+    if (!zoneId.trim()) {
+      throw new Error('Ambient action "Set zone" requires an ambient zone')
+    }
+    request.zoneId = zoneId.trim()
+  }
+  if (useVolumeOverride) {
+    const parsedVolume = Number(volumeOverride)
+    if (!Number.isFinite(parsedVolume) || parsedVolume < 0 || parsedVolume > 1) {
+      throw new Error('Ambient volume override must be between 0 and 1')
+    }
+    request.volumeOverride = parsedVolume
+  }
+  if (useFadeOverride) {
+    const parsedFadeMs = Number(fadeMsOverride)
+    if (!Number.isInteger(parsedFadeMs) || parsedFadeMs < 0) {
+      throw new Error('Ambient fade override must be a whole number of milliseconds')
+    }
+    request.fadeMsOverride = parsedFadeMs
+  }
+  return request
+}
+
+export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue: initialAutoContinue, loopVideo: initialLoopVideo, backgroundColor: initialBg, musicAssetId: initialMusicAssetId, ambient: initialAmbient, hideDecisionButtons: initialHideDecisionButtons, showDecisionInputIndicator: initialShowDecisionInputIndicator, onNodeUpdated }: SceneEditorProps) {
   const projectConfig = useEditorStore((s) => s.projectConfig)
+  const ambientZones = projectConfig?.ambientZones ?? []
   const projectDefaultBackgroundColor = projectConfig?.defaultBackgroundColor ?? '#000000'
   const projectHideDecisionButtons = projectConfig?.hideDecisionButtons ?? false
   const projectShowDecisionInputIndicator = projectHideDecisionButtons && (projectConfig?.showDecisionInputIndicator ?? false)
@@ -70,6 +122,12 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
   const [loopVideo, setLoopVideo] = useState(initialLoopVideo)
   const [bgColor, setBgColor]     = useState(initialBg ?? projectDefaultBackgroundColor)
   const [musicAssetId, setMusicAssetId] = useState<string | null>(initialMusicAssetId)
+  const [ambientAction, setAmbientAction] = useState<AmbientAction>(normalizeAmbientAction(initialAmbient?.action))
+  const [ambientZoneId, setAmbientZoneId] = useState(initialAmbient?.zoneId ?? '')
+  const [useAmbientVolumeOverride, setUseAmbientVolumeOverride] = useState(initialAmbient?.volumeOverride != null)
+  const [ambientVolumeOverride, setAmbientVolumeOverride] = useState(initialAmbient?.volumeOverride != null ? String(initialAmbient.volumeOverride) : '1')
+  const [useAmbientFadeOverride, setUseAmbientFadeOverride] = useState(initialAmbient?.fadeMsOverride != null)
+  const [ambientFadeMsOverride, setAmbientFadeMsOverride] = useState(initialAmbient?.fadeMsOverride != null ? String(initialAmbient.fadeMsOverride) : '0')
   const [useSceneDecisionInputMode, setUseSceneDecisionInputMode] = useState(
     initialHideDecisionButtons != null || initialShowDecisionInputIndicator != null
   )
@@ -89,13 +147,19 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
     setLoopVideo(initialLoopVideo)
     setBgColor(initialBg ?? projectDefaultBackgroundColor)
     setMusicAssetId(initialMusicAssetId)
+    setAmbientAction(normalizeAmbientAction(initialAmbient?.action))
+    setAmbientZoneId(initialAmbient?.zoneId ?? '')
+    setUseAmbientVolumeOverride(initialAmbient?.volumeOverride != null)
+    setAmbientVolumeOverride(initialAmbient?.volumeOverride != null ? String(initialAmbient.volumeOverride) : '1')
+    setUseAmbientFadeOverride(initialAmbient?.fadeMsOverride != null)
+    setAmbientFadeMsOverride(initialAmbient?.fadeMsOverride != null ? String(initialAmbient.fadeMsOverride) : '0')
     setUseSceneDecisionInputMode(initialHideDecisionButtons != null || initialShowDecisionInputIndicator != null)
     setHideDecisionButtons(initialHideDecisionButtons ?? projectHideDecisionButtons)
     setShowDecisionInputIndicator(
       (initialHideDecisionButtons ?? projectHideDecisionButtons)
         && (initialShowDecisionInputIndicator ?? projectShowDecisionInputIndicator)
     )
-  }, [initialIsEnd, initialAutoContinue, initialLoopVideo, initialBg, projectDefaultBackgroundColor, initialMusicAssetId, initialHideDecisionButtons, initialShowDecisionInputIndicator, projectHideDecisionButtons, projectShowDecisionInputIndicator, nodeId])
+  }, [initialIsEnd, initialAutoContinue, initialLoopVideo, initialBg, projectDefaultBackgroundColor, initialMusicAssetId, initialAmbient?.action, initialAmbient?.zoneId, initialAmbient?.volumeOverride, initialAmbient?.fadeMsOverride, initialHideDecisionButtons, initialShowDecisionInputIndicator, projectHideDecisionButtons, projectShowDecisionInputIndicator, nodeId])
 
   async function handlePreview() {
     setPreviewing(true)
@@ -379,6 +443,19 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
 
   async function saveProperties() {
     const payload: Record<string, unknown> = { isEnd, autoContinue, loopVideo, backgroundColor: bgColor }
+    try {
+      payload.ambient = buildAmbientRequest(
+        ambientAction,
+        ambientZoneId,
+        useAmbientVolumeOverride,
+        ambientVolumeOverride,
+        useAmbientFadeOverride,
+        ambientFadeMsOverride,
+      )
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Ambient settings are invalid')
+      return
+    }
     if (musicAssetId) {
       payload.musicAssetId = musicAssetId
     } else {
@@ -402,6 +479,8 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
     { id: 'decisions', label: 'Decisions' },
     { id: 'props', label: 'Props' },
   ]
+  const selectedAmbientZone = ambientZones.find((zone) => zone.id === ambientZoneId)
+  const ambientOverridesEnabled = ambientAction !== 'stop'
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -712,6 +791,144 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
                 assets={audioAssets}
                 onPick={(a) => setMusicAssetId(a.id)}
               />
+            </div>
+
+            <div className="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/20 px-3 py-3">
+              <div>
+                <span className="font-medium text-foreground" style={{ fontSize: 14 }}>Ambient audio</span>
+                <p className="text-muted-foreground" style={{ fontSize: 13 }}>Persistent environmental audio for this scene.</p>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-muted-foreground" style={{ fontSize: 14 }}>Action</label>
+                <select
+                  value={ambientAction}
+                  onChange={e => {
+                    const nextAction = e.target.value as AmbientAction
+                    setAmbientAction(nextAction)
+                    if (nextAction === 'set' && !ambientZoneId && ambientZones[0]) {
+                      setAmbientZoneId(ambientZones[0].id)
+                    }
+                  }}
+                  className="input-base text-sm"
+                >
+                  <option value="inherit">Inherit current ambient</option>
+                  <option value="set">Set ambient zone</option>
+                  <option value="stop">Stop ambient</option>
+                </select>
+              </div>
+              {ambientAction === 'inherit' && (
+                <p className="text-xs text-muted-foreground">Keeps the currently active ambient track and can optionally rebalance its volume without restarting it.</p>
+              )}
+              {ambientAction === 'stop' && (
+                <p className="text-xs text-muted-foreground">Stops the active ambient channel when this scene begins.</p>
+              )}
+              {ambientOverridesEnabled && (
+                <div className="flex flex-col gap-3">
+                  {ambientAction === 'set' && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-muted-foreground" style={{ fontSize: 14 }}>Ambient zone</label>
+                        <select
+                          value={ambientZoneId}
+                          onChange={e => setAmbientZoneId(e.target.value)}
+                          className="input-base text-sm"
+                          disabled={!ambientZones.length}
+                        >
+                          <option value="">Select ambient zone…</option>
+                          {ambientZones.map((zone) => (
+                            <option key={zone.id} value={zone.id}>{zone.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="rounded-lg border border-border/40 bg-muted/10 px-3 py-2.5">
+                        <span className="text-xs font-medium text-foreground">Zone defaults</span>
+                        {selectedAmbientZone ? (
+                          <p className="text-xs text-muted-foreground" style={{ marginTop: 4 }}>
+                            {selectedAmbientZone.assetFileName ?? selectedAmbientZone.assetId} · volume {selectedAmbientZone.defaultVolume.toFixed(2)} · fade {selectedAmbientZone.defaultFadeMs}ms{selectedAmbientZone.loop ? ' · loop' : ''}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground" style={{ marginTop: 4 }}>
+                            {ambientZones.length ? 'Choose a zone to inspect its defaults.' : 'Create ambient zones in the Ambient panel first.'}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="flex items-center gap-3 cursor-pointer rounded-lg border border-border/40 bg-muted/10 px-3 py-2.5">
+                      <input
+                        type="checkbox"
+                        checked={useAmbientVolumeOverride}
+                        onChange={e => {
+                          const checked = e.target.checked
+                          setUseAmbientVolumeOverride(checked)
+                          if (checked) {
+                            setAmbientVolumeOverride(
+                              ambientAction === 'set' && selectedAmbientZone
+                                ? String(selectedAmbientZone.defaultVolume)
+                                : ambientVolumeOverride || '1'
+                            )
+                          }
+                        }}
+                        className="w-4 h-4 accent-primary"
+                      />
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-sm font-medium text-foreground">Override volume</span>
+                        <span className="text-xs text-muted-foreground">Adjust the target ambient volume for this scene without forcing a track restart.</span>
+                      </div>
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer rounded-lg border border-border/40 bg-muted/10 px-3 py-2.5">
+                      <input
+                        type="checkbox"
+                        checked={useAmbientFadeOverride}
+                        onChange={e => {
+                          const checked = e.target.checked
+                          setUseAmbientFadeOverride(checked)
+                          if (checked) {
+                            setAmbientFadeMsOverride(
+                              ambientAction === 'set' && selectedAmbientZone
+                                ? String(selectedAmbientZone.defaultFadeMs)
+                                : ambientFadeMsOverride || '0'
+                            )
+                          }
+                        }}
+                        className="w-4 h-4 accent-primary"
+                      />
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-sm font-medium text-foreground">Override fade</span>
+                        <span className="text-xs text-muted-foreground">Set how quickly this scene adjusts or swaps ambient playback.</span>
+                      </div>
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-muted-foreground" style={{ fontSize: 14 }}>Volume override</label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        value={ambientVolumeOverride}
+                        onChange={e => setAmbientVolumeOverride(e.target.value)}
+                        disabled={!useAmbientVolumeOverride}
+                        className="input-base"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-muted-foreground" style={{ fontSize: 14 }}>Fade override (ms)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        step={50}
+                        value={ambientFadeMsOverride}
+                        onChange={e => setAmbientFadeMsOverride(e.target.value)}
+                        disabled={!useAmbientFadeOverride}
+                        className="input-base"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <button

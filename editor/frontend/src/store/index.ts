@@ -13,6 +13,7 @@ interface EditorState {
   validationPanelOpen: boolean
   localizationPanelOpen: boolean
   projectSettingsPanelOpen: boolean
+  ambientZonesPanelOpen: boolean
   customCssPanelOpen: boolean
   saveStatus: SaveStatus
   saveError: string | null
@@ -25,6 +26,7 @@ interface EditorState {
   toggleValidationPanel: () => void
   toggleLocalizationPanel: () => void
   toggleProjectSettingsPanel: () => void
+  toggleAmbientZonesPanel: () => void
   toggleCustomCssPanel: () => void
   setSaveStatus: (status: SaveStatus, error?: string | null) => void
 }
@@ -39,6 +41,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   validationPanelOpen: false,
   localizationPanelOpen: false,
   projectSettingsPanelOpen: false,
+  ambientZonesPanelOpen: false,
   customCssPanelOpen: false,
   saveStatus: 'idle',
   saveError: null,
@@ -47,7 +50,20 @@ export const useEditorStore = create<EditorState>((set) => ({
     set({ projectConfig: config, isProjectOpen: true }),
 
   clearProject: () =>
-    set({ projectConfig: null, isProjectOpen: false, assetPanelOpen: false, selectedNodeId: null, selectedEdgeId: null, validationPanelOpen: false, localizationPanelOpen: false, projectSettingsPanelOpen: false, customCssPanelOpen: false, saveStatus: 'idle', saveError: null }),
+    set({ 
+      projectConfig: null, 
+      isProjectOpen: false, 
+      assetPanelOpen: false, 
+      selectedNodeId: null, 
+      selectedEdgeId: null, 
+      validationPanelOpen: false, 
+      localizationPanelOpen: false, 
+      projectSettingsPanelOpen: false, 
+      ambientZonesPanelOpen: false, 
+      customCssPanelOpen: false, 
+      saveStatus: 'idle', 
+      saveError: null 
+    }),
 
   setAppLoading: (loading) =>
     set({ appLoading: loading }),
@@ -69,6 +85,9 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   toggleProjectSettingsPanel: () =>
     set((s) => ({ projectSettingsPanelOpen: !s.projectSettingsPanelOpen })),
+
+  toggleAmbientZonesPanel: () =>
+    set((s) => ({ ambientZonesPanelOpen: !s.ambientZonesPanelOpen })),
 
   toggleCustomCssPanel: () =>
     set((s) => ({ customCssPanelOpen: !s.customCssPanelOpen })),

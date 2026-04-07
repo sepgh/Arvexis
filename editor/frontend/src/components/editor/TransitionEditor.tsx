@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
-import type { TransitionResponse, TransitionType, Asset, TransitionLayerData, TransitionAudioData } from '@/types'
-import { getTransition, setTransitionType, saveTransitionLayers, saveTransitionAudio, setTransitionBackgroundColor } from '@/api/transition'
+import type { AmbientAction, AmbientConfig, AmbientConfigRequest, TransitionResponse, TransitionType, Asset, TransitionLayerData, TransitionAudioData } from '@/types'
+import { getTransition, setTransitionType, saveTransitionLayers, saveTransitionAudio, setTransitionBackgroundColor, setTransitionAmbient } from '@/api/transition'
 import type { VideoLayerRequest, AudioTrackRequest } from '@/api/nodeEditor'
 import { listAssets } from '@/api/assets'
 import { startTransitionPreview, type PreviewJobStatus } from '@/api/preview'
+import { useEditorStore } from '@/store'
 import PreviewModal from './PreviewModal'
 
 const TRANSITION_TYPES: { value: TransitionType; label: string }[] = [
@@ -23,7 +24,59 @@ interface TransitionEditorProps { edgeId: string }
 
 type Section = 'config' | 'layers' | 'audio'
 
+function normalizeAmbientAction(action: AmbientConfig['action'] | null | undefined): AmbientAction {
+  if (action === 'set' || action === 'stop') {
+    return action
+  }
+  return 'inherit'
+}
+
+function buildAmbientRequest(
+  action: AmbientAction,
+  zoneId: string,
+  useVolumeOverride: boolean,
+  volumeOverride: string,
+  useFadeOverride: boolean,
+  fadeMsOverride: string,
+): AmbientConfigRequest {
+  if (action === 'stop') {
+    return {
+      action,
+      clearVolumeOverride: true,
+      clearFadeMsOverride: true,
+    }
+  }
+  const request: AmbientConfigRequest = {
+    action,
+    clearVolumeOverride: !useVolumeOverride,
+    clearFadeMsOverride: !useFadeOverride,
+  }
+  if (action === 'set') {
+    if (!zoneId.trim()) {
+      throw new Error('Ambient action "Set zone" requires an ambient zone')
+    }
+    request.zoneId = zoneId.trim()
+  }
+  if (useVolumeOverride) {
+    const parsedVolume = Number(volumeOverride)
+    if (!Number.isFinite(parsedVolume) || parsedVolume < 0 || parsedVolume > 1) {
+      throw new Error('Ambient volume override must be between 0 and 1')
+    }
+    request.volumeOverride = parsedVolume
+  }
+  if (useFadeOverride) {
+    const parsedFadeMs = Number(fadeMsOverride)
+    if (!Number.isInteger(parsedFadeMs) || parsedFadeMs < 0) {
+      throw new Error('Ambient fade override must be a whole number of milliseconds')
+    }
+    request.fadeMsOverride = parsedFadeMs
+  }
+  return request
+}
+
 export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
+  const projectConfig = useEditorStore((s) => s.projectConfig)
+  const ambientZones = projectConfig?.ambientZones ?? []
   const [data, setData]       = useState<TransitionResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving]   = useState(false)
@@ -33,6 +86,12 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
   const [audioAssets, setAudioAssets] = useState<Asset[]>([])
   const [durationInput, setDurationInput] = useState('')
   const [bgColorInput, setBgColorInput]   = useState('#ffffff')
+  const [ambientAction, setAmbientAction] = useState<AmbientAction>('inherit')
+  const [ambientZoneId, setAmbientZoneId] = useState('')
+  const [useAmbientVolumeOverride, setUseAmbientVolumeOverride] = useState(false)
+  const [ambientVolumeOverride, setAmbientVolumeOverride] = useState('1')
+  const [useAmbientFadeOverride, setUseAmbientFadeOverride] = useState(false)
+  const [ambientFadeMsOverride, setAmbientFadeMsOverride] = useState('0')
   const [previewJob, setPreviewJob]   = useState<PreviewJobStatus | null>(null)
   const [previewing, setPreviewing]   = useState(false)
 
@@ -61,6 +120,12 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
         setBgColorInput(d.backgroundColor ?? '#ffffff')
         setVideoAssets(v)
         setAudioAssets(a)
+        setAmbientAction(normalizeAmbientAction(d.ambient?.action))
+        setAmbientZoneId(d.ambient?.zoneId ?? '')
+        setUseAmbientVolumeOverride(d.ambient?.volumeOverride != null)
+        setAmbientVolumeOverride(d.ambient?.volumeOverride != null ? String(d.ambient.volumeOverride) : '1')
+        setUseAmbientFadeOverride(d.ambient?.fadeMsOverride != null)
+        setAmbientFadeMsOverride(d.ambient?.fadeMsOverride != null ? String(d.ambient.fadeMsOverride) : '0')
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Load failed'))
       .finally(() => setLoading(false))
@@ -89,7 +154,23 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
     if (result) setData(result)
   }
 
-  // Video layers
+  async function handleAmbientSave() {
+    try {
+      const ambient = buildAmbientRequest(
+        ambientAction,
+        ambientZoneId,
+        useAmbientVolumeOverride,
+        ambientVolumeOverride,
+        useAmbientFadeOverride,
+        ambientFadeMsOverride,
+      )
+      const result = await withSave(() => setTransitionAmbient(edgeId, ambient))
+      if (result) setData(result)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Ambient settings are invalid')
+    }
+  }
+
   function toLayerReq(l: TransitionLayerData): VideoLayerRequest {
     return { assetId: l.assetId, startAt: l.startAt, startAtFrames: l.startAtFrames, freezeLastFrame: l.freezeLastFrame, loopLayer: false }
   }
@@ -148,7 +229,6 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
     if (result) setData(result)
   }
 
-  // Audio tracks
   function toAudioReq(t: TransitionAudioData): AudioTrackRequest {
     return { assetId: t.assetId, startAt: t.startAt, startAtFrames: t.startAtFrames }
   }
@@ -190,7 +270,6 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
 
   if (loading) return <div className="flex items-center justify-center h-20 text-xs text-muted-foreground">Loading…</div>
 
-  // Non-scene target: show disabled message
   if (data && !data.transitionAllowed) {
     return (
       <div className="flex flex-col items-center justify-center h-full px-6 gap-3 text-center">
@@ -205,6 +284,9 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
   }
 
   const isVideo = data?.type === 'video'
+  const selectedAmbientZone = ambientZones.find((zone) => zone.id === ambientZoneId)
+  const ambientOverridesEnabled = ambientAction !== 'stop'
+
   const SECTIONS: { id: Section; label: string; show: boolean }[] = [
     { id: 'config', label: 'Type',   show: true },
     { id: 'layers', label: 'Layers', show: !!isVideo },
@@ -325,6 +407,156 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
                 </p>
               </>
             )}
+
+            <div className="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/20 px-3 py-3">
+              <div>
+                <span className="text-sm font-medium text-foreground">Ambient audio</span>
+                <p className="text-xs text-muted-foreground" style={{ marginTop: 4 }}>
+                  Applied when this edge is taken, independently of the visual transition type.
+                </p>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm text-muted-foreground">Action</label>
+                <select
+                  value={ambientAction}
+                  onChange={e => {
+                    const nextAction = e.target.value as AmbientAction
+                    setAmbientAction(nextAction)
+                    if (nextAction === 'set' && !ambientZoneId && ambientZones[0]) {
+                      setAmbientZoneId(ambientZones[0].id)
+                    }
+                  }}
+                  className="input-base text-xs py-1.5"
+                >
+                  <option value="inherit">Inherit current ambient</option>
+                  <option value="set">Set ambient zone</option>
+                  <option value="stop">Stop ambient</option>
+                </select>
+              </div>
+              {ambientAction === 'inherit' && (
+                <p className="text-xs text-muted-foreground">Keeps the currently active ambient track and can optionally rebalance its volume without restarting it.</p>
+              )}
+              {ambientAction === 'stop' && (
+                <p className="text-xs text-muted-foreground">Stops the active ambient layer when this edge is used.</p>
+              )}
+              {ambientOverridesEnabled && (
+                <div className="flex flex-col gap-3">
+                  {ambientAction === 'set' && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-sm text-muted-foreground">Ambient zone</label>
+                        <select
+                          value={ambientZoneId}
+                          onChange={e => setAmbientZoneId(e.target.value)}
+                          className="input-base text-xs py-1.5"
+                          disabled={!ambientZones.length}
+                        >
+                          <option value="">Select ambient zone…</option>
+                          {ambientZones.map((zone) => (
+                            <option key={zone.id} value={zone.id}>{zone.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="rounded-lg border border-border/40 bg-muted/10 px-3 py-2.5">
+                        <span className="text-xs font-medium text-foreground">Zone defaults</span>
+                        {selectedAmbientZone ? (
+                          <p className="text-xs text-muted-foreground" style={{ marginTop: 4 }}>
+                            {selectedAmbientZone.assetFileName ?? selectedAmbientZone.assetId} · volume {selectedAmbientZone.defaultVolume.toFixed(2)} · fade {selectedAmbientZone.defaultFadeMs}ms{selectedAmbientZone.loop ? ' · loop' : ''}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground" style={{ marginTop: 4 }}>
+                            {ambientZones.length ? 'Choose a zone to inspect its defaults.' : 'Create ambient zones in the Ambient panel first.'}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="flex items-center gap-3 cursor-pointer rounded-lg border border-border/40 bg-muted/10 px-3 py-2.5">
+                      <input
+                        type="checkbox"
+                        checked={useAmbientVolumeOverride}
+                        onChange={e => {
+                          const checked = e.target.checked
+                          setUseAmbientVolumeOverride(checked)
+                          if (checked) {
+                            setAmbientVolumeOverride(
+                              ambientAction === 'set' && selectedAmbientZone
+                                ? String(selectedAmbientZone.defaultVolume)
+                                : ambientVolumeOverride || '1'
+                            )
+                          }
+                        }}
+                        className="w-4 h-4 accent-primary"
+                      />
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-sm font-medium text-foreground">Override volume</span>
+                        <span className="text-xs text-muted-foreground">Adjust the target ambient volume for this edge without forcing a track restart.</span>
+                      </div>
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer rounded-lg border border-border/40 bg-muted/10 px-3 py-2.5">
+                      <input
+                        type="checkbox"
+                        checked={useAmbientFadeOverride}
+                        onChange={e => {
+                          const checked = e.target.checked
+                          setUseAmbientFadeOverride(checked)
+                          if (checked) {
+                            setAmbientFadeMsOverride(
+                              ambientAction === 'set' && selectedAmbientZone
+                                ? String(selectedAmbientZone.defaultFadeMs)
+                                : ambientFadeMsOverride || '0'
+                            )
+                          }
+                        }}
+                        className="w-4 h-4 accent-primary"
+                      />
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-sm font-medium text-foreground">Override fade</span>
+                        <span className="text-xs text-muted-foreground">Set how quickly this edge adjusts or swaps ambient playback.</span>
+                      </div>
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-sm text-muted-foreground">Volume override</label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        value={ambientVolumeOverride}
+                        onChange={e => setAmbientVolumeOverride(e.target.value)}
+                        disabled={!useAmbientVolumeOverride}
+                        className="input-base text-xs py-1"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-sm text-muted-foreground">Fade override (ms)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        step={50}
+                        value={ambientFadeMsOverride}
+                        onChange={e => setAmbientFadeMsOverride(e.target.value)}
+                        disabled={!useAmbientFadeOverride}
+                        className="input-base text-xs py-1"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleAmbientSave}
+                  disabled={saving}
+                  className="rounded-md bg-primary text-primary-foreground disabled:opacity-40 transition-opacity px-3 py-1.5 text-sm font-medium"
+                >
+                  Save ambient
+                </button>
+              </div>
+            </div>
           </>
         )}
 

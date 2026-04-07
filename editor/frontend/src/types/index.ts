@@ -20,6 +20,7 @@ export interface GraphNode {
   backgroundColor?: string
   decisionAppearanceConfig?: DecisionAppearanceConfig
   musicAssetId?: string | null
+  ambient?: AmbientConfig
   hideDecisionButtons?: boolean | null
   showDecisionInputIndicator?: boolean | null
   posX: number
@@ -30,6 +31,35 @@ export interface GraphNode {
 export interface DecisionAppearanceConfig {
   timing: 'at_timestamp' | 'after_video_ends'
   timestampSeconds?: number
+}
+
+export type AmbientAction = 'inherit' | 'set' | 'stop'
+
+export interface AmbientConfig {
+  action: AmbientAction
+  zoneId?: string | null
+  volumeOverride?: number | null
+  fadeMsOverride?: number | null
+}
+
+export interface AmbientConfigRequest {
+  action?: AmbientAction
+  zoneId?: string | null
+  volumeOverride?: number | null
+  clearVolumeOverride?: boolean
+  fadeMsOverride?: number | null
+  clearFadeMsOverride?: boolean
+}
+
+export interface AmbientZone {
+  id: string
+  name: string
+  assetId: string
+  assetFileName?: string
+  assetRelPath?: string
+  defaultVolume: number
+  defaultFadeMs: number
+  loop: boolean
 }
 
 // ── Edge / Transition types ──────────────────────────────────────────────────
@@ -54,6 +84,7 @@ export interface GraphEdge {
   sourceConditionName?: string
   targetNodeId: string
   transition?: EdgeTransition
+  ambient?: AmbientConfig
 }
 
 export interface EdgeTransition {
@@ -198,6 +229,7 @@ export interface TransitionResponse {
   type: TransitionType | null
   duration: number | null
   backgroundColor: string | null
+  ambient: AmbientConfig
   videoLayers: TransitionLayerData[]
   audioTracks: TransitionAudioData[]
 }
@@ -225,6 +257,7 @@ export interface ProjectConfig {
   outputDirectory?: string
   previewResolution?: string
   compileResolutions?: string[]
+  ambientZones?: AmbientZone[]
   fps: number
   audioSampleRate: number
   audioBitRate: number

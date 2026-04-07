@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { ProjectConfig } from '@/types'
+import type { AmbientZone, ProjectConfig } from '@/types'
 
 export interface ProjectStatus {
   open: boolean
@@ -29,6 +29,7 @@ export interface UpdateProjectConfigPayload {
   outputDirectory?: string
   previewResolution?: string
   compileResolutions?: string[]
+  ambientZones?: Array<Pick<AmbientZone, 'id' | 'name' | 'assetId' | 'defaultVolume' | 'defaultFadeMs' | 'loop'>>
   fps?: number
   audioSampleRate?: number
   audioBitRate?: number

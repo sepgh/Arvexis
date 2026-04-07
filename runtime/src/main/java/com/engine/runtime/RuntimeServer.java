@@ -57,9 +57,14 @@ public class RuntimeServer {
         GameState loaded = stateStore.load();
         if (loaded != null && engine.nodeById(loaded.currentSceneId) != null) {
             state = loaded;
+            if (state.ambient == null) {
+                initializeAmbientState(state);
+                stateStore.save(state);
+            }
             System.out.println("  Resumed  : scene " + state.currentSceneId);
         } else {
             state = new GameState(manifest.rootNodeId);
+            initializeAmbientState(state);
             stateStore.save(state);
             System.out.println("  New game : root = " + manifest.rootNodeId);
         }
@@ -126,6 +131,7 @@ public class RuntimeServer {
                     RequestHelper.sendError(ex, 409, "Game is over. Call /api/game/restart to play again."); return;
                 }
                 GameEngine.TraversalResult result = engine.decide(state, decisionKey);
+                applyAmbientTraversal(state, result);
                 stateStore.save(state);
 
                 Map<String, Object> resp = new LinkedHashMap<>();
@@ -140,6 +146,7 @@ public class RuntimeServer {
                 } else {
                     resp.put("transition", null);
                 }
+                resp.put("edgeAmbient", buildAmbientDirective(result.sceneEdge() != null ? result.sceneEdge().ambient : null));
                 resp.put("nextState", buildStateResponse(state, locale));
                 RequestHelper.sendJson(ex, 200, resp);
             }
@@ -161,6 +168,7 @@ public class RuntimeServer {
         String locale = queryParam(ex, "locale");
         synchronized (stateLock) {
             state = new GameState(manifest.rootNodeId);
+            initializeAmbientState(state);
             stateStore.save(state);
             RequestHelper.sendJson(ex, 200, buildStateResponse(state, locale));
         }
@@ -288,6 +296,7 @@ public class RuntimeServer {
             return dm;
         }).toList());
         resp.put("preloadUrls",       engine.preloadUrlsForScene(s.currentSceneId));
+        resp.put("preloadSceneUrls",  engine.preloadSceneUrlsForScene(s, s.currentSceneId));
         // Scene-level auto-continue: only active when there are no explicit decisions
         boolean autoContinues = engine.sceneAutoContinues(s.currentSceneId);
         resp.put("autoContinue", autoContinues);
@@ -307,6 +316,8 @@ public class RuntimeServer {
         } else {
             resp.put("musicUrl", null);  // null = keep current music playing
         }
+        resp.put("ambient", buildAmbientState(s.ambient));
+        resp.put("sceneAmbient", buildAmbientDirective(scene != null ? scene.ambient : null));
 
         resp.put("variables",         Map.copyOf(s.variables));
 
@@ -328,6 +339,128 @@ public class RuntimeServer {
         }
 
         return resp;
+    }
+
+    private void initializeAmbientState(GameState gameState) {
+        ensureAmbientState(gameState);
+        Manifest.NodeData scene = engine.nodeById(gameState.currentSceneId);
+        applyAmbientConfig(gameState, scene != null ? scene.ambient : null);
+    }
+
+    private void applyAmbientTraversal(GameState gameState, GameEngine.TraversalResult result) {
+        if (result == null) {
+            return;
+        }
+        ensureAmbientState(gameState);
+        applyAmbientConfig(gameState, result.sceneEdge() != null ? result.sceneEdge().ambient : null);
+        applyAmbientConfig(gameState, result.nextScene() != null ? result.nextScene().ambient : null);
+    }
+
+    private void applyAmbientConfig(GameState gameState, Manifest.AmbientConfigData config) {
+        ensureAmbientState(gameState);
+        String action = normalizeAmbientAction(config != null ? config.action : null);
+        if ("inherit".equals(action)) {
+            if (config != null && "set".equalsIgnoreCase(gameState.ambient.action)
+                && gameState.ambient.assetRelPath != null && !gameState.ambient.assetRelPath.isBlank()) {
+                if (config.volumeOverride != null) {
+                    gameState.ambient.volume = clampVolume(config.volumeOverride);
+                }
+                if (config.fadeMsOverride != null) {
+                    gameState.ambient.fadeMs = Math.max(0, config.fadeMsOverride);
+                }
+            }
+            return;
+        }
+        if ("stop".equals(action)) {
+            gameState.ambient = new GameState.AmbientState();
+            return;
+        }
+        Manifest.AmbientZoneData zone = engine.ambientZoneById(config.zoneId);
+        if (zone == null || zone.assetRelPath == null || zone.assetRelPath.isBlank()) {
+            gameState.ambient = new GameState.AmbientState();
+            return;
+        }
+        GameState.AmbientState ambient = new GameState.AmbientState();
+        ambient.action = "set";
+        ambient.zoneId = zone.id;
+        ambient.assetRelPath = zone.assetRelPath;
+        ambient.volume = config.volumeOverride != null ? clampVolume(config.volumeOverride) : clampVolume(zone.defaultVolume);
+        ambient.fadeMs = config.fadeMsOverride != null ? Math.max(0, config.fadeMsOverride) : Math.max(0, zone.defaultFadeMs);
+        ambient.loop = zone.loop;
+        gameState.ambient = ambient;
+    }
+
+    private Map<String, Object> buildAmbientDirective(Manifest.AmbientConfigData config) {
+        String action = normalizeAmbientAction(config != null ? config.action : null);
+        Map<String, Object> ambient = new LinkedHashMap<>();
+        ambient.put("action", action);
+        if ("inherit".equals(action)) {
+            if (config != null && config.volumeOverride != null) {
+                ambient.put("volume", clampVolume(config.volumeOverride));
+            }
+            if (config != null && config.fadeMsOverride != null) {
+                ambient.put("fadeMs", Math.max(0, config.fadeMsOverride));
+            }
+            return ambient;
+        }
+        if ("stop".equals(action)) {
+            ambient.put("fadeMs", config != null && config.fadeMsOverride != null ? Math.max(0, config.fadeMsOverride) : 0);
+            return ambient;
+        }
+        if (!"set".equals(action)) {
+            return ambient;
+        }
+        Manifest.AmbientZoneData zone = engine.ambientZoneById(config.zoneId);
+        if (zone == null || zone.assetRelPath == null || zone.assetRelPath.isBlank()) {
+            ambient.put("action", "stop");
+            return ambient;
+        }
+        ambient.put("zoneId", zone.id);
+        ambient.put("assetUrl", "/assets/" + zone.assetRelPath);
+        ambient.put("volume", config.volumeOverride != null ? clampVolume(config.volumeOverride) : clampVolume(zone.defaultVolume));
+        ambient.put("fadeMs", config.fadeMsOverride != null ? Math.max(0, config.fadeMsOverride) : Math.max(0, zone.defaultFadeMs));
+        ambient.put("loop", zone.loop);
+        return ambient;
+    }
+
+    private Map<String, Object> buildAmbientState(GameState.AmbientState ambientState) {
+        Map<String, Object> ambient = new LinkedHashMap<>();
+        if (ambientState == null || !"set".equalsIgnoreCase(ambientState.action)
+            || ambientState.assetRelPath == null || ambientState.assetRelPath.isBlank()) {
+            ambient.put("action", "stop");
+            return ambient;
+        }
+        ambient.put("action", "set");
+        ambient.put("zoneId", ambientState.zoneId);
+        ambient.put("assetUrl", "/assets/" + ambientState.assetRelPath);
+        ambient.put("volume", clampVolume(ambientState.volume != null ? ambientState.volume : 1.0));
+        ambient.put("fadeMs", ambientState.fadeMs != null ? Math.max(0, ambientState.fadeMs) : 0);
+        ambient.put("loop", ambientState.loop == null || ambientState.loop);
+        return ambient;
+    }
+
+    private void ensureAmbientState(GameState gameState) {
+        if (gameState.ambient == null) {
+            gameState.ambient = new GameState.AmbientState();
+        }
+        if (gameState.ambient.action == null || gameState.ambient.action.isBlank()) {
+            gameState.ambient.action = "stop";
+        }
+    }
+
+    private String normalizeAmbientAction(String action) {
+        if (action == null || action.isBlank()) {
+            return "inherit";
+        }
+        String normalized = action.trim().toLowerCase(Locale.ROOT);
+        return switch (normalized) {
+            case "inherit", "set", "stop" -> normalized;
+            default -> "inherit";
+        };
+    }
+
+    private double clampVolume(double value) {
+        return Math.max(0.0, Math.min(1.0, value));
     }
 
     private String queryParam(HttpExchange ex, String name) {

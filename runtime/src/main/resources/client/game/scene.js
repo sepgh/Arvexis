@@ -1,7 +1,8 @@
 export function createSceneController(ctx, { apiFetch, localeQueryString, ui, playback, decisions }) {
-  async function loadScene(state) {
+  async function loadScene(state, options = {}) {
+    const restoreAmbientState = !!options.restoreAmbientState
     ctx.state.currentState = state;
-    ctx.state.decisionMade = false;
+    ctx.state.decisionMade = true;
     decisions.clearActiveDecisionHotkeys();
 
     ui.clearSceneVideoListeners();
@@ -12,40 +13,70 @@ export function createSceneController(ctx, { apiFetch, localeQueryString, ui, pl
     playback.stopSubtitleSync();
     ctx.dom.endScreen.classList.remove('visible');
 
-    if (ctx.dom.freezeCanvas.style.display === 'none') ui.showSpinner('Loading…');
-
-    if (ctx.state.hlsInstance) {
-      ctx.state.hlsInstance.destroy();
-      ctx.state.hlsInstance = null;
-    }
-
     const sceneUrl = state.sceneHlsUrl;
-    if (ctx.state.preloadedSceneHls[sceneUrl]) {
-      ctx.state.preloadedSceneHls[sceneUrl].destroy();
-      delete ctx.state.preloadedSceneHls[sceneUrl];
+    const preparedSceneMatches = ctx.state.preparedSceneUrl === sceneUrl;
+    const canReusePreparedScene = preparedSceneMatches && ctx.state.preparedSceneReady && ctx.state.hlsInstance;
+
+    if (!canReusePreparedScene && ctx.dom.freezeCanvas.style.display === 'none') ui.showSpinner('Loading…');
+
+    if (!canReusePreparedScene) {
+      if (preparedSceneMatches && ctx.state.preparedScenePromise) {
+        try {
+          await ctx.state.preparedScenePromise;
+        } catch {}
+      }
+
+      if (!(ctx.state.preparedSceneUrl === sceneUrl && ctx.state.preparedSceneReady && ctx.state.hlsInstance)) {
+        if (ctx.state.hlsInstance) {
+          ctx.state.hlsInstance.destroy();
+          ctx.state.hlsInstance = null;
+        }
+
+        const preloadedScene = ctx.state.preloadedSceneHls[sceneUrl];
+        if (preloadedScene?.promise) {
+          await preloadedScene.promise;
+          delete ctx.state.preloadedSceneHls[sceneUrl];
+        }
+
+        await playback.loadHls(ctx.dom.videoEl, sceneUrl, (hls) => {
+          ctx.state.hlsInstance = hls;
+        });
+      }
     }
 
-    await playback.loadHls(ctx.dom.videoEl, sceneUrl, (hls) => {
-      ctx.state.hlsInstance = hls;
-    });
+    ctx.state.preparedSceneUrl = null;
+    ctx.state.preparedScenePromise = null;
+    ctx.state.preparedSceneReady = false;
 
     ctx.dom.videoEl.volume = ctx.settings.videoVolume;
 
     playback.preloadTransitions(state.preloadUrls || []);
-    if (state.autoContinueNextSceneUrl) {
-      playback.preloadScene(state.autoContinueNextSceneUrl);
-    }
+    playback.preloadScenes([
+      ...(state.preloadSceneUrls || []),
+      state.autoContinueNextSceneUrl,
+    ].filter(Boolean));
 
     playback.updateMusic(state.musicUrl);
     playback.setSubtitles(state.subtitles || []);
+    if (restoreAmbientState) {
+      playback.restoreAmbientState(state.ambient || state.sceneAmbient || { action: 'stop' })
+    } else {
+      playback.applyAmbientDirective(state.sceneAmbient || { action: 'inherit' })
+    }
 
     const loopVideo = !!state.loopVideo;
-    ctx.dom.videoEl.loop = false;
+    ctx.dom.videoEl.loop = loopVideo;
 
     const availableDecisions = state.decisions || [];
     const hasExplicitDecisions = !!state.hasExplicitDecisions;
+    const hasContinueDecision = availableDecisions.some((decision) => decision.key === 'CONTINUE');
+    const sceneDuration = typeof state.duration === 'number' && Number.isFinite(state.duration)
+      ? state.duration
+      : null;
     const timeoutSeconds = state.decisionTimeoutSecs || 5;
     const isEnd = state.isEnd;
+    const loopDecisionLeadSeconds = 0.75;
+    ctx.state.decisionMade = false;
 
     if (state.autoContinue) {
       ui.addSceneVideoListener('ended', async () => {
@@ -66,40 +97,43 @@ export function createSceneController(ctx, { apiFetch, localeQueryString, ui, pl
         }
       } catch {}
 
+      const addLoopBoundaryHandler = (callback) => {
+        ui.addSceneVideoListener('timeupdate', function onLoopBoundary() {
+          if (ctx.state.decisionMade) {
+            ctx.dom.videoEl.removeEventListener('timeupdate', onLoopBoundary);
+            return;
+          }
+          const duration = Number.isFinite(ctx.dom.videoEl.duration) && ctx.dom.videoEl.duration > 0
+            ? ctx.dom.videoEl.duration
+            : sceneDuration;
+          if (!Number.isFinite(duration) || duration <= 0) return;
+          if (ctx.dom.videoEl.currentTime >= Math.max(0, duration - loopDecisionLeadSeconds)) {
+            ctx.dom.videoEl.removeEventListener('timeupdate', onLoopBoundary);
+            callback();
+          }
+        });
+      };
+
       if (availableDecisions.length > 0) {
         if (appearAt !== null) {
           ui.addSceneVideoListener('timeupdate', function onTimeUpdate() {
             if (ctx.dom.videoEl.currentTime >= appearAt) {
               ctx.dom.videoEl.removeEventListener('timeupdate', onTimeUpdate);
-              if (!ctx.state.decisionMade) decisions.showDecisions(availableDecisions, timeoutSeconds, makeDecision);
+              if (!ctx.state.decisionMade) {
+                decisions.showDecisions(availableDecisions, timeoutSeconds, makeDecision);
+              }
             }
           });
         }
 
         if (loopVideo) {
-          let decisionsShown = false;
-          ctx.state.loopHandler = function onLoop() {
-            if (ctx.state.decisionMade) {
-              ctx.dom.videoEl.removeEventListener('ended', ctx.state.loopHandler);
-              ctx.state.loopHandler = null;
-              return;
-            }
-            if (isEnd) {
-              ctx.dom.videoEl.removeEventListener('ended', ctx.state.loopHandler);
-              ctx.state.loopHandler = null;
-              ui.captureFreeze();
-              ui.showEndScreen();
-              return;
-            }
-            if (!decisionsShown && appearAt === null) {
-              decisionsShown = true;
-              decisions.showDecisions(availableDecisions, timeoutSeconds, makeDecision);
-            }
-            if (ctx.state.hlsInstance) ctx.state.hlsInstance.startLoad(0);
-            ctx.dom.videoEl.currentTime = 0;
-            ctx.dom.videoEl.play().catch(() => {});
-          };
-          ui.addSceneVideoListener('ended', ctx.state.loopHandler);
+          if (appearAt === null) {
+            addLoopBoundaryHandler(() => {
+              if (!ctx.state.decisionMade) {
+                decisions.showDecisions(availableDecisions, timeoutSeconds, makeDecision);
+              }
+            });
+          }
         } else {
           ui.addSceneVideoListener('ended', function onEnded() {
             ctx.dom.videoEl.removeEventListener('ended', onEnded);
@@ -122,30 +156,13 @@ export function createSceneController(ctx, { apiFetch, localeQueryString, ui, pl
         }
 
         if (loopVideo) {
-          let unavailableShown = false;
-          ctx.state.loopHandler = function onLoop() {
-            if (ctx.state.decisionMade) {
-              ctx.dom.videoEl.removeEventListener('ended', ctx.state.loopHandler);
-              ctx.state.loopHandler = null;
-              return;
-            }
-            if (isEnd) {
-              ctx.dom.videoEl.removeEventListener('ended', ctx.state.loopHandler);
-              ctx.state.loopHandler = null;
-              ui.captureFreeze();
-              ui.showEndScreen();
-              return;
-            }
-            if (!unavailableShown && appearAt === null) {
-              unavailableShown = true;
-              decisions.showUnavailableDecisionsError();
-              return;
-            }
-            if (ctx.state.hlsInstance) ctx.state.hlsInstance.startLoad(0);
-            ctx.dom.videoEl.currentTime = 0;
-            ctx.dom.videoEl.play().catch(() => {});
-          };
-          ui.addSceneVideoListener('ended', ctx.state.loopHandler);
+          if (appearAt === null) {
+            addLoopBoundaryHandler(() => {
+              if (!ctx.state.decisionMade) {
+                decisions.showUnavailableDecisionsError();
+              }
+            });
+          }
         } else {
           ui.addSceneVideoListener('ended', function onEnded() {
             ctx.dom.videoEl.removeEventListener('ended', onEnded);
@@ -157,10 +174,16 @@ export function createSceneController(ctx, { apiFetch, localeQueryString, ui, pl
           ui.captureFreeze();
           ui.showEndScreen();
         }, { once: true });
-      } else {
+      } else if (hasContinueDecision) {
         ui.addSceneVideoListener('ended', async () => {
           ui.captureFreeze();
           await makeDecision('CONTINUE');
+        }, { once: true });
+      } else {
+        ui.addSceneVideoListener('ended', () => {
+          if (!ctx.state.decisionMade) {
+            decisions.showUnavailableDecisionsError();
+          }
         }, { once: true });
       }
     }
@@ -185,14 +208,31 @@ export function createSceneController(ctx, { apiFetch, localeQueryString, ui, pl
     ctx.dom.videoEl.loop = false;
     ctx.dom.videoEl.pause();
     playback.stopSubtitleSync();
+    ui.clearSceneVideoListeners();
+    ctx.state.loopHandler = null;
     try {
       const result = await apiFetch('/api/game/decide' + localeQueryString(), {
         method: 'POST',
         body: JSON.stringify({ decisionKey }),
       });
 
+      let prepareScenePromise = null;
+
+      if (result.nextState && result.nextState.sceneHlsUrl) {
+        playback.preloadScene(result.nextState.sceneHlsUrl);
+        if (result.transition) {
+          prepareScenePromise = playback.prepareScene(result.nextState.sceneHlsUrl).catch(() => null);
+        }
+      }
+
+      playback.applyAmbientDirective(result.edgeAmbient || { action: 'inherit' })
+
       if (result.transition) {
         await playback.playTransition(result.transition);
+      }
+
+      if (prepareScenePromise) {
+        await prepareScenePromise;
       }
 
       await loadScene(result.nextState);

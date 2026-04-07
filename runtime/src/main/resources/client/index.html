@@ -34,7 +34,7 @@
       <!-- Main scene video -->
       <video id="video-el" playsinline webkit-playsinline></video>
       <!-- Transition video (layered on top) -->
-      <video id="transition-el" playsinline webkit-playsinline muted></video>
+      <video id="transition-el" playsinline webkit-playsinline></video>
       <!-- Freeze frame canvas -->
       <canvas id="freeze-canvas"></canvas>
 
@@ -81,6 +81,7 @@
 
     <!-- Background music audio element (hidden) -->
     <audio id="music-el" loop preload="auto"></audio>
+    <audio id="ambient-el" preload="auto"></audio>
   </div>
 
   <!-- ══════════════════════════════════════════════════════════════════════
@@ -109,6 +110,14 @@
         <div class="settings-control">
           <input type="range" id="setting-music-vol" min="0" max="100" value="70"/>
           <span class="volume-value" id="music-vol-display">70%</span>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <span class="settings-label">Ambient Volume</span>
+        <div class="settings-control">
+          <input type="range" id="setting-ambient-vol" min="0" max="100" value="100"/>
+          <span class="volume-value" id="ambient-vol-display">100%</span>
         </div>
       </div>
 

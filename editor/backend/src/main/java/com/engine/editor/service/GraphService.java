@@ -5,6 +5,7 @@ import com.engine.editor.controller.dto.CreateNodeRequest;
 import com.engine.editor.controller.dto.UpdateEdgeRequest;
 import com.engine.editor.controller.dto.UpdateNodeRequest;
 import com.engine.editor.exception.ProjectException;
+import com.engine.editor.model.AmbientConfigData;
 import com.engine.editor.model.EdgeTransitionData;
 import com.engine.editor.model.GraphEdge;
 import com.engine.editor.model.GraphNode;
@@ -91,6 +92,7 @@ public class GraphService {
                           : existing.getDecisionAppearanceConfig();
         String musicAsset = Boolean.TRUE.equals(req.clearMusicAsset()) ? null
                           : (req.musicAssetId() != null ? req.musicAssetId() : existing.getMusicAssetId());
+        AmbientConfigData ambient = resolveAmbientConfig(existing.getAmbient(), req.ambient());
         Boolean hideDecisionButtons = Boolean.TRUE.equals(req.clearDecisionInputModeOverride())
             ? null
             : (req.hideDecisionButtons() != null ? req.hideDecisionButtons() : existing.getHideDecisionButtons());
@@ -107,10 +109,12 @@ public class GraphService {
 
         jdbc.update("""
             UPDATE nodes SET name=?, is_end=?, auto_continue=?, loop_video=?, background_color=?,
-                decision_appearance_config=?, music_asset_id=?, hide_decision_buttons=?,
+                decision_appearance_config=?, music_asset_id=?, ambient_action=?, ambient_zone_id=?,
+                ambient_volume_override=?, ambient_fade_ms_override=?, hide_decision_buttons=?,
                 show_decision_input_indicator=?, pos_x=?, pos_y=?
             WHERE id=?
             """, name, isEnd ? 1 : 0, autoCont ? 1 : 0, loopVid ? 1 : 0, bgColor, dac, musicAsset,
+            ambient.getAction(), ambient.getZoneId(), ambient.getVolumeOverride(), ambient.getFadeMsOverride(),
             toDbFlag(hideDecisionButtons), toDbFlag(showDecisionInputIndicator), posX, posY, id);
 
         return getNode(id);
@@ -190,7 +194,10 @@ public class GraphService {
     public List<GraphEdge> listEdges() {
         JdbcTemplate jdbc = projectService.requireJdbc();
         List<GraphEdge> edges = jdbc.query("SELECT * FROM edges", this::mapEdge);
-        edges.forEach(e -> e.setTransition(loadTransition(jdbc, e.getId())));
+        edges.forEach(e -> {
+            e.setTransition(loadTransition(jdbc, e.getId()));
+            e.setAmbient(loadEdgeAmbient(jdbc, e.getId()));
+        });
         return edges;
     }
 
@@ -200,6 +207,7 @@ public class GraphService {
         if (rows.isEmpty()) throw new ProjectException("Edge not found: " + id);
         GraphEdge edge = rows.get(0);
         edge.setTransition(loadTransition(jdbc, id));
+        edge.setAmbient(loadEdgeAmbient(jdbc, id));
         return edge;
     }
 
@@ -244,6 +252,12 @@ public class GraphService {
         n.setBackgroundColor(rs.getString("background_color"));
         n.setDecisionAppearanceConfig(rs.getString("decision_appearance_config"));
         n.setMusicAssetId(rs.getString("music_asset_id"));
+        n.setAmbient(readAmbientConfig(
+            rs.getString("ambient_action"),
+            rs.getString("ambient_zone_id"),
+            nullableDouble(rs, "ambient_volume_override"),
+            nullableInteger(rs, "ambient_fade_ms_override")
+        ));
         n.setHideDecisionButtons(nullableFlag(rs, "hide_decision_buttons"));
         n.setShowDecisionInputIndicator(nullableFlag(rs, "show_decision_input_indicator"));
         n.setPosX(rs.getDouble("pos_x"));
@@ -277,6 +291,20 @@ public class GraphService {
         return rows.isEmpty() ? null : rows.get(0);
     }
 
+    private AmbientConfigData loadEdgeAmbient(JdbcTemplate jdbc, String edgeId) {
+        List<AmbientConfigData> rows = jdbc.query(
+            "SELECT ambient_action, ambient_zone_id, ambient_volume_override, ambient_fade_ms_override FROM edge_ambient WHERE edge_id = ?",
+            (rs, row) -> readAmbientConfig(
+                rs.getString("ambient_action"),
+                rs.getString("ambient_zone_id"),
+                nullableDouble(rs, "ambient_volume_override"),
+                nullableInteger(rs, "ambient_fade_ms_override")
+            ),
+            edgeId
+        );
+        return rows.isEmpty() ? AmbientSupport.defaultConfig() : rows.get(0);
+    }
+
     private void requireNodeExists(JdbcTemplate jdbc, String nodeId) {
         Integer count = jdbc.queryForObject(
             "SELECT COUNT(*) FROM nodes WHERE id=?", Integer.class, nodeId);
@@ -284,9 +312,58 @@ public class GraphService {
             throw new ProjectException("Node not found: " + nodeId);
     }
 
+    private AmbientConfigData resolveAmbientConfig(AmbientConfigData existing, com.engine.editor.controller.dto.AmbientConfigRequest request) {
+        AmbientConfigData current = existing != null ? existing : AmbientSupport.defaultConfig();
+        if (request == null) {
+            return current;
+        }
+        String action = request.action() != null ? request.action() : current.getAction();
+        String zoneId = request.zoneId() != null ? request.zoneId() : current.getZoneId();
+        Double volumeOverride = Boolean.TRUE.equals(request.clearVolumeOverride())
+            ? null
+            : (request.volumeOverride() != null ? request.volumeOverride() : current.getVolumeOverride());
+        Integer fadeMsOverride = Boolean.TRUE.equals(request.clearFadeMsOverride())
+            ? null
+            : (request.fadeMsOverride() != null ? request.fadeMsOverride() : current.getFadeMsOverride());
+        AmbientConfigData resolved = AmbientSupport.normalizeConfig(action, zoneId, volumeOverride, fadeMsOverride);
+        if ("set".equals(resolved.getAction())) {
+            requireAmbientZoneExists(resolved.getZoneId());
+        }
+        return resolved;
+    }
+
+    private AmbientConfigData readAmbientConfig(String action, String zoneId, Double volumeOverride, Integer fadeMsOverride) {
+        AmbientConfigData ambient = AmbientSupport.normalizeConfig(action, zoneId, volumeOverride, fadeMsOverride);
+        if ("set".equals(ambient.getAction())) {
+            requireAmbientZoneExists(ambient.getZoneId());
+        }
+        return ambient;
+    }
+
+    private void requireAmbientZoneExists(String zoneId) {
+        if (zoneId == null || zoneId.isBlank()) {
+            throw new ProjectException("Ambient zone id is required");
+        }
+        boolean exists = projectService.getConfig().getAmbientZones() != null
+            && projectService.getConfig().getAmbientZones().stream().anyMatch(zone -> zoneId.equals(zone.getId()));
+        if (!exists) {
+            throw new ProjectException("Ambient zone not found: " + zoneId);
+        }
+    }
+
     private Integer toDbFlag(Boolean value) {
         if (value == null) return null;
         return value ? 1 : 0;
+    }
+
+    private Double nullableDouble(ResultSet rs, String columnName) throws SQLException {
+        double value = rs.getDouble(columnName);
+        return rs.wasNull() ? null : value;
+    }
+
+    private Integer nullableInteger(ResultSet rs, String columnName) throws SQLException {
+        int value = rs.getInt(columnName);
+        return rs.wasNull() ? null : value;
     }
 
     private Boolean nullableFlag(ResultSet rs, String columnName) throws SQLException {

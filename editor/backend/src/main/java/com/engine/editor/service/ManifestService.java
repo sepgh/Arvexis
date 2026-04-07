@@ -45,6 +45,7 @@ public class ManifestService {
         manifest.put("version", "1.0");
         manifest.put("generatedAt", Instant.now().toString());
         manifest.put("project", buildProjectSection(config));
+        manifest.put("ambientZones", buildAmbientZones(config));
         manifest.put("assetsDirectory", config.getAssetsDirectory());
         manifest.put("rootNodeId", rootId);
 
@@ -164,6 +165,13 @@ public class ManifestService {
                 n.put("musicAssetFileName", musicRows.get(0).get("file_name"));
             }
         }
+
+        n.put("ambient", buildAmbientConfig(
+            nodeFullRow.get("ambient_action"),
+            nodeFullRow.get("ambient_zone_id"),
+            nodeFullRow.get("ambient_volume_override"),
+            nodeFullRow.get("ambient_fade_ms_override")
+        ));
 
         // Video layers with relative asset path
         List<Map<String, Object>> layers = jdbc.queryForList("""
@@ -288,6 +296,7 @@ public class ManifestService {
             e.put("sourceDecisionKey",    row.get("source_decision_key"));
             e.put("sourceConditionOrder", row.get("source_condition_order"));
             e.put("transition", buildTransition(edgeId, config, jdbc));
+            e.put("ambient", buildEdgeAmbient(edgeId, jdbc));
             result.add(e);
         }
         return result;
@@ -416,6 +425,62 @@ public class ManifestService {
         return p;
     }
 
+    private List<Map<String, Object>> buildAmbientZones(ProjectConfigData config) {
+        if (config.getAmbientZones() == null || config.getAmbientZones().isEmpty()) {
+            return List.of();
+        }
+        List<Map<String, Object>> zones = new ArrayList<>();
+        for (var zone : config.getAmbientZones()) {
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("id", zone.getId());
+            entry.put("name", zone.getName());
+            entry.put("assetId", zone.getAssetId());
+            entry.put("assetFileName", zone.getAssetFileName());
+            entry.put("assetRelPath", zone.getAssetRelPath());
+            entry.put("defaultVolume", zone.getDefaultVolume());
+            entry.put("defaultFadeMs", zone.getDefaultFadeMs());
+            entry.put("loop", zone.isLoop());
+            zones.add(entry);
+        }
+        return zones;
+    }
+
+    private Map<String, Object> buildEdgeAmbient(String edgeId, JdbcTemplate jdbc) {
+        List<Map<String, Object>> rows = jdbc.queryForList(
+            "SELECT ambient_action, ambient_zone_id, ambient_volume_override, ambient_fade_ms_override FROM edge_ambient WHERE edge_id=?",
+            edgeId
+        );
+        if (rows.isEmpty()) {
+            return buildAmbientConfig("inherit", null, null, null);
+        }
+        Map<String, Object> row = rows.get(0);
+        return buildAmbientConfig(
+            row.get("ambient_action"),
+            row.get("ambient_zone_id"),
+            row.get("ambient_volume_override"),
+            row.get("ambient_fade_ms_override")
+        );
+    }
+
+    private Map<String, Object> buildAmbientConfig(Object actionValue, Object zoneIdValue, Object volumeOverrideValue, Object fadeMsOverrideValue) {
+        Map<String, Object> ambient = new LinkedHashMap<>();
+        String action = AmbientSupport.normalizeAction(actionValue != null ? actionValue.toString() : null);
+        ambient.put("action", action);
+        if (!"set".equals(action)) {
+            return ambient;
+        }
+        if (zoneIdValue != null) {
+            ambient.put("zoneId", zoneIdValue);
+        }
+        if (volumeOverrideValue != null) {
+            ambient.put("volumeOverride", toDouble(volumeOverrideValue));
+        }
+        if (fadeMsOverrideValue != null) {
+            ambient.put("fadeMsOverride", toInt(fadeMsOverrideValue));
+        }
+        return ambient;
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private String relPath(String assetsDir, String filePath) {
@@ -479,5 +544,11 @@ public class ManifestService {
         if (val == null) return 0;
         if (val instanceof Number n) return n.doubleValue();
         try { return Double.parseDouble(val.toString()); } catch (Exception e) { return 0; }
+    }
+
+    private int toInt(Object val) {
+        if (val == null) return 0;
+        if (val instanceof Number n) return n.intValue();
+        try { return Integer.parseInt(val.toString()); } catch (Exception e) { return 0; }
     }
 }

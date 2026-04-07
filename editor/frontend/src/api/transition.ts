@@ -1,5 +1,5 @@
 import apiClient from './client'
-import type { TransitionResponse, TransitionType } from '@/types'
+import type { AmbientConfigRequest, TransitionResponse, TransitionType } from '@/types'
 import type { VideoLayerRequest, AudioTrackRequest } from './nodeEditor'
 
 export const getTransition   = (edgeId: string) =>
@@ -16,3 +16,6 @@ export const saveTransitionAudio = (edgeId: string, tracks: AudioTrackRequest[])
 
 export const setTransitionBackgroundColor = (edgeId: string, backgroundColor: string | null) =>
   apiClient.put<TransitionResponse>(`/edges/${edgeId}/transition/background-color`, { backgroundColor })
+
+export const setTransitionAmbient = (edgeId: string, ambient: AmbientConfigRequest) =>
+  apiClient.put<TransitionResponse>(`/edges/${edgeId}/transition/ambient`, ambient)

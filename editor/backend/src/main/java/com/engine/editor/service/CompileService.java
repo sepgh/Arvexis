@@ -92,6 +92,7 @@ public class CompileService {
 
             List<Map<String, Object>> nodes = (List<Map<String, Object>>) manifest.get("nodes");
             List<Map<String, Object>> edges = (List<Map<String, Object>>) manifest.get("edges");
+            List<Map<String, Object>> ambientZones = (List<Map<String, Object>>) manifest.getOrDefault("ambientZones", List.of());
 
             List<String> resolutions = resolveResolutions(config);
             int fps = config.getFps() > 0 ? config.getFps() : 30;
@@ -210,8 +211,8 @@ public class CompileService {
             // ── Stage 5: Package dist/ + create ZIP (92→100%) ──────────────
             if (job.isCancelRequested()) { job.markCancelled(); return; }
             Path sourceAssetsDir = Path.of(config.getAssetsDirectory()).normalize();
-            Set<String> referencedMusicAssetPaths = collectReferencedMusicAssetPaths(sceneNodes);
-            Path zipPath = buildPackage(job, projectDir, outputBase, manifestFile, sourceAssetsDir, referencedMusicAssetPaths);
+            Set<String> referencedAssetPaths = collectReferencedAudioAssetPaths(sceneNodes, edges, ambientZones);
+            Path zipPath = buildPackage(job, projectDir, outputBase, manifestFile, sourceAssetsDir, referencedAssetPaths);
 
             lastZipPath = zipPath;
             job.markDone(zipPath.toAbsolutePath().toString());
@@ -226,7 +227,7 @@ public class CompileService {
 
     private Path buildPackage(PreviewJob job, Path projectDir, Path outputBase,
                                Path manifestFile, Path sourceAssetsDir,
-                               Set<String> referencedMusicAssetPaths) throws Exception {
+                               Set<String> referencedAssetPaths) throws Exception {
         Path distDir = projectDir.resolve("dist");
         recreateDirectory(distDir);
 
@@ -304,10 +305,10 @@ public class CompileService {
         Path distOutputDir = distDir.resolve("output");
         copyDirectoryContents(outputBase, distOutputDir);
 
-        // Copy only referenced background-music assets into dist/assets.
-        if (Files.isDirectory(sourceAssetsDir) && referencedMusicAssetPaths != null && !referencedMusicAssetPaths.isEmpty()) {
+        // Copy only referenced standalone audio assets into dist/assets.
+        if (Files.isDirectory(sourceAssetsDir) && referencedAssetPaths != null && !referencedAssetPaths.isEmpty()) {
             Path distAssetsDir = distDir.resolve("assets");
-            for (String relPath : referencedMusicAssetPaths) {
+            for (String relPath : referencedAssetPaths) {
                 Path assetPath = sourceAssetsDir.resolve(relPath).normalize();
                 if (!assetPath.startsWith(sourceAssetsDir) || !Files.isRegularFile(assetPath)) {
                     continue;
@@ -416,15 +417,63 @@ public class CompileService {
         }
     }
 
-    private Set<String> collectReferencedMusicAssetPaths(List<Map<String, Object>> sceneNodes) {
-        return sceneNodes.stream()
+    private Set<String> collectReferencedAudioAssetPaths(List<Map<String, Object>> sceneNodes,
+                                                         List<Map<String, Object>> edges,
+                                                         List<Map<String, Object>> ambientZones) {
+        Set<String> paths = new LinkedHashSet<>();
+
+        sceneNodes.stream()
             .map(node -> node.get("musicAssetRelPath"))
             .filter(String.class::isInstance)
             .map(String.class::cast)
             .map(String::trim)
             .filter(path -> !path.isBlank())
             .map(path -> path.replace('\\', '/'))
-            .collect(Collectors.toCollection(LinkedHashSet::new));
+            .forEach(paths::add);
+
+        Map<String, String> ambientAssetPathByZoneId = ambientZones.stream()
+            .filter(Map.class::isInstance)
+            .map(zone -> (Map<String, Object>) zone)
+            .filter(zone -> zone.get("id") instanceof String && zone.get("assetRelPath") instanceof String)
+            .collect(Collectors.toMap(
+                zone -> ((String) zone.get("id")).trim(),
+                zone -> ((String) zone.get("assetRelPath")).trim().replace('\\', '/'),
+                (left, right) -> left,
+                LinkedHashMap::new
+            ));
+
+        collectAmbientZoneIds(sceneNodes).stream()
+            .map(ambientAssetPathByZoneId::get)
+            .filter(Objects::nonNull)
+            .filter(path -> !path.isBlank())
+            .forEach(paths::add);
+
+        collectAmbientZoneIds(edges).stream()
+            .map(ambientAssetPathByZoneId::get)
+            .filter(Objects::nonNull)
+            .filter(path -> !path.isBlank())
+            .forEach(paths::add);
+
+        return paths;
+    }
+
+    private Set<String> collectAmbientZoneIds(List<Map<String, Object>> items) {
+        Set<String> zoneIds = new LinkedHashSet<>();
+        for (Map<String, Object> item : items) {
+            Object ambientObj = item.get("ambient");
+            if (!(ambientObj instanceof Map<?, ?> ambientMap)) {
+                continue;
+            }
+            Object action = ambientMap.get("action");
+            if (!(action instanceof String actionValue) || !"set".equals(actionValue)) {
+                continue;
+            }
+            Object zoneId = ambientMap.get("zoneId");
+            if (zoneId instanceof String zoneIdValue && !zoneIdValue.isBlank()) {
+                zoneIds.add(zoneIdValue.trim());
+            }
+        }
+        return zoneIds;
     }
 
     // ── Scene compilation ─────────────────────────────────────────────────────
