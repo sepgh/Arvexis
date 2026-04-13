@@ -197,6 +197,7 @@ export function createSceneController(ctx, { apiFetch, localeQueryString, ui, pl
       ctx.dom.videoEl.addEventListener('playing', resolve, { once: true });
       setTimeout(resolve, 1000);
     });
+    await playback.waitForVisibleFrame(ctx.dom.videoEl, 1000);
 
     ui.hideSpinner();
     ui.hideFreeze();
@@ -204,9 +205,12 @@ export function createSceneController(ctx, { apiFetch, localeQueryString, ui, pl
   }
 
   async function makeDecision(decisionKey) {
-    ui.captureFreeze();
-    ctx.dom.videoEl.loop = false;
-    ctx.dom.videoEl.pause();
+    const keepLoopingSceneVisible = ctx.dom.videoEl.loop && !ctx.dom.videoEl.paused && ctx.dom.freezeCanvas.style.display === 'none';
+    if (!keepLoopingSceneVisible) {
+      ui.captureFreeze();
+      ctx.dom.videoEl.loop = false;
+      ctx.dom.videoEl.pause();
+    }
     playback.stopSubtitleSync();
     ui.clearSceneVideoListeners();
     ctx.state.loopHandler = null;
@@ -217,18 +221,28 @@ export function createSceneController(ctx, { apiFetch, localeQueryString, ui, pl
       });
 
       let prepareScenePromise = null;
-
-      if (result.nextState && result.nextState.sceneHlsUrl) {
-        playback.preloadScene(result.nextState.sceneHlsUrl);
-        if (result.transition) {
-          prepareScenePromise = playback.prepareScene(result.nextState.sceneHlsUrl).catch(() => null);
-        }
-      }
+      const nextSceneUrl = result.nextState?.sceneHlsUrl || null;
+      const preloadScenePromise = nextSceneUrl
+        ? playback.preloadScene(nextSceneUrl)
+        : Promise.resolve();
 
       playback.applyAmbientDirective(result.edgeAmbient || { action: 'inherit' })
 
       if (result.transition) {
-        await playback.playTransition(result.transition);
+        await playback.playTransition(result.transition, {
+          onShown: () => {
+            ctx.dom.videoEl.loop = false;
+            ctx.dom.videoEl.pause();
+            if (nextSceneUrl) {
+              prepareScenePromise = playback.prepareScene(nextSceneUrl).catch(() => null);
+            }
+          },
+        });
+      } else if (keepLoopingSceneVisible) {
+        await preloadScenePromise;
+        ui.captureFreeze();
+        ctx.dom.videoEl.loop = false;
+        ctx.dom.videoEl.pause();
       }
 
       if (prepareScenePromise) {

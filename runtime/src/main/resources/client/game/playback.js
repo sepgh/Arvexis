@@ -251,6 +251,62 @@ export function createPlaybackController(ctx, ui) {
     ctx.dom.transEl.pause();
   }
 
+  function waitForVisibleFrame(videoElement, timeoutMs = 1000) {
+    return new Promise((resolve) => {
+      if (!videoElement) {
+        resolve();
+        return;
+      }
+
+      let settled = false;
+      let videoFrameRequestId = null;
+      let timeoutId = null;
+
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        videoElement.removeEventListener('loadeddata', onFrameReady);
+        videoElement.removeEventListener('canplay', onFrameReady);
+        videoElement.removeEventListener('playing', onFrameReady);
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+        if (videoFrameRequestId !== null && typeof videoElement.cancelVideoFrameCallback === 'function') {
+          videoElement.cancelVideoFrameCallback(videoFrameRequestId);
+        }
+        resolve();
+      };
+
+      const settleAfterPaint = () => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(finish);
+        });
+      };
+
+      const onFrameReady = () => {
+        settleAfterPaint();
+      };
+
+      const hasVideoFrameCallback = typeof videoElement.requestVideoFrameCallback === 'function';
+      if (hasVideoFrameCallback) {
+        try {
+          videoFrameRequestId = videoElement.requestVideoFrameCallback(() => {
+            settleAfterPaint();
+          });
+        } catch {}
+      } else {
+        videoElement.addEventListener('loadeddata', onFrameReady, { once: true });
+        videoElement.addEventListener('canplay', onFrameReady, { once: true });
+        videoElement.addEventListener('playing', onFrameReady, { once: true });
+        if (videoElement.readyState >= 2) {
+          settleAfterPaint();
+        }
+      }
+
+      timeoutId = setTimeout(finish, timeoutMs);
+    });
+  }
+
   function clearPreparedSceneState() {
     ctx.state.preparedSceneUrl = null;
     ctx.state.preparedScenePromise = null;
@@ -329,7 +385,8 @@ export function createPlaybackController(ctx, ui) {
   }
 
   function prefetchHls(url, store) {
-    if (!url || store[url]) return;
+    if (!url) return Promise.resolve();
+    if (store[url]) return store[url].promise;
 
     const controller = new AbortController();
     const promise = (async () => {
@@ -374,6 +431,7 @@ export function createPlaybackController(ctx, ui) {
     })().catch(() => {});
 
     store[url] = { controller, promise };
+    return promise;
   }
 
   function loadHls(videoElement, src, onReady) {
@@ -430,32 +488,32 @@ export function createPlaybackController(ctx, ui) {
   }
 
   function preloadTransitions(urls) {
-    syncPreloadedStore(ctx.state.preloadedHls, urls);
+    const uniqueUrls = [...new Set((urls || []).filter(Boolean))];
+    syncPreloadedStore(ctx.state.preloadedHls, uniqueUrls);
 
-    for (const url of urls) {
-      prefetchHls(url, ctx.state.preloadedHls);
-    }
+    return Promise.all(uniqueUrls.map((url) => prefetchHls(url, ctx.state.preloadedHls)));
   }
 
   function preloadScenes(urls) {
     const uniqueUrls = [...new Set((urls || []).filter(Boolean))];
     syncPreloadedStore(ctx.state.preloadedSceneHls, uniqueUrls);
-    for (const url of uniqueUrls) {
-      prefetchHls(url, ctx.state.preloadedSceneHls);
-    }
+    return Promise.all(uniqueUrls.map((url) => prefetchHls(url, ctx.state.preloadedSceneHls)));
   }
 
   function preloadScene(url) {
-    preloadScenes(url ? [url] : []);
+    return url ? prefetchHls(url, ctx.state.preloadedSceneHls) : Promise.resolve();
   }
 
-  async function playTransition(transition) {
+  async function playTransition(transition, options = {}) {
+    const onShown = typeof options.onShown === 'function' ? options.onShown : null;
+
     if (ctx.state.transHls) {
       ctx.state.transHls.destroy();
       ctx.state.transHls = null;
     }
 
     ctx.dom.transEl.pause();
+    ctx.dom.transEl.classList.remove('active');
     ctx.dom.transEl.removeAttribute('src');
     ctx.dom.transEl.load();
 
@@ -466,23 +524,16 @@ export function createPlaybackController(ctx, ui) {
     });
 
     ui.hideSpinner();
-    ui.hideFreeze();
-    ctx.dom.transEl.classList.add('active');
     ctx.dom.transEl.defaultMuted = false;
     ctx.dom.transEl.muted = false;
     ctx.dom.transEl.volume = ctx.settings.videoVolume;
     ctx.dom.transEl.style.backgroundColor = transition.backgroundColor || '';
-    ctx.dom.transEl.play().catch(() => {});
-
-    return new Promise((resolve) => {
+    const completionPromise = new Promise((resolve) => {
       let cleaned = false;
       function cleanup() {
         if (cleaned) return;
         cleaned = true;
-        const preparedSceneReady = ctx.state.preparedSceneReady;
-        if (!preparedSceneReady) {
-          ui.captureFreezeFrom(ctx.dom.transEl);
-        }
+        ui.captureFreezeFrom(ctx.dom.transEl);
         ctx.dom.transEl.pause();
         ctx.dom.transEl.classList.remove('active');
         ctx.dom.transEl.style.backgroundColor = '';
@@ -492,14 +543,23 @@ export function createPlaybackController(ctx, ui) {
         }
         ctx.dom.transEl.removeAttribute('src');
         ctx.dom.transEl.load();
-        if (preparedSceneReady) {
-          ui.hideFreeze();
-        }
         resolve();
       }
       ctx.dom.transEl.addEventListener('ended', cleanup, { once: true });
       setTimeout(cleanup, ((transition.duration || 2) + 1) * 1000);
     });
+    const playPromise = ctx.dom.transEl.play().catch(() => {});
+    await waitForVisibleFrame(ctx.dom.transEl, 1000);
+    ctx.dom.transEl.classList.add('active');
+    ui.hideFreeze();
+
+    if (onShown) {
+      await onShown();
+    }
+
+    await playPromise;
+
+    return completionPromise;
   }
 
   function resetPlaybackState() {
@@ -542,5 +602,6 @@ export function createPlaybackController(ctx, ui) {
     stopMusic,
     stopSubtitleSync,
     updateMusic,
+    waitForVisibleFrame,
   };
 }
