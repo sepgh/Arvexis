@@ -2,6 +2,7 @@ import apiClient from './client'
 import type { AmbientConfigRequest, GraphNode, GraphEdge } from '@/types'
 
 export interface CreateNodePayload {
+  id?: string
   name: string
   type: string
   posX?: number
@@ -14,6 +15,7 @@ export interface UpdateNodePayload {
   autoContinue?: boolean
   loopVideo?: boolean
   backgroundColor?: string
+  clearBackgroundColor?: boolean
   decisionAppearanceConfig?: string
   musicAssetId?: string | null
   clearMusicAsset?: boolean
@@ -26,6 +28,7 @@ export interface UpdateNodePayload {
 }
 
 export interface CreateEdgePayload {
+  id?: string
   sourceNodeId: string
   targetNodeId: string
   sourceDecisionKey?: string
@@ -45,6 +48,7 @@ export const createNode = (p: CreateNodePayload) => apiClient.post<GraphNode>('/
 export const updateNode = (id: string, p: UpdateNodePayload) => apiClient.put<GraphNode>(`/nodes/${id}`, p)
 export const deleteNode = (id: string) => apiClient.delete<void>(`/nodes/${id}`)
 export const setRoot    = (id: string) => apiClient.put<GraphNode>(`/nodes/${id}/root`, {})
+export const clearRoot  = () => apiClient.delete<void>('/nodes/root')
 
 export const listEdges  = () => apiClient.get<GraphEdge[]>('/edges')
 export const createEdge = (p: CreateEdgePayload) => apiClient.post<GraphEdge>('/edges', p)

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { openProject } from '@/api/project'
+import { clearHistory } from '@/history'
 import { useEditorStore } from '@/store'
 
 interface OpenProjectDialogProps {
@@ -22,6 +23,7 @@ export default function OpenProjectDialog({ onClose }: OpenProjectDialogProps) {
 
     try {
       const config = await openProject(dirPath.trim())
+      clearHistory()
       setProjectConfig(config)
       onClose()
     } catch (err: unknown) {

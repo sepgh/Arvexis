@@ -6,6 +6,7 @@ public record UpdateNodeRequest(
     Boolean autoContinue,
     Boolean loopVideo,
     String backgroundColor,
+    Boolean clearBackgroundColor,
     String decisionAppearanceConfig,
     String musicAssetId,
     Boolean clearMusicAsset,

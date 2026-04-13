@@ -3,6 +3,7 @@ import type { AmbientAction, AmbientConfig, AmbientConfigRequest, TransitionResp
 import { getTransition, setTransitionType, saveTransitionLayers, saveTransitionAudio, setTransitionBackgroundColor, setTransitionAmbient } from '@/api/transition'
 import type { VideoLayerRequest, AudioTrackRequest } from '@/api/nodeEditor'
 import { listAssets } from '@/api/assets'
+import { recordHistoryEntry } from '@/history'
 import { startTransitionPreview, type PreviewJobStatus } from '@/api/preview'
 import { useEditorStore } from '@/store'
 import PreviewModal from './PreviewModal'
@@ -74,6 +75,32 @@ function buildAmbientRequest(
   return request
 }
 
+function buildExplicitAmbientRequest(ambient: AmbientConfig | null | undefined): AmbientConfigRequest {
+  if (!ambient) {
+    return {
+      action: 'inherit',
+      clearVolumeOverride: true,
+      clearFadeMsOverride: true,
+    }
+  }
+  return buildAmbientRequest(
+    normalizeAmbientAction(ambient.action),
+    ambient.zoneId ?? '',
+    ambient.volumeOverride != null,
+    ambient.volumeOverride != null ? String(ambient.volumeOverride) : '1',
+    ambient.fadeMsOverride != null,
+    ambient.fadeMsOverride != null ? String(ambient.fadeMsOverride) : '0',
+  )
+}
+
+function normalizeHexColor(value: string): string {
+  const normalized = value.trim()
+  if (!/^#[0-9a-fA-F]{6}$/.test(normalized)) {
+    throw new Error('Transition background color must be a hex color like #ffffff')
+  }
+  return normalized
+}
+
 export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
   const projectConfig = useEditorStore((s) => s.projectConfig)
   const ambientZones = projectConfig?.ambientZones ?? []
@@ -85,6 +112,7 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
   const [videoAssets, setVideoAssets] = useState<Asset[]>([])
   const [audioAssets, setAudioAssets] = useState<Asset[]>([])
   const [durationInput, setDurationInput] = useState('')
+  const [useCustomBackgroundColor, setUseCustomBackgroundColor] = useState(false)
   const [bgColorInput, setBgColorInput]   = useState('#ffffff')
   const [ambientAction, setAmbientAction] = useState<AmbientAction>('inherit')
   const [ambientZoneId, setAmbientZoneId] = useState('')
@@ -107,6 +135,25 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
     }
   }
 
+  function applyTransitionData(transition: TransitionResponse) {
+    setData(transition)
+    setDurationInput(transition.duration != null ? String(transition.duration) : '')
+    setUseCustomBackgroundColor(transition.backgroundColor != null)
+    setBgColorInput(transition.backgroundColor ?? '#ffffff')
+    setAmbientAction(normalizeAmbientAction(transition.ambient?.action))
+    setAmbientZoneId(transition.ambient?.zoneId ?? '')
+    setUseAmbientVolumeOverride(transition.ambient?.volumeOverride != null)
+    setAmbientVolumeOverride(transition.ambient?.volumeOverride != null ? String(transition.ambient.volumeOverride) : '1')
+    setUseAmbientFadeOverride(transition.ambient?.fadeMsOverride != null)
+    setAmbientFadeMsOverride(transition.ambient?.fadeMsOverride != null ? String(transition.ambient.fadeMsOverride) : '0')
+  }
+
+  async function refreshTransitionSelection() {
+    const transition = await getTransition(edgeId)
+    applyTransitionData(transition)
+    useEditorStore.getState().setSelectedEdgeId(edgeId)
+  }
+
   useEffect(() => {
     setLoading(true)
     Promise.all([
@@ -115,17 +162,9 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
       listAssets({ mediaType: 'audio' }),
     ])
       .then(([d, v, a]) => {
-        setData(d)
-        setDurationInput(d.duration != null ? String(d.duration) : '')
-        setBgColorInput(d.backgroundColor ?? '#ffffff')
+        applyTransitionData(d)
         setVideoAssets(v)
         setAudioAssets(a)
-        setAmbientAction(normalizeAmbientAction(d.ambient?.action))
-        setAmbientZoneId(d.ambient?.zoneId ?? '')
-        setUseAmbientVolumeOverride(d.ambient?.volumeOverride != null)
-        setAmbientVolumeOverride(d.ambient?.volumeOverride != null ? String(d.ambient.volumeOverride) : '1')
-        setUseAmbientFadeOverride(d.ambient?.fadeMsOverride != null)
-        setAmbientFadeMsOverride(d.ambient?.fadeMsOverride != null ? String(d.ambient.fadeMsOverride) : '0')
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Load failed'))
       .finally(() => setLoading(false))
@@ -139,10 +178,30 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
   }
 
   async function handleTypeChange(type: TransitionType) {
+    if (!data) return
     const dur = parseFloat(durationInput)
+    const previousType = data.type ?? 'none'
+    const previousDuration = data.duration ?? null
+    const nextDuration = !isNaN(dur) && dur > 0 ? dur : null
+    if (previousType === type && previousDuration === nextDuration) {
+      return
+    }
     const result = await withSave(() =>
-      setTransitionType(edgeId, type, !isNaN(dur) && dur > 0 ? dur : undefined))
-    if (result) setData(result)
+      setTransitionType(edgeId, type, nextDuration ?? undefined))
+    if (result) {
+      applyTransitionData(result)
+      recordHistoryEntry({
+        label: 'Update Edge Transition',
+        undo: async () => {
+          await setTransitionType(edgeId, previousType, previousDuration ?? undefined)
+          await refreshTransitionSelection()
+        },
+        redo: async () => {
+          await setTransitionType(edgeId, type, nextDuration ?? undefined)
+          await refreshTransitionSelection()
+        },
+      })
+    }
   }
 
   async function handleDurationBlur() {
@@ -150,13 +209,62 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
     const dur = parseFloat(durationInput)
     if (isNaN(dur)) return
     const type = data.type ?? 'none'
-    const result = await withSave(() => setTransitionType(edgeId, type, dur > 0 ? dur : undefined))
-    if (result) setData(result)
+    const previousDuration = data.duration ?? null
+    const nextDuration = dur > 0 ? dur : null
+    if (previousDuration === nextDuration) {
+      return
+    }
+    const result = await withSave(() => setTransitionType(edgeId, type, nextDuration ?? undefined))
+    if (result) {
+      applyTransitionData(result)
+      recordHistoryEntry({
+        label: 'Update Edge Transition',
+        undo: async () => {
+          await setTransitionType(edgeId, type, previousDuration ?? undefined)
+          await refreshTransitionSelection()
+        },
+        redo: async () => {
+          await setTransitionType(edgeId, type, nextDuration ?? undefined)
+          await refreshTransitionSelection()
+        },
+      })
+    }
+  }
+
+  async function handleBackgroundColorSave(nextUseCustomBackgroundColor = useCustomBackgroundColor) {
+    try {
+      if (!data) return
+      const previousBackgroundColor = data.backgroundColor ?? null
+      const nextBackgroundColor = nextUseCustomBackgroundColor ? normalizeHexColor(bgColorInput) : null
+      if (previousBackgroundColor === nextBackgroundColor) {
+        return
+      }
+
+      const result = await withSave(() => setTransitionBackgroundColor(edgeId, nextBackgroundColor))
+      if (result) {
+        applyTransitionData(result)
+        recordHistoryEntry({
+          label: 'Update Edge Background',
+          undo: async () => {
+            await setTransitionBackgroundColor(edgeId, previousBackgroundColor)
+            await refreshTransitionSelection()
+          },
+          redo: async () => {
+            await setTransitionBackgroundColor(edgeId, nextBackgroundColor)
+            await refreshTransitionSelection()
+          },
+        })
+      }
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Transition background color is invalid')
+    }
   }
 
   async function handleAmbientSave() {
     try {
-      const ambient = buildAmbientRequest(
+      if (!data) return
+      const previousAmbient = buildExplicitAmbientRequest(data.ambient)
+      const nextAmbient = buildAmbientRequest(
         ambientAction,
         ambientZoneId,
         useAmbientVolumeOverride,
@@ -164,8 +272,24 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
         useAmbientFadeOverride,
         ambientFadeMsOverride,
       )
-      const result = await withSave(() => setTransitionAmbient(edgeId, ambient))
-      if (result) setData(result)
+      if (JSON.stringify(previousAmbient) === JSON.stringify(nextAmbient)) {
+        return
+      }
+      const result = await withSave(() => setTransitionAmbient(edgeId, nextAmbient))
+      if (result) {
+        applyTransitionData(result)
+        recordHistoryEntry({
+          label: 'Update Edge Ambient',
+          undo: async () => {
+            await setTransitionAmbient(edgeId, previousAmbient)
+            await refreshTransitionSelection()
+          },
+          redo: async () => {
+            await setTransitionAmbient(edgeId, nextAmbient)
+            await refreshTransitionSelection()
+          },
+        })
+      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Ambient settings are invalid')
     }
@@ -378,28 +502,48 @@ export default function TransitionEditor({ edgeId }: TransitionEditorProps) {
                   <p className="text-xs text-muted-foreground">
                     Composited behind video layers with alpha channel.
                   </p>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={bgColorInput}
-                      onChange={e => setBgColorInput(e.target.value)}
-                      onBlur={async () => {
-                        const result = await withSave(() => setTransitionBackgroundColor(edgeId, bgColorInput))
-                        if (result) setData(result)
-                      }}
-                      className="w-10 h-8 rounded cursor-pointer border border-border bg-transparent"
-                    />
-                    <input
-                      type="text"
-                      value={bgColorInput}
-                      onChange={e => setBgColorInput(e.target.value)}
-                      onBlur={async () => {
-                        const result = await withSave(() => setTransitionBackgroundColor(edgeId, bgColorInput))
-                        if (result) setData(result)
-                      }}
-                      className="input-base text-xs py-1 w-28 font-mono"
-                      placeholder="#ffffff"
-                    />
+                  <div className="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/20 px-3 py-3">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={useCustomBackgroundColor}
+                        onChange={e => {
+                          const checked = e.target.checked
+                          setUseCustomBackgroundColor(checked)
+                          if (!checked) {
+                            void handleBackgroundColorSave(false)
+                          }
+                        }}
+                        className="w-4 h-4 accent-primary"
+                      />
+                      <div>
+                        <span className="text-sm font-medium text-foreground">Use transition-specific background</span>
+                        <p className="text-xs text-muted-foreground">Leave off to use the inherited/default background color.</p>
+                      </div>
+                    </label>
+                    {useCustomBackgroundColor ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={bgColorInput}
+                          onChange={e => setBgColorInput(e.target.value)}
+                          onBlur={() => { void handleBackgroundColorSave() }}
+                          className="w-10 h-8 rounded cursor-pointer border border-border bg-transparent"
+                        />
+                        <input
+                          type="text"
+                          value={bgColorInput}
+                          onChange={e => setBgColorInput(e.target.value)}
+                          onBlur={() => { void handleBackgroundColorSave() }}
+                          className="input-base text-xs py-1 w-28 font-mono"
+                          placeholder="#ffffff"
+                        />
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border border-border/40 bg-muted/10 px-3 py-2.5">
+                        <span className="text-xs font-medium text-foreground">Using inherited/default background</span>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground bg-muted/30 rounded-lg p-2.5">

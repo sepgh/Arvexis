@@ -5,7 +5,8 @@ import {
   type VideoLayerRequest, type AudioTrackRequest, type DecisionItemRequest,
 } from '@/api/nodeEditor'
 import { listAssets } from '@/api/assets'
-import { updateNode } from '@/api/graph'
+import { updateNode, type UpdateNodePayload } from '@/api/graph'
+import { recordHistoryEntry } from '@/history'
 import { startScenePreview, type PreviewJobStatus } from '@/api/preview'
 import { useEditorStore } from '@/store'
 import PreviewModal from './PreviewModal'
@@ -22,6 +23,23 @@ interface SceneEditorProps {
   hideDecisionButtons: boolean | null
   showDecisionInputIndicator: boolean | null
   onNodeUpdated?: () => void
+}
+
+interface ScenePropertySnapshot {
+  isEnd: boolean
+  autoContinue: boolean
+  loopVideo: boolean
+  backgroundColor: string | null
+  musicAssetId: string | null
+  ambientAction: AmbientAction
+  ambientZoneId: string
+  useAmbientVolumeOverride: boolean
+  ambientVolumeOverride: string
+  useAmbientFadeOverride: boolean
+  ambientFadeMsOverride: string
+  useSceneDecisionInputMode: boolean
+  hideDecisionButtons: boolean
+  showDecisionInputIndicator: boolean
 }
 
 type Section = 'layers' | 'audio' | 'decisions' | 'props'
@@ -103,6 +121,44 @@ function buildAmbientRequest(
   return request
 }
 
+function buildScenePropertyPayload(snapshot: ScenePropertySnapshot): UpdateNodePayload {
+  const payload: UpdateNodePayload = {
+    isEnd: snapshot.isEnd,
+    autoContinue: snapshot.autoContinue,
+    loopVideo: snapshot.loopVideo,
+  }
+
+  if (snapshot.backgroundColor != null) {
+    payload.backgroundColor = snapshot.backgroundColor
+  } else {
+    payload.clearBackgroundColor = true
+  }
+
+  payload.ambient = buildAmbientRequest(
+    snapshot.ambientAction,
+    snapshot.ambientZoneId,
+    snapshot.useAmbientVolumeOverride,
+    snapshot.ambientVolumeOverride,
+    snapshot.useAmbientFadeOverride,
+    snapshot.ambientFadeMsOverride,
+  )
+
+  if (snapshot.musicAssetId) {
+    payload.musicAssetId = snapshot.musicAssetId
+  } else {
+    payload.clearMusicAsset = true
+  }
+
+  if (snapshot.useSceneDecisionInputMode) {
+    payload.hideDecisionButtons = snapshot.hideDecisionButtons
+    payload.showDecisionInputIndicator = snapshot.hideDecisionButtons && snapshot.showDecisionInputIndicator
+  } else {
+    payload.clearDecisionInputModeOverride = true
+  }
+
+  return payload
+}
+
 export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue: initialAutoContinue, loopVideo: initialLoopVideo, backgroundColor: initialBg, musicAssetId: initialMusicAssetId, ambient: initialAmbient, hideDecisionButtons: initialHideDecisionButtons, showDecisionInputIndicator: initialShowDecisionInputIndicator, onNodeUpdated }: SceneEditorProps) {
   const projectConfig = useEditorStore((s) => s.projectConfig)
   const ambientZones = projectConfig?.ambientZones ?? []
@@ -120,6 +176,7 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
   const [isEnd, setIsEnd]         = useState(initialIsEnd)
   const [autoContinue, setAutoContinue] = useState(initialAutoContinue)
   const [loopVideo, setLoopVideo] = useState(initialLoopVideo)
+  const [useCustomBackgroundColor, setUseCustomBackgroundColor] = useState(initialBg != null)
   const [bgColor, setBgColor]     = useState(initialBg ?? projectDefaultBackgroundColor)
   const [musicAssetId, setMusicAssetId] = useState<string | null>(initialMusicAssetId)
   const [ambientAction, setAmbientAction] = useState<AmbientAction>(normalizeAmbientAction(initialAmbient?.action))
@@ -145,6 +202,7 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
     setIsEnd(initialIsEnd)
     setAutoContinue(initialAutoContinue)
     setLoopVideo(initialLoopVideo)
+    setUseCustomBackgroundColor(initialBg != null)
     setBgColor(initialBg ?? projectDefaultBackgroundColor)
     setMusicAssetId(initialMusicAssetId)
     setAmbientAction(normalizeAmbientAction(initialAmbient?.action))
@@ -215,6 +273,11 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
     try { return await fn() }
     catch (e: unknown) { setError(e instanceof Error ? e.message : 'Save failed'); return null }
     finally { setSaving(false) }
+  }
+
+  async function refreshNodeSelection() {
+    await Promise.resolve(onNodeUpdated?.())
+    useEditorStore.getState().setSelectedNodeId(nodeId)
   }
 
   // ── Video layers ─────────────────────────────────────────────────────────
@@ -393,7 +456,7 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
   async function removeDecision(decId: number) {
     if (!data) return
     const filtered = data.decisions.filter(d => d.id !== decId)
-    let decisions = filtered.map((d, i) => ({ ...toDecisionReq(d), decisionOrder: i }))
+    const decisions = filtered.map((d, i) => ({ ...toDecisionReq(d), decisionOrder: i }))
     if (decisions.length > 0 && !decisions.some(d => d.isDefault)) decisions[0].isDefault = true
     const result = await withSave(() => saveDecisions(nodeId, decisions))
     if (result) {
@@ -442,33 +505,69 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
   // ── Properties ────────────────────────────────────────────────────────────
 
   async function saveProperties() {
-    const payload: Record<string, unknown> = { isEnd, autoContinue, loopVideo, backgroundColor: bgColor }
+    const previousSnapshot: ScenePropertySnapshot = {
+      isEnd: initialIsEnd,
+      autoContinue: initialAutoContinue,
+      loopVideo: initialLoopVideo,
+      backgroundColor: initialBg ?? null,
+      musicAssetId: initialMusicAssetId,
+      ambientAction: normalizeAmbientAction(initialAmbient?.action),
+      ambientZoneId: initialAmbient?.zoneId ?? '',
+      useAmbientVolumeOverride: initialAmbient?.volumeOverride != null,
+      ambientVolumeOverride: initialAmbient?.volumeOverride != null ? String(initialAmbient.volumeOverride) : '1',
+      useAmbientFadeOverride: initialAmbient?.fadeMsOverride != null,
+      ambientFadeMsOverride: initialAmbient?.fadeMsOverride != null ? String(initialAmbient.fadeMsOverride) : '0',
+      useSceneDecisionInputMode: initialHideDecisionButtons != null || initialShowDecisionInputIndicator != null,
+      hideDecisionButtons: initialHideDecisionButtons ?? projectHideDecisionButtons,
+      showDecisionInputIndicator: (initialHideDecisionButtons ?? projectHideDecisionButtons)
+        && (initialShowDecisionInputIndicator ?? projectShowDecisionInputIndicator),
+    }
+    const nextSnapshot: ScenePropertySnapshot = {
+      isEnd,
+      autoContinue,
+      loopVideo,
+      backgroundColor: useCustomBackgroundColor ? bgColor : null,
+      musicAssetId,
+      ambientAction,
+      ambientZoneId,
+      useAmbientVolumeOverride,
+      ambientVolumeOverride,
+      useAmbientFadeOverride,
+      ambientFadeMsOverride,
+      useSceneDecisionInputMode,
+      hideDecisionButtons,
+      showDecisionInputIndicator,
+    }
+
+    let previousPayload: UpdateNodePayload
+    let nextPayload: UpdateNodePayload
     try {
-      payload.ambient = buildAmbientRequest(
-        ambientAction,
-        ambientZoneId,
-        useAmbientVolumeOverride,
-        ambientVolumeOverride,
-        useAmbientFadeOverride,
-        ambientFadeMsOverride,
-      )
+      previousPayload = buildScenePropertyPayload(previousSnapshot)
+      nextPayload = buildScenePropertyPayload(nextSnapshot)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Ambient settings are invalid')
       return
     }
-    if (musicAssetId) {
-      payload.musicAssetId = musicAssetId
-    } else {
-      payload.clearMusicAsset = true
+
+    if (JSON.stringify(previousPayload) === JSON.stringify(nextPayload)) {
+      return
     }
-    if (useSceneDecisionInputMode) {
-      payload.hideDecisionButtons = hideDecisionButtons
-      payload.showDecisionInputIndicator = hideDecisionButtons && showDecisionInputIndicator
-    } else {
-      payload.clearDecisionInputModeOverride = true
+
+    const result = await withSave(() => updateNode(nodeId, nextPayload))
+    if (result) {
+      await refreshNodeSelection()
+      recordHistoryEntry({
+        label: 'Update Scene Properties',
+        undo: async () => {
+          await updateNode(nodeId, previousPayload)
+          await refreshNodeSelection()
+        },
+        redo: async () => {
+          await updateNode(nodeId, nextPayload)
+          await refreshNodeSelection()
+        },
+      })
     }
-    const result = await withSave(() => updateNode(nodeId, payload))
-    if (result && onNodeUpdated) onNodeUpdated()
   }
 
   if (loading) return <div className="flex items-center justify-center h-20 text-xs text-muted-foreground">Loading…</div>
@@ -761,14 +860,35 @@ export default function SceneEditor({ nodeId, isEnd: initialIsEnd, autoContinue:
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-muted-foreground" style={{ fontSize: 14 }}>Background color</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={bgColor}
-                  onChange={e => setBgColor(e.target.value)}
-                  className="w-10 h-8 rounded border border-border bg-transparent cursor-pointer"
-                />
-                <span className="text-sm text-muted-foreground font-mono">{bgColor}</span>
+              <div className="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/20 px-3 py-3">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={useCustomBackgroundColor}
+                    onChange={e => setUseCustomBackgroundColor(e.target.checked)}
+                    className="w-4 h-4 accent-primary"
+                  />
+                  <div>
+                    <span className="font-medium text-foreground" style={{ fontSize: 14 }}>Use scene-specific background</span>
+                    <p className="text-muted-foreground" style={{ fontSize: 13 }}>Leave off to inherit the current project default.</p>
+                  </div>
+                </label>
+                {useCustomBackgroundColor ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={bgColor}
+                      onChange={e => setBgColor(e.target.value)}
+                      className="w-10 h-8 rounded border border-border bg-transparent cursor-pointer"
+                    />
+                    <span className="text-sm text-muted-foreground font-mono">{bgColor}</span>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-border/40 bg-muted/10 px-3 py-2.5">
+                    <span className="text-xs font-medium text-foreground">Using project default</span>
+                    <p className="text-xs text-muted-foreground font-mono" style={{ marginTop: 4 }}>{projectDefaultBackgroundColor}</p>
+                  </div>
+                )}
               </div>
             </div>
             {/* Background Music */}

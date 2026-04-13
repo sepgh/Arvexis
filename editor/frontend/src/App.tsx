@@ -4,11 +4,13 @@ import CanvasPage from '@/pages/CanvasPage'
 import WelcomePage from '@/pages/WelcomePage'
 import { useEditorStore } from '@/store'
 import { getProjectStatus, getProjectConfig } from '@/api/project'
+import { clearHistory } from '@/history'
 
 export default function App() {
   const { isProjectOpen, appLoading, setProjectConfig, setAppLoading } = useEditorStore()
 
   useEffect(() => {
+    clearHistory()
     getProjectStatus()
       .then(async (status) => {
         if (status.open) {
@@ -22,7 +24,7 @@ export default function App() {
       .finally(() => {
         setAppLoading(false)
       })
-  }, [])
+  }, [setAppLoading, setProjectConfig])
 
   if (appLoading) {
     return (

@@ -12,6 +12,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 @Service
 public class TransitionService {
@@ -21,6 +22,7 @@ public class TransitionService {
         "slide_left", "slide_right", "wipe", "dissolve", "cut", "video"
     );
     private static final double MAX_SECS = 5.0;
+    private static final Pattern HEX_COLOR_PATTERN = Pattern.compile("^#[0-9a-fA-F]{6}$");
 
     private final ProjectService projectService;
 
@@ -133,6 +135,9 @@ public class TransitionService {
         JdbcTemplate jdbc = projectService.requireJdbc();
         requireEdge(jdbc, edgeId);
         requireTargetIsScene(jdbc, edgeId);
+        if (backgroundColor != null && !HEX_COLOR_PATTERN.matcher(backgroundColor).matches()) {
+            throw new ProjectException("Transition background color must be a hex color like #ffffff");
+        }
         jdbc.update("UPDATE edge_transitions SET background_color = ? WHERE edge_id = ?",
             backgroundColor, edgeId);
         return getTransition(edgeId);

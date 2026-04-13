@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { createProject } from '@/api/project'
+import { clearHistory } from '@/history'
 import { useEditorStore } from '@/store'
 
 interface NewProjectWizardProps {
@@ -50,6 +51,7 @@ export default function NewProjectWizard({ onClose }: NewProjectWizardProps) {
         defaultBackgroundColor,
         ffmpegThreads: ffmpegThreadsTrimmed === '' ? null : Number(ffmpegThreadsTrimmed),
       })
+      clearHistory()
       setProjectConfig(config)
       onClose()
     } catch (err: unknown) {

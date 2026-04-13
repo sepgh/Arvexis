@@ -59,6 +59,12 @@ public class GraphController {
         return ResponseEntity.ok(graphService.setRoot(id));
     }
 
+    @DeleteMapping("/nodes/root")
+    public ResponseEntity<Void> clearRoot() {
+        graphService.clearRoot();
+        return ResponseEntity.noContent().build();
+    }
+
     // ── Edges ─────────────────────────────────────────────────────────────────
 
     @PostMapping("/edges")

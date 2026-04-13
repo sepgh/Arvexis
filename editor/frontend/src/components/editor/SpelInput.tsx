@@ -11,7 +11,7 @@ interface SpelInputProps {
 }
 
 // Regex patterns for SpEL syntax highlighting
-const TOKEN_RE = /(\#[A-Z_][A-Z0-9_]*)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')|([-+]?\d+\.?\d*)|([=!<>+\-*\/&|!]+)|(true|false|null)/g
+const TOKEN_RE = /(#[A-Z_][A-Z0-9_]*)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')|([-+]?\d+\.?\d*)|([=!<>+*/&|-]+)|(true|false|null)/g
 
 function highlight(text: string): string {
   return text

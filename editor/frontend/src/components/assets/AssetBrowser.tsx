@@ -42,7 +42,7 @@ export default function AssetBrowser() {
     }
   }, [selected])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { void load() }, [load])
 
   async function handleUpload(files: FileList | null) {
     if (!files || files.length === 0) return

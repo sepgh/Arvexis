@@ -1,4 +1,5 @@
 import { type ReactNode, useState, useEffect, useRef } from 'react'
+import { redoHistory, undoHistory, useHistoryStore } from '@/history'
 import { useEditorStore } from '@/store'
 import SaveIndicator from './SaveIndicator'
 import { generateManifest, manifestDownloadUrl, startCompilation, getCompileStatus, cancelCompile, compileDownloadUrl } from '@/api/compile'
@@ -6,6 +7,18 @@ import type { PreviewJobStatus } from '@/api/preview'
 
 interface RootLayoutProps {
   children: ReactNode
+}
+
+function isEditableTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return false
+  }
+  const tagName = target.tagName.toLowerCase()
+  return target.isContentEditable
+    || tagName === 'input'
+    || tagName === 'textarea'
+    || tagName === 'select'
+    || target.closest('[contenteditable="true"]') != null
 }
 
 export default function RootLayout({ children }: RootLayoutProps) {
@@ -22,6 +35,11 @@ export default function RootLayout({ children }: RootLayoutProps) {
   const toggleAmbientZonesPanel = useEditorStore((s) => s.toggleAmbientZonesPanel)
   const customCssPanelOpen = useEditorStore((s) => s.customCssPanelOpen)
   const toggleCustomCssPanel = useEditorStore((s) => s.toggleCustomCssPanel)
+  const canUndo = useHistoryStore((s) => s.canUndo)
+  const canRedo = useHistoryStore((s) => s.canRedo)
+  const undoLabel = useHistoryStore((s) => s.undoLabel)
+  const redoLabel = useHistoryStore((s) => s.redoLabel)
+  const historyReplaying = useHistoryStore((s) => s.isReplaying)
   const [manifestGenerating, setManifestGenerating] = useState(false)
   const [manifestReady, setManifestReady] = useState(false)
   const [manifestError, setManifestError] = useState<string | null>(null)
@@ -45,6 +63,35 @@ export default function RootLayout({ children }: RootLayoutProps) {
     }, 800)
     return () => { if (compileTimerRef.current) clearTimeout(compileTimerRef.current) }
   }, [compileJob])
+
+  useEffect(() => {
+    if (!projectConfig) {
+      return
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((!event.ctrlKey && !event.metaKey) || event.altKey || isEditableTarget(event.target)) {
+        return
+      }
+
+      const key = event.key.toLowerCase()
+      const wantsUndo = key === 'z' && !event.shiftKey
+      const wantsRedo = key === 'y' || (key === 'z' && event.shiftKey)
+
+      if (wantsUndo && canUndo && !historyReplaying) {
+        event.preventDefault()
+        void undoHistory()
+      } else if (wantsRedo && canRedo && !historyReplaying) {
+        event.preventDefault()
+        void redoHistory()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [canRedo, canUndo, historyReplaying, projectConfig])
 
   async function handleCompile() {
     try {
@@ -103,6 +150,42 @@ export default function RootLayout({ children }: RootLayoutProps) {
         {projectConfig && (
           <div className="flex items-center" style={{ gap: 10 }}>
             <SaveIndicator />
+            <button
+              onClick={() => { void undoHistory() }}
+              disabled={!canUndo || historyReplaying}
+              title={undoLabel ? `Undo ${undoLabel}` : 'Undo'}
+              className={[
+                'flex items-center rounded-md font-medium transition-colors border',
+                canUndo && !historyReplaying
+                  ? 'text-muted-foreground hover:text-foreground hover:bg-accent border-transparent'
+                  : 'text-muted-foreground/40 border-transparent cursor-not-allowed',
+              ].join(' ')}
+              style={{ padding: '8px 12px', fontSize: 14, gap: 7 }}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M5.5 3.5 2 7l3.5 3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M3 7h5.25A2.75 2.75 0 0 1 11 9.75v.25" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Undo
+            </button>
+            <button
+              onClick={() => { void redoHistory() }}
+              disabled={!canRedo || historyReplaying}
+              title={redoLabel ? `Redo ${redoLabel}` : 'Redo'}
+              className={[
+                'flex items-center rounded-md font-medium transition-colors border',
+                canRedo && !historyReplaying
+                  ? 'text-muted-foreground hover:text-foreground hover:bg-accent border-transparent'
+                  : 'text-muted-foreground/40 border-transparent cursor-not-allowed',
+              ].join(' ')}
+              style={{ padding: '8px 12px', fontSize: 14, gap: 7 }}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M8.5 3.5 12 7l-3.5 3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M11 7H5.75A2.75 2.75 0 0 0 3 9.75v.25" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Redo
+            </button>
             <div className="w-px h-4 bg-border" />
             <button
               onClick={toggleAssetPanel}

@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 /**
  * CRUD operations for graph nodes and edges.
@@ -32,6 +33,7 @@ public class GraphService {
         "slide_left", "slide_right", "wipe", "dissolve", "cut", "video"
     );
     private static final double MAX_TRANSITION_SECS = 5.0;
+    private static final Pattern HEX_COLOR_PATTERN = Pattern.compile("^#[0-9a-fA-F]{6}$");
 
     private final ProjectService projectService;
 
@@ -48,7 +50,7 @@ public class GraphService {
             throw new ProjectException("Invalid node type: " + req.type());
 
         JdbcTemplate jdbc = projectService.requireJdbc();
-        String id = UUID.randomUUID().toString();
+        String id = req.id() != null && !req.id().isBlank() ? req.id().trim() : UUID.randomUUID().toString();
         double x = req.posX() != null ? req.posX() : 0.0;
         double y = req.posY() != null ? req.posY() : 0.0;
 
@@ -86,7 +88,8 @@ public class GraphService {
         boolean isEnd     = req.isEnd()    != null ? req.isEnd()       : existing.isEnd();
         boolean autoCont  = req.autoContinue() != null ? req.autoContinue() : existing.isAutoContinue();
         boolean loopVid   = req.loopVideo() != null ? req.loopVideo() : existing.isLoopVideo();
-        String bgColor    = req.backgroundColor() != null ? req.backgroundColor() : existing.getBackgroundColor();
+        String bgColor    = Boolean.TRUE.equals(req.clearBackgroundColor()) ? null
+                          : (req.backgroundColor() != null ? req.backgroundColor() : existing.getBackgroundColor());
         String dac        = req.decisionAppearanceConfig() != null
                           ? req.decisionAppearanceConfig()
                           : existing.getDecisionAppearanceConfig();
@@ -106,6 +109,9 @@ public class GraphService {
         double posY       = req.posY() != null ? req.posY() : existing.getPosY();
 
         if (name.isBlank()) throw new ProjectException("Node name must not be blank");
+        if (bgColor != null && !HEX_COLOR_PATTERN.matcher(bgColor).matches()) {
+            throw new ProjectException("Node background color must be a hex color like #000000");
+        }
 
         jdbc.update("""
             UPDATE nodes SET name=?, is_end=?, auto_continue=?, loop_video=?, background_color=?,
@@ -131,6 +137,10 @@ public class GraphService {
         jdbc.update("UPDATE nodes SET is_root = 0");
         jdbc.update("UPDATE nodes SET is_root = 1 WHERE id = ?", id);
         return getNode(id);
+    }
+
+    public void clearRoot() {
+        projectService.requireJdbc().update("UPDATE nodes SET is_root = 0");
     }
 
     // ── Edges ─────────────────────────────────────────────────────────────────
@@ -180,7 +190,7 @@ public class GraphService {
             condOrder = req.sourceConditionOrder();
         }
 
-        String id = UUID.randomUUID().toString();
+        String id = req.id() != null && !req.id().isBlank() ? req.id().trim() : UUID.randomUUID().toString();
         jdbc.update("""
             INSERT INTO edges (id, source_node_id, target_node_id,
                                source_decision_key, source_condition_order, source_condition_name)
