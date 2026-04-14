@@ -330,7 +330,7 @@ export async function restoreEdgeSnapshot(snapshot: GraphEdgeSnapshot) {
     sourceConditionName: snapshot.edge.sourceConditionName,
   })
 
-  if (!snapshot.transition) {
+  if (!snapshot.transition || !snapshot.transition.transitionAllowed) {
     return
   }
 
