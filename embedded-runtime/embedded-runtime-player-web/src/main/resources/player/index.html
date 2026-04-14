@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Arvexis Embedded Player</title>
+  <link rel="stylesheet" href="__ARVEXIS_PLAYER_ASSETS_PATH__/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Arvexis Embedded Runtime</p>
+        <h1 id="project-name">Loading…</h1>
+      </div>
+      <div class="toolbar">
+        <label>
+          <span>Locale</span>
+          <select id="locale-select">
+            <option value="">Default</option>
+          </select>
+        </label>
+        <button id="refresh-button" type="button">Reload</button>
+        <button id="restart-button" type="button">Restart</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="player-card">
+        <video id="scene-video" controls playsinline></video>
+        <div id="subtitle-box" class="subtitle-box"></div>
+        <div id="status" class="status">Preparing player…</div>
+      </section>
+
+      <aside class="sidebar">
+        <section class="panel">
+          <h2>Scene</h2>
+          <dl class="meta-list">
+            <div><dt>Scene ID</dt><dd id="scene-id">-</dd></div>
+            <div><dt>Scene Name</dt><dd id="scene-name">-</dd></div>
+            <div><dt>Session ID</dt><dd id="session-id">-</dd></div>
+          </dl>
+        </section>
+
+        <section class="panel">
+          <h2>Decisions</h2>
+          <div id="decisions" class="decisions"></div>
+        </section>
+
+        <section class="panel">
+          <h2>Variables</h2>
+          <pre id="variables" class="variables">{}</pre>
+        </section>
+      </aside>
+    </main>
+  </div>
+
+  <script>
+    window.ARVEXIS_RUNTIME_CONFIG = __ARVEXIS_RUNTIME_CONFIG__;
+  </script>
+  <script type="module" src="__ARVEXIS_PLAYER_ASSETS_PATH__/game.js"></script>
+</body>
+</html>

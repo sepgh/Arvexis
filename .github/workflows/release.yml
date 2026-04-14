@@ -101,6 +101,16 @@ jobs:
             project_path: runtime
             artifact: arvexis-runtime-jar
             jar: runtime/target/runtime-*.jar
+          - name: Embedded Runtime Libraries
+            component: embedded-runtime
+            project_path: embedded-runtime
+            artifact: arvexis-embedded-runtime-jars
+            jar: |
+              embedded-runtime/embedded-runtime-core/target/embedded-runtime-core-*.jar
+              embedded-runtime/embedded-runtime-player-web/target/embedded-runtime-player-web-*.jar
+              embedded-runtime/embedded-runtime-spring-boot-starter/target/embedded-runtime-spring-boot-starter-*.jar
+              embedded-runtime/embedded-runtime-spring-data-jpa/target/embedded-runtime-spring-data-jpa-*.jar
+              embedded-runtime/embedded-runtime-testkit/target/embedded-runtime-testkit-*.jar
 
     steps:
       - name: Checkout
@@ -179,6 +189,21 @@ jobs:
           RUNTIME_JAR=$(find artifacts/arvexis-runtime-jar -name "runtime-*.jar" ! -name "original-*" | head -1)
           if [ -n "$RUNTIME_JAR" ]; then cp "$RUNTIME_JAR" release/arvexis-runtime.jar; else echo "Runtime JAR not found"; fi
 
+          EMBEDDED_CORE_JAR=$(find artifacts/arvexis-embedded-runtime-jars -name "embedded-runtime-core-*.jar" ! -name "original-*" | head -1)
+          if [ -n "$EMBEDDED_CORE_JAR" ]; then cp "$EMBEDDED_CORE_JAR" release/arvexis-embedded-runtime-core.jar; else echo "Embedded runtime core JAR not found"; fi
+
+          EMBEDDED_PLAYER_WEB_JAR=$(find artifacts/arvexis-embedded-runtime-jars -name "embedded-runtime-player-web-*.jar" ! -name "original-*" | head -1)
+          if [ -n "$EMBEDDED_PLAYER_WEB_JAR" ]; then cp "$EMBEDDED_PLAYER_WEB_JAR" release/arvexis-embedded-runtime-player-web.jar; else echo "Embedded runtime player web JAR not found"; fi
+
+          EMBEDDED_STARTER_JAR=$(find artifacts/arvexis-embedded-runtime-jars -name "embedded-runtime-spring-boot-starter-*.jar" ! -name "original-*" | head -1)
+          if [ -n "$EMBEDDED_STARTER_JAR" ]; then cp "$EMBEDDED_STARTER_JAR" release/arvexis-embedded-runtime-spring-boot-starter.jar; else echo "Embedded runtime starter JAR not found"; fi
+
+          EMBEDDED_JPA_JAR=$(find artifacts/arvexis-embedded-runtime-jars -name "embedded-runtime-spring-data-jpa-*.jar" ! -name "original-*" | head -1)
+          if [ -n "$EMBEDDED_JPA_JAR" ]; then cp "$EMBEDDED_JPA_JAR" release/arvexis-embedded-runtime-spring-data-jpa.jar; else echo "Embedded runtime JPA JAR not found"; fi
+
+          EMBEDDED_TESTKIT_JAR=$(find artifacts/arvexis-embedded-runtime-jars -name "embedded-runtime-testkit-*.jar" ! -name "original-*" | head -1)
+          if [ -n "$EMBEDDED_TESTKIT_JAR" ]; then cp "$EMBEDDED_TESTKIT_JAR" release/arvexis-embedded-runtime-testkit.jar; else echo "Embedded runtime testkit JAR not found"; fi
+
           ls -la release/
 
       - name: Create draft release
@@ -205,6 +230,16 @@ jobs:
             | Windows x64 (native, no JVM) | `arvexis-runtime-windows-x64.exe` |
             | All platforms (requires Java 21) | `arvexis-runtime.jar` |
 
+            ## Embedded runtime libraries
+
+            | Library | File |
+            |---------|------|
+            | Core facade/contracts | `arvexis-embedded-runtime-core.jar` |
+            | Embeddable player assets | `arvexis-embedded-runtime-player-web.jar` |
+            | Spring Boot starter | `arvexis-embedded-runtime-spring-boot-starter.jar` |
+            | Spring Data/JPA reference adapter | `arvexis-embedded-runtime-spring-data-jpa.jar` |
+            | Test helpers | `arvexis-embedded-runtime-testkit.jar` |
+
             Exported game packages no longer bundle the runtime. Download a runtime artifact from this release and place it next to the exported `start.sh` or `start.bat` launcher before running the package.
 
             **Run the editor JAR:**
@@ -224,4 +259,9 @@ jobs:
             release/arvexis-runtime-linux-x64
             release/arvexis-runtime-windows-x64.exe
             release/arvexis-runtime.jar
+            release/arvexis-embedded-runtime-core.jar
+            release/arvexis-embedded-runtime-player-web.jar
+            release/arvexis-embedded-runtime-spring-boot-starter.jar
+            release/arvexis-embedded-runtime-spring-data-jpa.jar
+            release/arvexis-embedded-runtime-testkit.jar
           fail_on_unmatched_files: false

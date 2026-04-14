@@ -1,0 +1,158 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, system-ui, sans-serif;
+  background: #08111f;
+  color: #e7edf7;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: linear-gradient(180deg, #0c1628 0%, #08111f 100%);
+}
+
+.app-shell {
+  padding: 24px;
+}
+
+.app-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 12px;
+  color: #7aa2ff;
+}
+
+h1, h2 {
+  margin: 0;
+}
+
+.toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: end;
+  flex-wrap: wrap;
+}
+
+.toolbar label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: #94a8c8;
+}
+
+button, select {
+  border: 1px solid #2e4367;
+  background: #13213a;
+  color: #edf3ff;
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+button {
+  cursor: pointer;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr);
+  gap: 24px;
+}
+
+.player-card, .panel {
+  border: 1px solid rgba(122, 162, 255, 0.18);
+  background: rgba(13, 23, 40, 0.85);
+  border-radius: 18px;
+  box-shadow: 0 20px 80px rgba(0, 0, 0, 0.3);
+}
+
+.player-card {
+  padding: 16px;
+}
+
+#scene-video {
+  width: 100%;
+  border-radius: 14px;
+  background: #000;
+  aspect-ratio: 16 / 9;
+}
+
+.subtitle-box {
+  min-height: 28px;
+  margin-top: 12px;
+  font-size: 16px;
+  color: #f8fbff;
+}
+
+.status {
+  margin-top: 12px;
+  color: #9ab1d7;
+}
+
+.sidebar {
+  display: grid;
+  gap: 16px;
+}
+
+.panel {
+  padding: 16px;
+}
+
+.meta-list {
+  display: grid;
+  gap: 12px;
+  margin: 12px 0 0;
+}
+
+.meta-list div {
+  display: grid;
+  gap: 4px;
+}
+
+.meta-list dt {
+  font-size: 12px;
+  color: #8fa5c6;
+}
+
+.meta-list dd {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
+
+.decisions {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.decision-button {
+  width: 100%;
+  text-align: left;
+}
+
+.variables {
+  margin: 12px 0 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: #09111f;
+  overflow: auto;
+  max-height: 260px;
+}
+
+@media (max-width: 1000px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}

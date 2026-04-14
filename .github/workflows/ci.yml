@@ -46,11 +46,28 @@ jobs:
           cd runtime
           mvn package -DskipTests -q
 
+      - name: Build embedded runtime modules
+        run: |
+          cd embedded-runtime
+          mvn package -DskipTests -q
+
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
         with:
           name: arvexis-editor-jar
           path: editor/backend/target/editor-backend-*.jar
+          retention-days: 14
+
+      - name: Upload embedded runtime artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: arvexis-embedded-runtime-jars
+          path: |
+            embedded-runtime/embedded-runtime-core/target/embedded-runtime-core-*.jar
+            embedded-runtime/embedded-runtime-player-web/target/embedded-runtime-player-web-*.jar
+            embedded-runtime/embedded-runtime-spring-boot-starter/target/embedded-runtime-spring-boot-starter-*.jar
+            embedded-runtime/embedded-runtime-spring-data-jpa/target/embedded-runtime-spring-data-jpa-*.jar
+            embedded-runtime/embedded-runtime-testkit/target/embedded-runtime-testkit-*.jar
           retention-days: 14
 
   test:
@@ -76,4 +93,9 @@ jobs:
       - name: Run runtime tests
         run: |
           cd runtime
+          mvn test -q
+
+      - name: Run embedded runtime tests
+        run: |
+          cd embedded-runtime
           mvn test -q
