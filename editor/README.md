@@ -131,7 +131,7 @@ All settings live in `src/main/resources/application.properties`:
 | `server.port` | `8080` | HTTP port |
 | `editor.db.path` | `~/.engine-editor/editor.db` | Startup SQLite path |
 | `editor.log.path` | `~/.engine-editor/logs` | Log file directory |
-| `logging.level.com.engine.editor` | `INFO` | Application log level (`DEBUG`, `INFO`, `WARN`, `ERROR`) |
+| `logging.level.io.github.sepgh.arvexis.editor` | `INFO` | Application log level (`DEBUG`, `INFO`, `WARN`, `ERROR`) |
 
 All properties can be overridden at runtime via CLI flags:
 
@@ -139,7 +139,7 @@ All properties can be overridden at runtime via CLI flags:
 java -jar arvexis-editor.jar \
   --server.port=9090 \
   --editor.log.path=/var/log/arvexis \
-  --logging.level.com.engine.editor=DEBUG
+  --logging.level.io.github.sepgh.arvexis.editor=DEBUG
 ```
 
 Test overrides are in `src/test/resources/application-test.properties`.
@@ -158,7 +158,7 @@ Log output goes to **both the console and a rolling log file**.
 
 **Rotation policy**: rotates daily and when the file exceeds 10 MB; keeps 30 days of archives (200 MB total cap).
 
-**Log levels** — set via `--logging.level.com.engine.editor=<LEVEL>`:
+**Log levels** — set via `--logging.level.io.github.sepgh.arvexis.editor=<LEVEL>`:
 
 | Level | What is logged |
 |-------|---------------|
@@ -167,7 +167,7 @@ Log output goes to **both the console and a rolling log file**.
 | `INFO` | Normal operation (default) |
 | `DEBUG` | Full detail including every FFmpeg command and its stderr output |
 
-**FFmpeg output** is always logged at `DEBUG` level (logger `com.engine.editor.ffmpeg`). Setting the application to `DEBUG` captures the complete FFmpeg command line and all stderr lines (progress, encoder stats, errors).
+**FFmpeg output** is always logged at `DEBUG` level (logger `io.github.sepgh.arvexis.editor.ffmpeg`). Setting the application to `DEBUG` captures the complete FFmpeg command line and all stderr lines (progress, encoder stats, errors).
 
 **Browser client logs** — `console.warn` and `console.error` calls from the React frontend are automatically forwarded to the server via `POST /api/logs` and appear in the same log file with the prefix `[browser]`.
 

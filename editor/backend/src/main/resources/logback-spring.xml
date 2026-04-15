@@ -7,19 +7,19 @@
         Configurable at runtime via Spring properties / CLI flags:
 
           editor.log.path                    Log directory (default: ~/.engine-editor/logs)
-          logging.level.com.engine.editor    Application log level (default: INFO)
+          logging.level.io.github.sepgh.arvexis.editor    Application log level (default: INFO)
 
         Example overrides:
           java -jar arvexis-editor.jar
                editor.log.path=/var/log/arvexis
-               logging.level.com.engine.editor=DEBUG
+               logging.level.io.github.sepgh.arvexis.editor=DEBUG
     -->
 
     <springProperty scope="context" name="LOG_PATH"
                     source="editor.log.path"
                     defaultValue="${user.home}/.engine-editor/logs"/>
     <springProperty scope="context" name="APP_LOG_LEVEL"
-                    source="logging.level.com.engine.editor"
+                    source="logging.level.io.github.sepgh.arvexis.editor"
                     defaultValue="INFO"/>
 
     <property name="LOG_FILE"        value="${LOG_PATH}/arvexis-editor.log"/>
@@ -51,7 +51,7 @@
     </appender>
 
     <!-- FFmpeg package: always DEBUG so all process output is captured -->
-    <logger name="com.engine.editor.ffmpeg" level="DEBUG" additivity="false">
+    <logger name="io.github.sepgh.arvexis.editor.ffmpeg" level="DEBUG" additivity="false">
         <appender-ref ref="CONSOLE"/>
         <appender-ref ref="FILE"/>
     </logger>
@@ -63,7 +63,7 @@
     </logger>
 
     <!-- Application loggers -->
-    <logger name="com.engine.editor" level="${APP_LOG_LEVEL}" additivity="false">
+    <logger name="io.github.sepgh.arvexis.editor" level="${APP_LOG_LEVEL}" additivity="false">
         <appender-ref ref="CONSOLE"/>
         <appender-ref ref="FILE"/>
     </logger>

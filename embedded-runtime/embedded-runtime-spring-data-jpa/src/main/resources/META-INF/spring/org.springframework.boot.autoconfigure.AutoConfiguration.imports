@@ -1,1 +1,1 @@
-com.engine.embeddedruntime.jpa.EmbeddedRuntimeJpaAutoConfiguration
+io.github.sepgh.arvexis.embeddedruntime.jpa.EmbeddedRuntimeJpaAutoConfiguration

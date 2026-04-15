@@ -1,0 +1,43 @@
+package io.github.sepgh.arvexis.editor.model;
+
+public class GraphEdge {
+
+    private String id;
+    private String sourceNodeId;
+    private String sourceDecisionKey;
+    private Integer sourceConditionOrder;
+    private String sourceConditionName;
+    private String targetNodeId;
+    private EdgeTransitionData transition;
+    private AmbientConfigData ambient;
+
+    public GraphEdge() {}
+
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
+
+    public String getSourceNodeId() { return sourceNodeId; }
+    public void setSourceNodeId(String sourceNodeId) { this.sourceNodeId = sourceNodeId; }
+
+    public String getSourceDecisionKey() { return sourceDecisionKey; }
+    public void setSourceDecisionKey(String sourceDecisionKey) { this.sourceDecisionKey = sourceDecisionKey; }
+
+    public Integer getSourceConditionOrder() { return sourceConditionOrder; }
+    public void setSourceConditionOrder(Integer sourceConditionOrder) {
+        this.sourceConditionOrder = sourceConditionOrder;
+    }
+
+    public String getSourceConditionName() { return sourceConditionName; }
+    public void setSourceConditionName(String sourceConditionName) {
+        this.sourceConditionName = sourceConditionName;
+    }
+
+    public String getTargetNodeId() { return targetNodeId; }
+    public void setTargetNodeId(String targetNodeId) { this.targetNodeId = targetNodeId; }
+
+    public EdgeTransitionData getTransition() { return transition; }
+    public void setTransition(EdgeTransitionData transition) { this.transition = transition; }
+
+    public AmbientConfigData getAmbient() { return ambient; }
+    public void setAmbient(AmbientConfigData ambient) { this.ambient = ambient; }
+}

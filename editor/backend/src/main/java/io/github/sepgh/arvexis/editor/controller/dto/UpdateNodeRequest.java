@@ -1,0 +1,19 @@
+package io.github.sepgh.arvexis.editor.controller.dto;
+
+public record UpdateNodeRequest(
+    String name,
+    Boolean isEnd,
+    Boolean autoContinue,
+    Boolean loopVideo,
+    String backgroundColor,
+    Boolean clearBackgroundColor,
+    String decisionAppearanceConfig,
+    String musicAssetId,
+    Boolean clearMusicAsset,
+    AmbientConfigRequest ambient,
+    Boolean hideDecisionButtons,
+    Boolean showDecisionInputIndicator,
+    Boolean clearDecisionInputModeOverride,
+    Double posX,
+    Double posY
+) {}

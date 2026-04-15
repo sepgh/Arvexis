@@ -142,6 +142,19 @@ jobs:
         working-directory: ${{ matrix.project_path }}
         run: mvn package -DskipTests -q
 
+      - name: Verify packaged JAR outputs
+        shell: bash
+        run: |
+          while IFS= read -r pattern; do
+            if [ -z "$pattern" ]; then
+              continue
+            fi
+            if ! compgen -G "$pattern" > /dev/null; then
+              echo "Missing packaged artifact for pattern: $pattern"
+              exit 1
+            fi
+          done <<< "${{ matrix.jar }}"
+
       - name: Upload JAR
         uses: actions/upload-artifact@v4
         with:

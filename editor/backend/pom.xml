@@ -11,7 +11,7 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.engine</groupId>
+    <groupId>io.github.sepgh.arvexis</groupId>
     <artifactId>editor-backend</artifactId>
     <version>1.3.0-RELEASE</version>
     <name>editor-backend</name>

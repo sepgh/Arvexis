@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.engine</groupId>
+    <groupId>io.github.sepgh.arvexis</groupId>
     <artifactId>runtime</artifactId>
     <version>1.3.0-RELEASE</version>
     <name>Arvexis — Compiled Runtime</name>
@@ -42,6 +42,26 @@
                 </configuration>
             </plugin>
 
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.6.0</version>
+                <executions>
+                    <execution>
+                        <id>add-shared-game-sources</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${project.basedir}/../shared/game/src/main/java</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
             <!-- Fat JAR so the runtime can run anywhere with just `java -jar runtime.jar` -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -55,7 +75,7 @@
                             <createDependencyReducedPom>false</createDependencyReducedPom>
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>com.engine.runtime.Main</mainClass>
+                                    <mainClass>io.github.sepgh.arvexis.runtime.Main</mainClass>
                                 </transformer>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                             </transformers>
@@ -87,7 +107,7 @@
                         <version>0.10.2</version>
                         <configuration>
                             <imageName>arvexis-runtime</imageName>
-                            <mainClass>com.engine.runtime.Main</mainClass>
+                            <mainClass>io.github.sepgh.arvexis.runtime.Main</mainClass>
                             <buildArgs>
                                 <buildArg>-H:+ReportExceptionStackTraces</buildArg>
                             </buildArgs>

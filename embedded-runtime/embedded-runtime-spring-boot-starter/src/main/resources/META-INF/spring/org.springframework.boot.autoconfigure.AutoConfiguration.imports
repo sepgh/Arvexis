@@ -1,1 +1,1 @@
-com.engine.embeddedruntime.spring.EmbeddedRuntimeAutoConfiguration
+io.github.sepgh.arvexis.embeddedruntime.spring.EmbeddedRuntimeAutoConfiguration
